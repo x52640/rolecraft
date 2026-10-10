@@ -62,6 +62,38 @@ export function createProvidersService(
     return next;
   };
 
+  const refresh = async (): Promise<ServiceStatus> => {
+    const check = await probe.check();
+    // 重新檢查不呼叫模型，無法得知額度；清掉舊的額度不足標記，下次執行再由工具回報。
+    return update('claude', {
+      state: claudeState(check, false),
+      login: check.login,
+      eligibility: check.eligibility,
+      subscriptionOnly: check.subscriptionOnly,
+      checkedAt: check.checkedAt,
+    });
+  };
+
+  const inFlight = new Map<string, Promise<SelectResult>>();
+
+  const verify = async (entry: CandidateEntry): Promise<SelectResult> => {
+    const result = await probe.verifyModel(entry.model);
+    if (result.record) lastRunCheck = result.record;
+    if (result.quotaExhausted) update('claude', { state: 'quota_exhausted' });
+    if (result.blocked) {
+      // 執行前被擋：先前的「可用」已不可信。重新檢查更新狀態；檢查仍說可用（例如閘門暫時擋下）也不保留可用。
+      const fresh = await refresh().catch(() => null);
+      if (!fresh || fresh.state === 'available') {
+        update('claude', { state: 'eligibility_unknown', checkedAt: new Date().toISOString() });
+      }
+    }
+    // 只有短驗證通過才記為選定；失敗或無法確認時保留原本的選定。
+    if (result.verification === 'passed') {
+      update('claude', { selectedCandidateId: entry.candidate.candidateId });
+    }
+    return { kind: 'verified', verification: result.verification };
+  };
+
   return {
     get lastRunCheck() {
       return lastRunCheck;
@@ -71,35 +103,29 @@ export function createProvidersService(
       return Promise.resolve(ALL_SERVICES.map(current));
     },
 
-    async recheck(service) {
+    recheck(service) {
       // Codex、Antigravity 首版「尚未支援」：不檢查、不啟動任何程式。
-      if (service !== 'claude') return current(service);
-      const check = await probe.check();
-      // 重新檢查不呼叫模型，無法得知額度；清掉舊的額度不足標記，下次執行再由工具回報。
-      return update('claude', {
-        state: claudeState(check, false),
-        login: check.login,
-        eligibility: check.eligibility,
-        subscriptionOnly: check.subscriptionOnly,
-        checkedAt: check.checkedAt,
-      });
+      if (service !== 'claude') return Promise.resolve(current(service));
+      return refresh();
     },
 
     listCandidates(service) {
       return Promise.resolve(candidatesOf(service).map((entry) => entry.candidate));
     },
 
-    async selectCandidate(service, candidateId): Promise<SelectResult> {
+    selectCandidate(service, candidateId): Promise<SelectResult> {
       const entry = candidatesOf(service).find((e) => e.candidate.candidateId === candidateId);
-      if (!entry) return { kind: 'unknown_candidate' };
-      const result = await probe.verifyModel(entry.model);
-      if (result.record) lastRunCheck = result.record;
-      if (result.quotaExhausted) update('claude', { state: 'quota_exhausted' });
-      // 只有短驗證通過才記為選定；失敗或無法確認時保留原本的選定。
-      if (result.verification === 'passed') {
-        update('claude', { selectedCandidateId: entry.candidate.candidateId });
+      if (!entry) return Promise.resolve({ kind: 'unknown_candidate' });
+      // 同一候選進行中的驗證合併成一次（不重複花模型呼叫）。
+      const running = inFlight.get(entry.candidate.candidateId);
+      if (running) return running;
+      // 不是「可用」就不呼叫模型（未檢查、被擋、額度不足等）。
+      if (current('claude').state !== 'available') {
+        return Promise.resolve({ kind: 'not_available' });
       }
-      return { kind: 'verified', verification: result.verification };
+      const task = verify(entry).finally(() => inFlight.delete(entry.candidate.candidateId));
+      inFlight.set(entry.candidate.candidateId, task);
+      return task;
     },
   };
 }

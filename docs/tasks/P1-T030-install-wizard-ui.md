@@ -83,7 +83,7 @@ npm run verify
 ## 完成結果
 
 - helper `apps/helper/src/handlers/providers/`：
-  - `claude-probe.ts`：Claude 檢查只走 `@rolecraft/providers` 既有路徑。重新檢查＝`checkConnection`（安裝、登入、資格、R6 總結）＋`createClaudeService().ensureVersion`（R5：版本閘門）；模型短驗證＝`ensureVersion` 後 `verifyClaudeModel`（經 R6 確認、強制串流守門，留下 RunCheckRecord）。deps 一律經 `claudeRunDeps(..., { acceptVersion: gate.isAccepted })`。helper 不組命令列、不讀憑證；`process.env` 只交給 core 清理。
+  - `claude-probe.ts`：Claude 檢查只走 `@rolecraft/providers` 既有路徑。重新檢查＝`checkConnection`（安裝、登入、資格、R6 總結）＋`createClaudeService().ensureVersion`（R5：版本閘門）；模型短驗證＝`ensureVersion` 後 `verifyClaudeModel`（經 R6 確認、強制串流守門，留下 RunCheckRecord）。deps 一律經 `helperClaudeDeps(..., { acceptVersion: gate.isAccepted })`（`services/claude-deps.ts`，內部即 `claudeRunDeps`）。helper 不組命令列、不讀憑證；`process.env` 只交給 core 清理。
   - `state.ts`：狀態判定。找不到 CLI → 工具缺少；版本讀不到、未驗證或服務停用（R5）→ 尚未支援；訂閱登入未通過 → 未登入；R6 明確未通過（例：apiKeyHelper）→ 尚未支援（S8）；R6 或資格無法確認 → 資格未知；短驗證回報額度用完 → 額度不足；全部通過才可用。Codex、Antigravity 固定尚未支援，不檢查、不啟動程式。
   - `providers-service.ts`：狀態、候選對照、選定結果、最近一次 RunCheckRecord 存記憶體。候選 ID 由 helper 隨機配發（`c`＋32 hex，同一程序內穩定），候選別名取 providers 的 `CLAUDE_MODEL_CANDIDATES`；選定只拿 ID 查自己的對照表，查不到（模型名稱、別家 ID、旗標形狀）回 `invalid_request`，錯誤訊息不回填請求內容；短驗證通過才記為選定，失敗保留原選定。
   - `service.ts`：`ProvidersService` 方法皆選填，未接上的方法 handler 回 `not_implemented`（分派表測試 `providers: {}` 照常通過）。
@@ -99,4 +99,13 @@ npm run verify
   - 狀態、選定模型、RunCheckRecord 只在記憶體，helper 重啟即消失；需 storage 接線 Task 保存（S9-2 證據也在此）。
   - Claude 服務實例：本群組自己建一個 `createClaudeService()`；一般執行（P1-T040 等）若另建一個，版本閘門的互斥不跨實例。應由服務組裝共用同一個（`createProvidersService({ service })` 已可注入）。
 - 手動驗證：未做（需擁有者真實帳號與瀏覽器）。
+
+### 對抗驗證修正
+
+| 缺陷 | 修正 | 測試 |
+| --- | --- | --- |
+| （屬實）選定時短驗證在執行前被擋（版本閘門、R6 未過、未執行），狀態仍留著舊的「可用」 | `verifyModel` 回 `blocked`；被擋時重跑 `probe.check()` 更新狀態與 checkedAt，檢查仍說可用或檢查丟錯也降為資格未知；編輯器 `ModelPicker` 任何非 passed 結果（含錯誤）都重新讀狀態 | `providers.test.ts`：recheck → available、select 被擋 → 不再 available；`SettingsPage.test.ts`：被擋／invalid_request 後重新讀狀態、模型選擇消失 |
+| （加固）同一候選並行選定會重複花模型呼叫；狀態不是可用時仍會呼叫模型 | 同一候選進行中的驗證共用同一個 Promise；狀態不是 available 回 `not_available`（handler 回 invalid_request），不呼叫模型 | `providers.test.ts`：10 個並行 select → 1 次 verifyModel；額度不足／未檢查時 select → 0 次 |
+
+- 配合 P1-T040：`claude-probe.ts` 改經 `helperClaudeDeps` 建立 Claude 執行 deps（`services/claude-deps.test.ts` 靜態檢查）。
 

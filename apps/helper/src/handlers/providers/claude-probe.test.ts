@@ -116,7 +116,10 @@ describe('Claude 檢查（假 spawn）', () => {
     expect(check.isolation).toBe('failed');
     expect(check.subscriptionOnly).not.toBe('passed');
     expect(fake.calls.some((c) => c.args.includes('-p') || c.args.includes('--print'))).toBe(false);
-    expect(await probe.verifyModel('haiku')).toMatchObject({ verification: 'unknown' });
+    expect(await probe.verifyModel('haiku')).toMatchObject({
+      verification: 'unknown',
+      blocked: true,
+    });
     expect(fake.calls.filter((c) => c.args[0] !== '--version' && c.args[0] !== 'auth')).toEqual([]);
   });
 
@@ -162,7 +165,11 @@ describe('Claude 檢查（假 spawn）', () => {
     const svc = createProvidersService({ claudeProbe: probe, newCandidateId: () => `cand${i++}` });
     const [first] = await svc.listCandidates('claude');
     expect(first?.candidateId).toBe('cand0');
-    await svc.selectCandidate('claude', 'cand0');
+    expect((await svc.recheck('claude')).state).toBe('available');
+    expect(await svc.selectCandidate('claude', 'cand0')).toEqual({
+      kind: 'verified',
+      verification: 'passed',
+    });
     const run = fake.calls.find((c) => c.args.includes('--model'));
     const model = run?.args[run.args.indexOf('--model') + 1];
     expect(model).toBe('haiku');

@@ -12,11 +12,11 @@ interface ProviderCardProps {
   status: ServiceStatus;
   busy: boolean;
   onRecheck: () => void;
-  onSelected: () => void;
+  onSettled: () => void;
 }
 
 /** 單一服務的狀態卡：狀態、各項檢查、下一步；可用時才顯示模型選擇。 */
-export function ProviderCard({ status, busy, onRecheck, onSelected }: ProviderCardProps) {
+export function ProviderCard({ status, busy, onRecheck, onSettled }: ProviderCardProps) {
   const name = SERVICE_NAMES[status.service];
   const text = STATE_TEXT[status.state];
   const supported = isFirstVersionSupported(status.service);
@@ -47,7 +47,7 @@ export function ProviderCard({ status, busy, onRecheck, onSelected }: ProviderCa
             <ModelPicker
               service={status.service}
               selectedCandidateId={status.selectedCandidateId}
-              onSelected={onSelected}
+              onSettled={onSettled}
             />
           ) : null}
         </>

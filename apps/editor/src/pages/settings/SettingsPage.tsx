@@ -74,7 +74,7 @@ export function SettingsPage() {
             status={status}
             busy={checking === status.service}
             onRecheck={() => void recheck(status.service)}
-            onSelected={() => void load()}
+            onSettled={() => void load()}
           />
         ))}
       </div>

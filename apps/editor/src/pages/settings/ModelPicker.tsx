@@ -7,15 +7,15 @@ import { type ServiceCandidate, VERIFY_TEXT } from './labels.ts';
 interface ModelPickerProps {
   service: Provider;
   selectedCandidateId: string | null;
-  /** 選定成功後讓頁面重新讀狀態 */
-  onSelected: () => void;
+  /** 選定結束（任何結果）後讓頁面重新讀狀態 */
+  onSettled: () => void;
 }
 
 /**
  * 模型選擇：候選由 helper 列出（ID 是 helper 配發的），只能從清單挑，不能自行輸入模型名稱。
  * 選定時 helper 會先做執行前確認，再用訂閱做一次極短呼叫驗證。
  */
-export function ModelPicker({ service, selectedCandidateId, onSelected }: ModelPickerProps) {
+export function ModelPicker({ service, selectedCandidateId, onSettled }: ModelPickerProps) {
   const bridge = useBridge();
   const [candidates, setCandidates] = useState<readonly ServiceCandidate[] | null>(null);
   const [choice, setChoice] = useState<string>(selectedCandidateId ?? '');
@@ -45,11 +45,13 @@ export function ModelPicker({ service, selectedCandidateId, onSelected }: ModelP
     setBusy(false);
     if (!res.ok) {
       setMessage(`無法選定：${res.error.message}`);
+      onSettled();
       return;
     }
     const outcome: CheckOutcome = res.verification;
     setMessage(VERIFY_TEXT[outcome]);
-    if (outcome === 'passed') onSelected();
+    // 不論結果都重新讀狀態：被擋下時 helper 已把服務降為不可用，畫面不能留著舊的「可用」。
+    onSettled();
   };
 
   if (candidates === null) return message ? <p role="alert">{message}</p> : <p>讀取模型清單中…</p>;

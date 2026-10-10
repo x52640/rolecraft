@@ -25,7 +25,12 @@ const CANDIDATES = [
   { candidateId: 'c2', label: 'Claude Sonnet' },
 ];
 
-function fakeHelper(claude: Partial<ServiceStatus>, replies: Record<string, unknown> = {}) {
+function fakeHelper(
+  claude: Partial<ServiceStatus>,
+  replies: Record<string, unknown> = {},
+  /** select 被擋下時：回 unknown，helper 端狀態改成這個 */
+  blockedTo?: Partial<ServiceStatus>,
+) {
   const requests: { op: string; payload: Record<string, unknown> }[] = [];
   let claudeStatus = status({ service: 'claude', ...claude });
   const send = vi.fn((raw: unknown) => {
@@ -45,6 +50,10 @@ function fakeHelper(claude: Partial<ServiceStatus>, replies: Record<string, unkn
       case 'providers.list_candidates':
         return Promise.resolve({ ok: true, candidates: CANDIDATES });
       case 'providers.select_candidate':
+        if (blockedTo) {
+          claudeStatus = { ...claudeStatus, ...blockedTo };
+          return Promise.resolve({ ok: true, verification: 'unknown' });
+        }
         claudeStatus = {
           ...claudeStatus,
           selectedCandidateId: req.payload['candidateId'] as string,
@@ -143,6 +152,29 @@ describe('<SettingsPage />', () => {
       payload: { service: 'claude', candidateId: 'c2' },
     });
     await waitFor(() => expect(screen.getByText(/目前使用：Claude Sonnet/)).toBeTruthy());
+  });
+
+  it.each([
+    ['被擋下（unknown）', undefined],
+    [
+      '服務已不可用（invalid_request）',
+      { ok: false, error: { code: 'invalid_request', message: 'x' } },
+    ],
+  ])('選定結果 %s：重新讀狀態，不留著舊的可用與模型選擇', async (_name, reply) => {
+    const { transport, requests } = fakeHelper(
+      { state: 'available' },
+      reply ? { 'providers.select_candidate': reply } : {},
+      { state: 'unsupported', subscriptionOnly: 'failed' },
+    );
+    renderPage(transport);
+    const select = await screen.findByRole('combobox');
+    fireEvent.change(select, { target: { value: 'c1' } });
+    fireEvent.click(screen.getByRole('button', { name: '選定並驗證' }));
+    await waitFor(() => expect(requests.filter((r) => r.op === 'providers.status').length).toBe(2));
+    if (!reply) {
+      await within(card(/Claude/)).findByText('尚未支援');
+      expect(screen.queryByRole('group', { name: '模型' })).toBeNull();
+    }
   });
 
   it('連不到 helper：顯示錯誤，不顯示任何可用狀態', async () => {

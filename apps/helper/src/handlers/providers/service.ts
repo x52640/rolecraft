@@ -9,9 +9,13 @@ export type ServiceCandidate = Extract<
   { ok: true }
 >['candidates'][number];
 
-/** 選定候選的結果：ID 不在 helper 自己列過的清單 → unknown_candidate（handler 回 invalid_request）。 */
+/**
+ * 選定候選的結果：ID 不在 helper 自己列過的清單 → unknown_candidate；
+ * 服務目前不是「可用」→ not_available（不呼叫模型）。兩者 handler 都回 invalid_request。
+ */
 export type SelectResult =
   | { readonly kind: 'unknown_candidate' }
+  | { readonly kind: 'not_available' }
   | { readonly kind: 'verified'; readonly verification: CheckOutcome };
 
 export interface ProvidersService {

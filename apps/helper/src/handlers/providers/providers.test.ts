@@ -28,6 +28,7 @@ function fakeProbe(check: Partial<ClaudeCheck> = {}, model: Partial<ClaudeModelC
       Promise.resolve({
         verification: 'passed',
         quotaExhausted: false,
+        blocked: false,
         record: null,
         ...model,
       }),
@@ -156,7 +157,8 @@ describe('providers.list_candidates／select_candidate', () => {
   });
 
   it('清單內的 ID：用對照表的別名驗證；通過才記為選定', async () => {
-    const { probe, services } = setup();
+    const { probe, providers, services } = setup();
+    await providers.recheck('claude');
     const list = await providersListCandidates({ service: 'claude' }, services);
     if (!list.ok) throw new Error('應成功');
     const sonnet = list.candidates[1];
@@ -175,6 +177,7 @@ describe('providers.list_candidates／select_candidate', () => {
 
   it('驗證失敗或無法確認：保留原本選定；額度用完 → 額度不足', async () => {
     const { probe, providers, services } = setup();
+    await providers.recheck('claude');
     const list = await providersListCandidates({ service: 'claude' }, services);
     if (!list.ok) throw new Error('應成功');
     const [first, second] = list.candidates;
@@ -184,6 +187,7 @@ describe('providers.list_candidates／select_candidate', () => {
     probe.verifyModel.mockResolvedValueOnce({
       verification: 'failed',
       quotaExhausted: true,
+      blocked: false,
       record: null,
     });
     const res = await providersSelectCandidate(
@@ -197,6 +201,79 @@ describe('providers.list_candidates／select_candidate', () => {
       selectedCandidateId: first.candidateId,
     });
   });
+});
+
+describe('對抗驗證修正：被擋後更新狀態、合併重複驗證', () => {
+  async function firstCandidate(services: HelperServices): Promise<string> {
+    const list = await providersListCandidates({ service: 'claude' }, services);
+    if (!list.ok || !list.candidates[0]) throw new Error('缺候選');
+    return list.candidates[0].candidateId;
+  }
+
+  it('recheck → available，select 被擋（未執行）→ 重新檢查，state 不再是 available', async () => {
+    const { probe, providers, services } = setup({}, { verification: 'unknown', blocked: true });
+    expect((await providers.recheck('claude')).state).toBe('available');
+    probe.check.mockResolvedValueOnce({ ...OK_CHECK, isolation: 'failed' });
+    const res = await providersSelectCandidate(
+      { service: 'claude', candidateId: await firstCandidate(services) },
+      services,
+    );
+    expect(res).toEqual({ ok: true, verification: 'unknown' });
+    expect(probe.check).toHaveBeenCalledTimes(2);
+    const [claude] = await providers.status();
+    expect(claude?.state).toBe('unsupported');
+    expect(claude?.selectedCandidateId).toBeNull();
+  });
+
+  it('被擋後重新檢查仍說可用（或檢查丟錯）：也不保留 available，並更新 checkedAt', async () => {
+    const { probe, providers, services } = setup({}, { verification: 'unknown', blocked: true });
+    await providers.recheck('claude');
+    const id = await firstCandidate(services);
+    await providers.selectCandidate('claude', id);
+    let [claude] = await providers.status();
+    expect(claude?.state).toBe('eligibility_unknown');
+
+    await providers.recheck('claude');
+    probe.check.mockRejectedValueOnce(new Error('boom'));
+    await providers.selectCandidate('claude', id);
+    [claude] = await providers.status();
+    expect(claude?.state).toBe('eligibility_unknown');
+    expect(claude?.checkedAt).not.toBe(OK_CHECK.checkedAt);
+  });
+
+  it('10 個並行 select 同一候選 → 只呼叫 1 次 verifyModel', async () => {
+    const { probe, providers, services } = setup();
+    await providers.recheck('claude');
+    const candidateId = await firstCandidate(services);
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        providersSelectCandidate({ service: 'claude', candidateId }, services),
+      ),
+    );
+    expect(probe.verifyModel).toHaveBeenCalledTimes(1);
+    for (const r of results) expect(r).toEqual({ ok: true, verification: 'passed' });
+  });
+
+  it.each(['quota_exhausted', 'not_checked'] as const)(
+    '狀態不是 available（%s）時 select → invalid_request，0 次模型呼叫',
+    async (which) => {
+      const { probe, providers, services } = setup(
+        {},
+        { verification: 'failed', quotaExhausted: true },
+      );
+      const candidateId = await firstCandidate(services);
+      if (which === 'quota_exhausted') {
+        await providers.recheck('claude');
+        await providers.selectCandidate('claude', candidateId);
+        expect((await providers.status())[0]?.state).toBe('quota_exhausted');
+        probe.verifyModel.mockClear();
+      }
+      const res = await providersSelectCandidate({ service: 'claude', candidateId }, services);
+      valid('providers.select_candidate', res);
+      expect(res).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
+      expect(probe.verifyModel).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('未接服務與登入引導', () => {

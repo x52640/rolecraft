@@ -8,11 +8,12 @@ import {
   checkConnection,
   CLAUDE_MODEL_CANDIDATES,
   type ClaudeService,
-  claudeRunDeps,
   createClaudeService,
   type RunDeps,
   verifyClaudeModel,
 } from '@rolecraft/providers';
+
+import { helperClaudeDeps } from '../../services/claude-deps.ts';
 
 /** 一次重新檢查的結果（不含路徑、帳號、環境變數值）。 */
 export interface ClaudeCheck {
@@ -31,6 +32,8 @@ export interface ClaudeModelCheck {
   readonly verification: CheckOutcome;
   /** 額度用完（R9：停止、不重試） */
   readonly quotaExhausted: boolean;
+  /** 執行前就被擋下（版本閘門、R6 未通過、未執行）：服務狀態已不可信，需重新檢查 */
+  readonly blocked: boolean;
   /** R6 確認紀錄（S9-2 證據）；版本被擋、未執行時為 null */
   readonly record: RunCheckRecord | null;
 }
@@ -46,7 +49,7 @@ export interface ClaudeProbe {
 export interface ClaudeProbeOptions {
   /** 共用的 Claude 服務（版本閘門要與一般執行共用同一個才互斥）；預設自己建一個、不接保存介面 */
   readonly service?: ClaudeService;
-  /** 測試用：覆寫執行 deps（環境、時鐘、子程序啟動函式）；一律再經 claudeRunDeps 套串流守門 */
+  /** 測試用：覆寫執行 deps（環境、時鐘、子程序啟動函式）；一律再經 helperClaudeDeps 套串流守門 */
   readonly runDeps?: Partial<RunDeps>;
   /** 預設 providers 的 CLAUDE_MODEL_CANDIDATES（不在 helper 另寫一份清單） */
   readonly candidates?: readonly string[];
@@ -61,7 +64,7 @@ export function createClaudeProbe(options: ClaudeProbeOptions = {}): ClaudeProbe
     newId: randomUUID,
     ...options.runDeps,
   });
-  const deps = () => claudeRunDeps(base(), { acceptVersion: service.gate.isAccepted });
+  const deps = () => helperClaudeDeps(base(), { acceptVersion: service.gate.isAccepted });
 
   return {
     candidates: options.candidates ?? CLAUDE_MODEL_CANDIDATES,
@@ -90,15 +93,21 @@ export function createClaudeProbe(options: ClaudeProbeOptions = {}): ClaudeProbe
       const d = deps();
       const version = await service.ensureVersion(d);
       if (version.status === 'blocked') {
-        return { verification: 'unknown', quotaExhausted: false, record: null };
+        return { verification: 'unknown', quotaExhausted: false, blocked: true, record: null };
       }
       const probe = await verifyClaudeModel(service.adapter, model, d);
       if (!probe.record.executed) {
-        return { verification: 'unknown', quotaExhausted: false, record: probe.record };
+        return {
+          verification: 'unknown',
+          quotaExhausted: false,
+          blocked: true,
+          record: probe.record,
+        };
       }
       return {
         verification: probe.available ? 'passed' : 'failed',
         quotaExhausted: probe.error?.kind === 'quota_exhausted',
+        blocked: false,
         record: probe.record,
       };
     },
