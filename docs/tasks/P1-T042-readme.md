@@ -1,7 +1,7 @@
 ---
 id: P1-T042
 phase: 1
-status: ready
+status: in_progress
 depends_on: []
 specs: ["architecture.md"]
 track: readme

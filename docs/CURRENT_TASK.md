@@ -5,7 +5,7 @@
 <!-- index:start -->
 ## 進行中
 
-- 無
+- P1-T042 README 與開源說明文件（`docs/tasks/P1-T042-readme.md`）
 
 ## ready
 
@@ -13,7 +13,6 @@
 - P1-T022 pipeline：文件分析成事實項
 - P1-T039 Claude CLI 版本變更時自動重新驗證
 - P1-T041 橋接：編輯器頁面所需操作清單
-- P1-T042 README 與開源說明文件
 <!-- index:end -->
 
 ## 下一步（2026-10-10 交接）
