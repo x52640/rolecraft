@@ -48,7 +48,12 @@ describe('relay sender 規則（P1-T041）', () => {
   it('職缺頁送出合法的事實項確認：拒絕且不轉送；編輯器頁則轉送', async () => {
     const request = {
       op: 'claims.confirm',
-      payload: { claimId: ID, text: '完成登入功能', completion: 'user_confirmed_done' },
+      payload: {
+        claimId: ID,
+        text: '完成登入功能',
+        completion: 'user_confirmed_done',
+        expectedReviewStatus: 'normal',
+      },
     };
     const send = vi.fn<BridgeClient['send']>(() => Promise.resolve({ ok: true }));
     const client = { send, close: vi.fn() } satisfies BridgeClient;
