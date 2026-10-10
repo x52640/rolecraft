@@ -221,7 +221,7 @@ async function main() {
     const page = await evaluateIn(send, targetId, EDITOR_PROBE);
     report.results.push({
       name: '編輯器（React）載入並顯示匯入頁',
-      pass: page.marker === 'ready' && page.heading === '匯入' && page.navCount === 7,
+      pass: page.marker === 'ready' && page.heading === '匯入' && page.navCount === 8,
       got: page,
     });
     const routed = await evaluateIn(send, targetId, ROUTE_PROBE);

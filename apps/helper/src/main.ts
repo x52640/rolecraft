@@ -19,6 +19,7 @@ import { createClaimsService, type HelperStorage } from './handlers/claims/stora
 import { createExportService } from './handlers/export/export-service.ts';
 import { createResumeImportService, type PdfFilePicker } from './handlers/import/import-service.ts';
 import { createJobsService } from './handlers/jobs/storage-service.ts';
+import { createMessagesService } from './handlers/messages/assemble.ts';
 import { createProvidersService } from './handlers/providers/providers-service.ts';
 import { createResumeService } from './handlers/resume/storage-service.ts';
 import type { HelperServices } from './handlers/services.ts';
@@ -53,8 +54,9 @@ export function createServices(
 ): HelperServices {
   const repositories = storage && createRepositories(storage.db);
   const { folder, pdf } = pickers;
+  const providers = createProvidersService();
   return {
-    providers: createProvidersService(),
+    providers,
     sources: createSourcesService(folder ? { picker: folder } : {}),
     ...(repositories && { jobs: createJobsService(repositories.jobSnapshots) }),
     ...(repositories &&
@@ -69,6 +71,7 @@ export function createServices(
     }),
     ...(storage && { claims: createClaimsService(storage) }),
     ...(storage && { resume: createResumeService({ db: storage.db }) }),
+    ...(storage && { messages: createMessagesService(storage.db, providers) }),
     ...(storage && isRuntime(storage) && { pdfExport: createExportService(storage) }),
   };
 }

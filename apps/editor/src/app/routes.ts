@@ -4,6 +4,7 @@ import { ApplicationsPage } from '../pages/applications/ApplicationsPage.tsx';
 import { ClaimsPage } from '../pages/claims/ClaimsPage.tsx';
 import { ImportPage } from '../pages/import/ImportPage.tsx';
 import { JobsPage } from '../pages/jobs/JobsPage.tsx';
+import { MessagesPage } from '../pages/messages/MessagesPage.tsx';
 import { ProjectsPage } from '../pages/projects/ProjectsPage.tsx';
 import { ResumesPage } from '../pages/resumes/ResumesPage.tsx';
 import { SettingsPage } from '../pages/settings/SettingsPage.tsx';
@@ -22,6 +23,7 @@ export const ROUTES: readonly EditorRoute[] = [
   { path: 'projects', label: '專案', Page: ProjectsPage },
   { path: 'claims', label: '事實項', Page: ClaimsPage },
   { path: 'jobs', label: '職缺', Page: JobsPage },
+  { path: 'messages', label: '訊息', Page: MessagesPage },
   { path: 'resumes', label: '履歷', Page: ResumesPage },
   { path: 'applications', label: '投遞', Page: ApplicationsPage },
   { path: 'settings', label: '設定', Page: SettingsPage },
