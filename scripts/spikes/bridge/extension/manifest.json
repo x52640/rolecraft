@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "RoleCraft bridge spike",
+  "version": "0.0.1",
+  "description": "P1-T013 原型：Native Messaging echo 測試。不讀任何網頁、不需 host 權限。",
+  "permissions": ["nativeMessaging"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "RoleCraft bridge spike" }
+}

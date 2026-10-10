@@ -75,9 +75,14 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
-- Blocker：無；手動驗證需擁有者：Arc／Edge 手動跑 echo 測試
+- 最後完成：原型（echo host＋MV3 擴充功能＋安裝腳本＋Chrome 自動實測）、ADR-0003、bridge.md Q3 指向句、open-verifications 兩項指向 ADR
+- 已通過驗證：`npm run verify` 綠；`node --test scripts/spikes/bridge/test/` 11/11；`node scripts/spikes/bridge/chrome-e2e.mjs` PASS（Chrome 155，拋棄式 profile）
+- 下一步：協調者收官；擁有者依 ADR-0003「手動驗證步驟」跑 Arc、Edge（與真實 Chrome profile）及原生選取器
+- Blocker：Arc／Edge 手動驗證需擁有者（本機未安裝 Edge）
 
 ## 完成結果
+
+- 建議：只用 Native Messaging；編輯器做成擴充功能頁；資料夾由輔助程式開 macOS 原生選取器，路徑不出 host（理由、代價、證據等級見 ADR-0003）。
+- 原型 `scripts/spikes/bridge/`：`host/`（框編解碼、固定操作 ping／echo／pickFolders、拒絕未知操作與多餘欄位）、`extension/`（MV3，頁面與 service worker 各跑自我測試）、`install.mjs`（預設 dry-run，`--yes` 才寫、`--uninstall` 移除）、`chrome-e2e.mjs`（拋棄式 profile＋CDP `Extensions.loadUnpacked`）、`test/host.test.mjs`（node:test）。
+- 實測：Chrome 155 頁面與 service worker 各 4 案全過；不在 `allowed_origins` 的擴充功能被拒（forbidden）。未實測：Arc、Edge、真實 profile 安裝、原生對話框與 TCC 提示。
+- 原型測試不在 `npm run verify`（vitest 只收 packages／apps）；要重跑用上面兩條命令。
