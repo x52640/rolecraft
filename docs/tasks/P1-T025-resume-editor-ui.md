@@ -1,7 +1,7 @@
 ---
 id: P1-T025
 phase: 1
-status: blocked
+status: in_progress
 depends_on: ["P1-T024", "P1-T023"]
 specs: ["resume-output.md", "evidence-model.md"]
 track: editor
@@ -78,6 +78,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：讀必讀入口後開工
-- Blocker：等待相依：P1-T024、P1-T023
+- Blocker：無
 
 ## 完成結果
