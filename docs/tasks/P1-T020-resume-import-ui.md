@@ -1,7 +1,7 @@
 ---
 id: P1-T020
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T009", "P1-T016", "P1-T014", "P1-T041"]
 specs: ["resume-import.md"]
 track: editor
