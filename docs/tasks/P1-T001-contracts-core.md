@@ -78,9 +78,15 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：entities 12 個物件、bridge 4 個操作 schema 與測試
+- 已通過驗證：`npm run verify` 綠（Vitest 14 檔 78 測試）
+- 下一步：協調者收官；spec 待裁定事項見完成結果
 - Blocker：無
 
 ## 完成結果
+
+- `packages/contracts/src/entities/`：common（Id、Timestamp、Platform、CaptureMethod、Provider、UserConfirmation）、source-document、claim、profile、project-evidence、job-snapshot、resume-version、export-version、application-record、message-draft、provider-connection（含 RunCheckRecord）、work-job（含 WorkUnit）。全部 `z.strictObject`。
+- `packages/contracts/src/bridge/`：`BridgeOperation` 封閉列舉（submit_job_capture、submit_message_capture、request_draft、open_editor）、各操作 request／response、`BridgeRequest` 判別聯集、`BRIDGE_SCHEMAS`（鍵以型別綁定 BridgeOperation）。
+- 跨欄位規則（schema 層）：Claim 只有功能／交付物有完成狀態；LinkedIn 不得標自動擷取（D8）；WorkJob 已暫停 ⇔ 有暫停原因。
+- 測試：每個物件合法樣本通過、多帶欄位被拒、非法狀態值被拒；bridge 每層多帶欄位被拒、未列操作被拒、遞迴掃描鍵名不得含路徑／指令／模型類詞。
+- spec 未定、暫行處理（待裁定）：ID／雜湊／日期格式、Claim 片段位置格式、Profile 個人資料欄位、ApplicationRecord 狀態值（自由文字）、回覆意圖（自由文字）、ProviderConnection／RunCheckRecord 狀態與欄位（providers.md 不在必讀，暫用 passed／failed／unknown）、WorkJob running／completed、橋接操作清單（spec 只舉例）與錯誤代碼、ResumeSection 的 origin 欄位與修改理由／接受退回狀態未建。
