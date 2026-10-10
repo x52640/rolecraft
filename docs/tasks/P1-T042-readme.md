@@ -68,9 +68,14 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：README.md、CONTRIBUTING.md 撰寫完畢
+- 已通過驗證：`npm run verify` 綠（含 verify:docs 連結檢查）
+- 下一步：協調者收官
 - Blocker：無
 
 ## 完成結果
+
+- README：英文一行摘要＋中文定位；核心原則（D2／D12、D4／D14、本機、D6、D7）；目前狀態分「已完成並有測試」與「開發中或尚未支援」兩表（Codex／Antigravity、Cake／Yourator 標尚未支援，104 擷取標開發中，PDF 匯出註明需本機 Chrome，macOS only D11、自用 D17）；文字架構圖；開發指令（install／verify／build）與 RUN_LIVE（含 RUN_LIVE_MODELS）／RUN_CHROME／RUN_RACE 表；文件導覽；MIT。
+- CONTRIBUTING：冷啟動五步（指向 CLAUDE.md、docs/README.md）、一 Task 一 commit 與 write_paths、verify 閘門、不得提交個人資料／金鑰／本機產物、不接受違反核心限制的變更、MIT。
+- 狀態清單依 2026-10-10 的 docs/tasks/INDEX.md；之後 Task 收官時 README「目前狀態」需要同步更新。
+- front matter `expected_commit` 寫 `feat(...)`，實際依協調者指示用 `docs(P1-T042)`。
