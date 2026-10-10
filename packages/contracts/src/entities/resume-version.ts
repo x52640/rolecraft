@@ -30,6 +30,30 @@ export const SectionOrigin = z.enum([
 ]);
 export type SectionOrigin = z.infer<typeof SectionOrigin>;
 
+/**
+ * 段落歸屬（P1-T040）：段落印在模板的哪一區。
+ * 工作經歷段落用公司＋職稱＋起始日期對到 Profile 的一段經歷（不用索引，經歷重排也不會掛錯公司）；
+ * 這三欄只用來比對，印出的公司、職稱、日期一律取自 Profile（R1），對不到就不能匯出。
+ */
+export const SectionPlacement = z.discriminatedUnion('group', [
+  z.strictObject({ group: z.literal('summary') }), // 自我介紹
+  z.strictObject({
+    group: z.literal('experience'), // 工作經歷（掛在某段經歷下）
+    company: NonEmptyText,
+    title: NonEmptyText,
+    startDate: NonEmptyText,
+  }),
+  z.strictObject({ group: z.literal('project') }), // 專案
+]);
+export type SectionPlacement = z.infer<typeof SectionPlacement>;
+
+/** 段落在模板中的項目類型（P1-T040）。 */
+export const SectionItemKind = z.enum([
+  'paragraph', // 一般段落
+  'bullet', // 條列
+]);
+export type SectionItemKind = z.infer<typeof SectionItemKind>;
+
 /** 履歷的一段。 */
 export const ResumeSection = z.strictObject({
   id: Id,
@@ -43,6 +67,10 @@ export const ResumeSection = z.strictObject({
    * 匯出前檢查用它確認引用沒被移除。生成段落缺這欄一律不能匯出（domain 檢查）。
    */
   generatedCitations: z.array(ClaimCitation).optional(),
+  /** 段落歸屬（P1-T040）；為維持 additive 設為選填，但缺這欄的非空白段落不能匯出 */
+  placement: SectionPlacement.optional(),
+  /** 項目類型（P1-T040）；省略視為一般段落 */
+  itemKind: SectionItemKind.optional(),
 });
 export type ResumeSection = z.infer<typeof ResumeSection>;
 

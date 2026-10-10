@@ -66,15 +66,25 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：匯出 handler／服務、ResumeDocument 組裝規則、contracts 段落歸屬欄位、helper 資料區與啟動清掃、Claude deps 入口、測試
+- 已通過驗證：worktree `npm run verify` 綠（Vitest 1976 通過、11 略過）；`RUN_CHROME=1` 的匯出接線整合測試本機 Chrome 實跑通過
+- 下一步：協調者收官前跑對抗驗證（碰 R1，高風險）
 - Blocker：無
 
 ## 完成結果
+
+- contracts（additive）：`ResumeSection` 加選填 `placement`（段落歸屬：`summary` 自我介紹／`experience` 工作經歷，以公司＋職稱＋起始日期對到 Profile 的一段經歷／`project` 專案）與 `itemKind`（`paragraph`／`bullet`，省略＝一般段落）。
+- 組 ResumeDocument（`apps/helper/src/handlers/export/document.ts`）：姓名（`personalInfo.姓名`）、聯絡方式（只印 電話／電子郵件／個人網站／地點，郵件與 http(s) 網址才成連結）、公司｜職稱、任職日期（「至今」）、技能一律取自 Profile；各段原文照印為一個項目；經歷依 Profile 順序，沒有段落的經歷也印標題列；Profile 舊經歷描述不印。R1 跳過的實質空白段落不印（用 `checkExportReadiness` 探測，與 R1 判定一致）。沒有歸屬、經歷對不到、缺姓名 → 不能匯出（`invalid_request`）。
+- `export.create`（`export-create.ts`）：履歷版本只讀一次並深度凍結成快照，R1、文件、匯出版本全部用這份；Profile 必須恰好一份且已確認；R1 未過回 `not_ready`、不呼叫匯出器；`exportResumePdf` 帶同一份 R1 結果；匯出版本只存印出的段落、這些段落引用的事實項與片段副本、職缺快照副本；不建立投遞紀錄。字型／Chrome／PDF 檢查／storage 拒絕 → `internal_error`（固定訊息；PDF 阻擋問題列代碼）。
+- `export.list_versions`／`get_version`／`read_pdf`：read_pdf 依 P1-T041 分塊協定（512 KiB／塊、最多 128 塊、整份 SHA-256）；超過分塊上限的 PDF 在匯出時就拒絕。
+- 服務介面 `ExportService` 方法設為選填：分派表測試以 `pdfExport: {}` 驗「未接上回 not_implemented」，方法未提供時 handler 回 not_implemented。
+- helper 資料區（`apps/helper/src/services/runtime.ts`）：環境變數 `ROLECRAFT_DATA_DIR`（資料庫 `rolecraft.sqlite`＋檔案區 `files/`）與 `ROLECRAFT_FONTS_DIR`（隨附字型）由安裝程式寫入包裝檔；都沒設 → 依賴儲存的服務不接（not_implemented）；只設一個、非絕對路徑、資料夾不存在、資料庫打不開或 `sweepStorage` 失敗 → `config_invalid`、結束碼 1。開啟時呼叫一次 `sweepStorage(db, fileStore)`。字型成功後快取、失敗下次重讀。`main.ts` 的 `createServices(runtime)` 接上 `pdfExport`。
+- Claude deps（`apps/helper/src/services/claude-deps.ts`）：`helperClaudeDeps` 是 helper 唯一入口（內部 `claudeRunDeps`）；靜態檢查擋 helper 其他檔案直接用 `claudeRunDeps`／`createClaudeStreamGuard`，以及用到 Claude 執行 API 卻沒經 `helperClaudeDeps`。
+- 測試：段落歸屬 schema；組裝規則（Profile 欄位、順序、空白段落、對不到經歷、無歸屬、連結）；R1 未過不匯出；**同一份版本**（repo 第二次讀回換過的版本、檢查後改資料庫或改讀出的物件，印出與存下的仍是檢查時那份，且交給匯出器的 R1 結果等於對印出段落重跑的結果）；錯誤對應；分塊拼回與邊界；未設資料區回 not_implemented；sweep 恰呼叫一次、孤兒 PDF 清掉、清掃失敗關資料庫；main 子行程端到端；Chrome 實際匯出（`RUN_CHROME=1` 才跑）。
+- 手動驗證：無（真實 104 PDF 與安裝後字型路徑留 P1-T031／P1-T032）。
