@@ -3,7 +3,7 @@ import { StringDecoder } from 'node:string_decoder';
 
 import { killProcessGroup } from '../core/kill.ts';
 import type { SpawnFn } from '../core/process.ts';
-import { StreamInspector, type StreamViolation } from './stream.ts';
+import { type AcceptVersion, StreamInspector, type StreamViolation } from './stream.ts';
 
 /**
  * 執行中串流守門：包住 spawn，在 stream-json 子程序的 stdout 上加一個逐行檢查器，
@@ -24,9 +24,12 @@ import { StreamInspector, type StreamViolation } from './stream.ts';
 export interface StreamGuardOptions {
   /** 每次終止時通知（記錄用；不含模型文字） */
   readonly onViolation?: (violation: StreamViolation) => void;
+  /** init 接受的 CLI 版本；預設只有 ADR-0002 驗證版本（P1-T039 重新驗證過的版本由呼叫端傳入） */
+  readonly acceptVersion?: AcceptVersion;
 }
 
-const guarded = new WeakSet<SpawnFn>();
+/** 守門版 spawn → 被包住的原始 spawn（換版本判定時從原始 spawn 重包，不疊兩層守門）。 */
+const guarded = new WeakMap<SpawnFn, SpawnFn>();
 
 /** 是否已經是串流守門包過的 spawn（避免重複包裝）。 */
 export const isClaudeStreamGuarded = (spawn: SpawnFn | undefined): boolean =>
@@ -46,7 +49,7 @@ export function createClaudeStreamGuard(
     const child = base(file, args, { ...spawnOptions, detached: true });
     if (!child.stdout) return child;
 
-    const inspector = new StreamInspector();
+    const inspector = new StreamInspector(options.acceptVersion);
     const decoder = new StringDecoder('utf8');
     let pending = '';
     let stopped = false;
@@ -74,21 +77,23 @@ export function createClaudeStreamGuard(
     });
     return child;
   };
-  guarded.add(guard);
+  guarded.set(guard, base);
   return guard;
 }
 
 /**
- * Claude 專用 deps 工廠：一律把 spawn 換成串流守門版本（已包過就沿用）。
- * RunDeps、ConnectionDeps 都適用；helper 呼叫 Claude 適配器時只能用這個產生 deps。
+ * Claude 專用 deps 工廠：一律把 spawn 換成串流守門版本。
+ * 沒給 options 時已包過就沿用；有給 options（例：acceptVersion）就從原始 spawn 重包，
+ * 確保用的是這次指定的判定。RunDeps、ConnectionDeps 都適用；helper 只能用這個產生 deps。
  */
 export function claudeRunDeps<T extends { readonly spawn?: SpawnFn }>(
   base: T,
-  options: StreamGuardOptions = {},
+  options?: StreamGuardOptions,
 ): T & { readonly spawn: SpawnFn } {
+  const raw = base.spawn ? (guarded.get(base.spawn) ?? base.spawn) : nodeSpawn;
   const spawn =
-    base.spawn && isClaudeStreamGuarded(base.spawn)
+    options === undefined && base.spawn && isClaudeStreamGuarded(base.spawn)
       ? base.spawn
-      : createClaudeStreamGuard(base.spawn ?? nodeSpawn, options);
+      : createClaudeStreamGuard(raw, options);
   return { ...base, spawn };
 }

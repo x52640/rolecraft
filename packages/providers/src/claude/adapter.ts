@@ -30,6 +30,8 @@ import {
 } from './constants.ts';
 import { findManagedSettings, locateClaude } from './locate.ts';
 import { analyzeRun, type ClaudeRunInfo } from './result.ts';
+import type { AcceptVersion } from './stream.ts';
+import { ClaudeVersionGate } from './version-gate.ts';
 
 /**
  * Claude 適配器（D13、ADR-0002）。每次執行前 core 會呼叫 verifySubscriptionRoute：
@@ -47,6 +49,11 @@ export interface ClaudeAdapterOptions {
   readonly locate?: () => Promise<string | null>;
   /** 受管設定偵測；預設看 CLAUDE_MANAGED_SETTINGS_PATHS */
   readonly findManagedSettings?: () => Promise<string[]>;
+  /**
+   * 版本閘門（P1-T039）：決定接受哪些 CLI 版本、停用狀態、與重新驗證互斥。
+   * 預設是沒有保存介面的閘門（只接受 ADR-0002 驗證版本、不做自動重新驗證）。
+   */
+  readonly versionGate?: ClaudeVersionGate;
 }
 
 export interface ClaudeExecution {
@@ -65,6 +72,9 @@ export interface ClaudeAdapter extends ProviderAdapter {
   readonly lastRun: ClaudeRunInfo | null;
   /** 與 execute 相同，但直接回傳這次的附帶資訊（不經共用狀態） */
   executeDetailed(request: ExecuteRequest): Promise<ClaudeExecution>;
+  /** 這個適配器接受的 CLI 版本（串流守門要用同一份判定：claudeRunDeps(deps, { acceptVersion })） */
+  readonly acceptsVersion: AcceptVersion;
+  readonly versionGate: ClaudeVersionGate;
 }
 
 const item = (outcome: RunCheckItem['outcome'], basis: string): RunCheckItem => ({
@@ -75,10 +85,12 @@ const item = (outcome: RunCheckItem['outcome'], basis: string): RunCheckItem => 
 const NOT_FOUND = '找不到官方 Claude CLI（原生執行檔）';
 const NOT_CONFIRMED = '這次執行沒有經過執行前確認（找不到確認時的 CLI 路徑），不執行';
 const PATH_CHANGED = 'Claude CLI 路徑在執行前確認之後改變（可能自動更新），不執行；請重新確認';
+const GATE_CLOSED = 'Claude 正在自動重新驗證或已停用，不執行';
 
 export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): ClaudeAdapter {
   const locate = options.locate ?? (() => locateClaude());
   const managed = options.findManagedSettings ?? (() => findManagedSettings());
+  const gate = options.versionGate ?? new ClaudeVersionGate();
   let lastCliVersion: string | null = null;
   let lastRun: ClaudeRunInfo | null = null;
   // 執行前確認時解析到的實際路徑，以該次的 launch 為鍵（core 每次執行建立一個 launch），
@@ -101,7 +113,12 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): ClaudeA
 
   const adapter: ClaudeAdapter = {
     provider: 'claude',
-    support: { state: 'supported' },
+    // 每次讀取都反映閘門狀態：停用或重新驗證中 → 無法確認，core 會擋下並在紀錄寫原因。
+    get support() {
+      return gate.support();
+    },
+    acceptsVersion: gate.isAccepted,
+    versionGate: gate,
     environment: CLAUDE_ENVIRONMENT,
     commands: CLAUDE_COMMANDS,
     get lastCliVersion() {
@@ -145,7 +162,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): ClaudeA
       confirmedPath.set(ctx.launch, path);
       const version = parseVersion(await run(ctx, path, CLAUDE_VERSION_COMMAND));
       lastCliVersion = version;
-      const executionMode = versionItem(version);
+      const executionMode = versionItem(version, gate.isAccepted);
       const status = await readAuth(ctx, path);
       const subscriptionLogin = subscriptionLoginItem(status);
       let cliConfig = cliConfigItem(status, await managed());
@@ -176,19 +193,26 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): ClaudeA
         };
       }
       if (!path) return fail(NOT_CONFIRMED);
-      const current = await locate();
-      if (!current) return fail(NOT_FOUND);
-      if (current !== path) return fail(PATH_CHANGED);
-      const output = await request.launch({
-        executablePath: path,
-        command: CLAUDE_RUN_COMMAND,
-        model: request.model,
-        stdin: request.prompt,
-        ...(request.signal ? { signal: request.signal } : {}),
-      });
-      const analysis = analyzeRun(output);
-      lastRun = analysis.info;
-      return { result: analysis.result, info: analysis.info };
+      // 與自動重新驗證互斥：重新驗證中或已停用就拒絕；進行中的執行會擋住重新驗證開始。
+      const release = gate.enterRun();
+      if (!release) return fail(GATE_CLOSED);
+      try {
+        const current = await locate();
+        if (!current) return fail(NOT_FOUND);
+        if (current !== path) return fail(PATH_CHANGED);
+        const output = await request.launch({
+          executablePath: path,
+          command: CLAUDE_RUN_COMMAND,
+          model: request.model,
+          stdin: request.prompt,
+          ...(request.signal ? { signal: request.signal } : {}),
+        });
+        const analysis = analyzeRun(output, gate.isAccepted);
+        lastRun = analysis.info;
+        return { result: analysis.result, info: analysis.info };
+      } finally {
+        release();
+      }
     },
   };
   return adapter;

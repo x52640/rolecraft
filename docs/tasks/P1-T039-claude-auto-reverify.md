@@ -67,15 +67,26 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：版本閘門、自動重新驗證、服務入口、單元測試、live 測試檔、ADR-0002 §7
+- 已通過驗證：`npm run verify` 綠（vitest 1162 過／10 略過）；live 測試未執行（等協調者）
+- 下一步：協調者跑一次 live（指令見完成結果）、E3 對抗驗證、收官
 - Blocker：無
 
 ## 完成結果
+
+- `packages/providers/src/claude/`：
+  - `version-gate.ts`：`ClaudeVersionGate`（已驗證版本集合＝ADR-0002 驗證版本＋保存清單中 verified 的版本；狀態 ready／reverifying／disabled；`enterRun`／`beginReverify` 互斥）與保存介面 `ClaudeVersionStore`（`load`／`save`，紀錄含版本、驗證時間、各案例結果、模型呼叫次數、失敗原因）。
+  - `reverify.ts`：`runClaudeReverification`，案例依序 version-confirm → auth-subscription → auth-detects-helper → 注入執行（模型呼叫 1）→ formal-run（模型呼叫 2）→ version-stable；任一失敗即停止。`CLAUDE_REVERIFY_MAX_MODEL_CALLS = 3`、`CLAUDE_REVERIFY_MODEL = 'haiku'`，`budgetLaunch` 超過上限直接拒絕啟動子程序。命令列、環境白名單、串流守門與正式執行相同。
+  - `reverify-cases.ts`：把注入執行輸出拆成 version-in-init、api-key-source、no-tool-calls、no-decoy-read、no-web、no-user-settings、injection-run；看不到證據就算失敗。
+  - `service.ts`：`createClaudeService({ store })` → `run(request, deps)`：先讀版本；已驗證照常執行；未驗證先重新驗證，通過才執行。一律經 `runWithSubscriptionCheck`，被擋下時 RunCheckRecord 依據寫原因。
+  - 既有檔：版本判定改成可注入的 `AcceptVersion`（`stream.ts`、`result.ts`、`auth.ts versionItem`、`guard.ts`；預設仍只有 2.1.296）；`claudeRunDeps(deps, { acceptVersion })` 從原始 spawn 重包守門；adapter 的 `support` 反映閘門狀態、`executeDetailed` 經 `enterRun` 互斥；`verifyClaudeModel` 用 adapter 的版本判定。`index.ts` 匯出服務、閘門與常數。
+- 保守處理：任一案例失敗或結果不確定 → 保存失敗紀錄、整個 Claude 服務停用、不重試任何版本（重啟後仍停用）；保存失敗也算失敗。讀不到版本、找不到 CLI、保存清單讀不到或格式不合法、沒注入保存介面 → 不重新驗證、不接受新版本。重新驗證中拒絕一般執行；有一般執行進行中則不開始重新驗證（該次被擋下）。
+- 測試（假 spawn／fixtures）：`service.test.ts`（版本相同不重跑、全過接受且之後不重跑、8 種失敗＋marker 停用且不重試、重新驗證中拒絕一般執行與並行重新驗證、執行中不開始重新驗證）、`reverify.test.ts`（上限常數與 budgetLaunch、版本讀不到、init 版本不符、找不到 CLI、保存介面各種失敗、啟動時已有失敗紀錄）。測試輔助 `reverify-fakes.ts`。
+- live（`RUN_LIVE=1`，本 Task 未執行）：`RUN_LIVE=1 npx vitest run packages/providers/src/claude/reverify-live.test.ts`。把目前版本當未驗證版本跑一次，不寫保存位置；預期模型呼叫 2 次（haiku）、`auth status` 2 次、`--version` 3 次；結果另寫 `$TMPDIR/rolecraft-claude-live-results.jsonl`。
+- ADR-0002：新增 §7，§6 版本建議改指向 §7。

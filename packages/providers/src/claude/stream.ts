@@ -18,8 +18,17 @@ const isObject = (value: unknown): value is Json =>
 
 const isEmptyArray = (value: unknown): boolean => Array.isArray(value) && value.length === 0;
 
+/** 接受哪些 CLI 版本（init 的 claude_code_version）；預設只有 ADR-0002 驗證版本。 */
+export type AcceptVersion = (version: string) => boolean;
+
+export const acceptBaselineVersion: AcceptVersion = (version) =>
+  version === CLAUDE_VERIFIED_VERSION;
+
 /** init 事件的隔離條件；回傳問題清單（空＝通過）。 */
-export function checkInit(event: Json): string[] {
+export function checkInit(
+  event: Json,
+  acceptVersion: AcceptVersion = acceptBaselineVersion,
+): string[] {
   const problems: string[] = [];
   if (event['type'] !== 'system' || event['subtype'] !== 'init') {
     return ['第一個事件不是 system/init'];
@@ -39,8 +48,8 @@ export function checkInit(event: Json): string[] {
     if (event[key] !== undefined && !isEmptyArray(event[key])) problems.push(`${key} 不是空的`);
   }
   const version = event['claude_code_version'];
-  if (version !== CLAUDE_VERIFIED_VERSION) {
-    problems.push(`CLI 版本 ${String(version)} 不是驗證版本 ${CLAUDE_VERIFIED_VERSION}`);
+  if (typeof version !== 'string' || !acceptVersion(version)) {
+    problems.push(`CLI 版本 ${String(version)} 不是已驗證版本`);
   }
   return problems;
 }
@@ -83,9 +92,14 @@ function rateLimitReason(event: Json): string | null {
 
 /** 逐行檢查串流；第一個違規之後的行不再檢查（呼叫端應立即終止）。 */
 export class StreamInspector {
+  private readonly acceptVersion: AcceptVersion;
   private seenFirst = false;
   private violationValue: StreamViolation | null = null;
   readonly events: Json[] = [];
+
+  constructor(acceptVersion: AcceptVersion = acceptBaselineVersion) {
+    this.acceptVersion = acceptVersion;
+  }
 
   get violation(): StreamViolation | null {
     return this.violationValue;
@@ -104,7 +118,7 @@ export class StreamInspector {
     this.events.push(event);
     if (!this.seenFirst) {
       this.seenFirst = true;
-      const problems = checkInit(event);
+      const problems = checkInit(event, this.acceptVersion);
       if (problems.length > 0) return this.fail('isolation', `init 異常：${problems.join('；')}`);
       return null;
     }
@@ -122,8 +136,11 @@ export class StreamInspector {
 }
 
 /** 把一整段 stdout 跑過檢查器（結束後判定用）。 */
-export function inspectStdout(stdout: string): StreamInspector {
-  const inspector = new StreamInspector();
+export function inspectStdout(
+  stdout: string,
+  acceptVersion: AcceptVersion = acceptBaselineVersion,
+): StreamInspector {
+  const inspector = new StreamInspector(acceptVersion);
   for (const line of stdout.split('\n')) {
     if (inspector.push(line)) break;
   }

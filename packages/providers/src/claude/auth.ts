@@ -99,17 +99,25 @@ export function parseVersion(output: ProcessOutput): string | null {
   return match?.[1] ?? null;
 }
 
-/** 版本是否為 ADR-0002 驗證版本；不同就是 unknown（不執行），提示重跑 P1-T011 spike。 */
-export function versionItem(version: string | null): RunCheckItem {
+/**
+ * 版本是否已驗證：ADR-0002 驗證版本，或通過 P1-T039 自動重新驗證的版本（accept 由閘門提供）。
+ * 未驗證就是 unknown（不執行），依據提示需重新驗證。
+ */
+export function versionItem(
+  version: string | null,
+  accept: (version: string) => boolean = (v) => v === CLAUDE_VERIFIED_VERSION,
+): RunCheckItem {
   if (version === null) return item('unknown', '無法取得 claude 版本');
-  if (version !== CLAUDE_VERIFIED_VERSION) {
+  if (!accept(version)) {
     return item(
       'unknown',
-      `claude ${version} 與 ADR-0002 驗證版本 ${CLAUDE_VERIFIED_VERSION} 不同；旗標行為可能已變，需重跑 P1-T011 spike（scripts/spikes/claude/）`,
+      `claude ${version} 不是已驗證版本（ADR-0002 驗證版本 ${CLAUDE_VERIFIED_VERSION}）；旗標行為可能已變，需先通過自動重新驗證（D22）或重跑 P1-T011 spike（scripts/spikes/claude/）`,
     );
   }
+  const which =
+    version === CLAUDE_VERIFIED_VERSION ? '= ADR-0002 驗證版本' : '已通過自動重新驗證（D22）';
   return item(
     'passed',
-    `claude ${version}（= ADR-0002 驗證版本）；命令列為固定常數、無禁用旗標（--bare、--settings 等）`,
+    `claude ${version}（${which}）；命令列為固定常數、無禁用旗標（--bare、--settings 等）`,
   );
 }

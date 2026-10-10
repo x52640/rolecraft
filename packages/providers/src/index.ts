@@ -68,7 +68,29 @@ export {
 export { locateClaude } from './claude/locate.ts';
 export { MODEL_PROBE_PROMPT, type ModelProbeResult, verifyClaudeModel } from './claude/models.ts';
 export type { ClaudeRunInfo } from './claude/result.ts';
-export type { StreamViolation } from './claude/stream.ts';
+export {
+  CLAUDE_REVERIFY_MAX_MODEL_CALLS,
+  CLAUDE_REVERIFY_MODEL,
+  type ReverifyDeps,
+  type ReverifyTarget,
+  runClaudeReverification,
+} from './claude/reverify.ts';
+export {
+  type ClaudeRunResult,
+  type ClaudeService,
+  type ClaudeServiceOptions,
+  createClaudeService,
+  type EnsureVersionResult,
+  type ServiceDeps,
+} from './claude/service.ts';
+export {
+  type ClaudeVersionRecord,
+  type ClaudeVersionStore,
+  ClaudeVersionGate,
+  type GateState,
+  type ReverifyCaseResult,
+} from './claude/version-gate.ts';
+export type { AcceptVersion, StreamViolation } from './claude/stream.ts';
 export {
   createFakeAdapter,
   type FakeAdapter,

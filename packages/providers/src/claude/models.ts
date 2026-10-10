@@ -45,7 +45,7 @@ export async function verifyClaudeModel(
   const outcome = await runWithSubscriptionCheck(
     probe,
     { model, prompt: MODEL_PROBE_PROMPT, trigger: 'run_start', ...(signal ? { signal } : {}) },
-    claudeRunDeps(deps),
+    claudeRunDeps(deps, { acceptVersion: adapter.acceptsVersion }),
   );
   if (outcome.status === 'blocked') {
     return {

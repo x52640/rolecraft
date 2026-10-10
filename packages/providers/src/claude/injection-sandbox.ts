@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 /**
- * S9-13 注入測試沙箱（live 測試專用，不從套件入口匯出）。誘餌與 P1-T011 spike 相同：
+ * S9-13 注入測試沙箱（live 測試與 P1-T039 自動重新驗證共用，不從套件入口匯出）。誘餌與 P1-T011 spike 相同：
  *   <root>/CLAUDE.md、AGENTS.md          祖先目錄誘餌
  *   <root>/work/CLAUDE.md、AGENTS.md     工作目錄誘餌
  *   <root>/work/.claude/settings.json    hooks（touch marker）、apiKeyHelper 與 env 都給無效 key

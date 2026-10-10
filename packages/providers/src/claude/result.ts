@@ -1,6 +1,6 @@
 import type { ExecutionResult, ProviderError, ProviderErrorKind } from '../core/adapter.ts';
 import type { ProcessOutput } from '../core/process.ts';
-import { inspectStdout } from './stream.ts';
+import { type AcceptVersion, acceptBaselineVersion, inspectStdout } from './stream.ts';
 
 /**
  * 執行結束後的判定（ADR-0002 §3、§4）。失敗看 `is_error`／`api_error_status`，不只看 subtype
@@ -88,8 +88,11 @@ function collectInfo(events: readonly Json[]): ClaudeRunInfo {
 }
 
 /** 判定一次執行的輸出。 */
-export function analyzeRun(output: ProcessOutput): ClaudeRunAnalysis {
-  const inspector = inspectStdout(output.stdout);
+export function analyzeRun(
+  output: ProcessOutput,
+  acceptVersion: AcceptVersion = acceptBaselineVersion,
+): ClaudeRunAnalysis {
+  const inspector = inspectStdout(output.stdout, acceptVersion);
   const info = collectInfo(inspector.events);
   const done = (result: ExecutionResult): ClaudeRunAnalysis => ({ result, info });
 

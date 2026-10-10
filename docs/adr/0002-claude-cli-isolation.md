@@ -102,7 +102,28 @@ safe-mode 下仍會載入 3 個**內建**外掛（`cc-plugin-agents-md`、`cc-pl
 - 執行前（R6，每次）：同環境、在空沙箱跑 `claude auth status --json`；要求 `loggedIn === true`、`authMethod === "claude.ai"`、`apiProvider === "firstParty"`、沒有 `apiKeySource`；受管設定檔存在就標「無法確認」。
 - 執行中：第一個事件 `system/init` 要 `apiKeySource === "none"`、`tools` 空、`mcp_servers` 空、`plugins` 全是 `builtin`、`skills` 空，否則立刻終止並記錄（init 先於第一個 API 請求送出是【推論】，所以這是第二道，第一道是執行前檢查）。任何 `tool_use` 事件 → 終止、丟棄輸出。`rate_limit_event.status` 不是 `allowed`／`allowed_warning` → 依 R9 停止。
 - 結束：看 `is_error`、`api_error_status`，記錄 `modelUsage.*.contextWindow`。
-- 版本：每次記 `claude --version`；與已驗證版本不同時建議重跑本 spike（CLI 會自動更新，旗標行為可能變）。
+- 版本：每次記 `claude --version`；與已驗證版本不同時自動重新驗證（見 §7，D22），不通過就停用；人工重跑本 spike 仍可用來深入調查。
+
+## 7. 版本變更時自動重新驗證（D22，P1-T039）
+
+CLI 會自動更新，旗標行為可能變。`packages/providers/src/claude/service.ts` 的 `run()` 每次執行前先讀 `--version`：
+
+- 版本是本 ADR 驗證版本，或在已驗證版本清單裡 → 照常執行，不重跑。
+- 版本未驗證 → 先跑自動重新驗證（`reverify.ts`），命令列、環境白名單、串流守門與正式執行完全相同，不加任何旗標：
+  1. `version-confirm`：再讀一次版本，必須相同。
+  2. `auth-subscription`：空工作目錄 `auth status` 必須是訂閱登入、無 `apiKeySource`、無受管設定。
+  3. `auth-detects-helper`：在 §2 誘餌工作目錄跑 `auth status`，必須抓到專案 apiKeyHelper（偵測仍有效）。
+  4. 注入執行（模型呼叫 1）：§2 誘餌工作目錄＋注入提示，拆成 `version-in-init`、`api-key-source`、`no-tool-calls`、`no-decoy-read`、`no-web`、`no-user-settings`（MCP、外掛、skills、CLAUDE.md／AGENTS.md 誘餌、hook／apiKeyHelper／MCP marker）、`injection-run`（必須成功且有回覆）。
+  5. `formal-run`（模型呼叫 2）：空工作目錄、極短提示，必須成功。
+  6. `version-stable`：結束時版本與 CLI 路徑都沒變。
+- 模型一律 `haiku`；每次重新驗證的模型呼叫上限 `CLAUDE_REVERIFY_MAX_MODEL_CALLS = 3`（實際用 2），超過直接拒絕啟動子程序。
+- 判定：任一案例失敗、或結果不確定（額度、逾時、錯誤、取消、缺 init）→ 記失敗、整個 Claude 服務停用（`support` 變「無法確認」，RunCheckRecord 依據寫原因），不重試、也不自動試別的版本；失敗紀錄也保存，重啟後仍停用。人工重新啟用屬後續 Task。
+- 通過 → 保存紀錄（版本、驗證時間、各案例結果、模型呼叫次數）後才接受；保存失敗視為失敗。
+- 互斥：重新驗證中，一般執行（含直接呼叫 `runWithSubscriptionCheck` 的）一律拒絕；有一般執行進行中時不開始重新驗證（該次執行被擋下，稍後再試）；同時只會有一個重新驗證。
+- 保守處理：讀不到版本、找不到 CLI、已驗證版本清單讀不到或格式不合法、沒有注入保存介面 → 不重新驗證、不視為已驗證，該次執行被擋下。
+- 保存位置由呼叫端注入（`ClaudeVersionStore`），helper 接線是後續 Task。
+- 新版若需要不同旗標，自動重新驗證只會失敗停用；命令列旗標的變更必須人工更新本 ADR。
+- live：`RUN_LIVE=1 npx vitest run packages/providers/src/claude/reverify-live.test.ts`（把目前版本當未驗證版本跑一次；模型 2 次、`auth status` 2 次、`--version` 3 次）。
 
 ## 殘餘風險
 
