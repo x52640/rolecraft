@@ -105,8 +105,29 @@ describe('splitBlocks', () => {
 
 describe('location format', () => {
   it('round-trips', () => {
-    const loc = { startBlock: 3, fingerprints: ['a'.repeat(64), 'b'.repeat(64)] };
+    const loc = {
+      startBlock: 3,
+      ordinal: 1,
+      count: 2,
+      fingerprints: ['a'.repeat(64), 'b'.repeat(64)],
+    };
+    expect(formatLocation(loc)).toBe(`tb2:3:1/2:${'a'.repeat(64)},${'b'.repeat(64)}`);
     expect(parseLocation(formatLocation(loc))).toEqual(loc);
+  });
+
+  it('parses legacy tb1 as the only copy (ordinal 0 of 1)', () => {
+    expect(parseLocation(`tb1:2:${'c'.repeat(64)}`)).toEqual({
+      startBlock: 2,
+      ordinal: 0,
+      count: 1,
+      fingerprints: ['c'.repeat(64)],
+    });
+  });
+
+  it('refuses to format an ordinal outside the count', () => {
+    expect(() =>
+      formatLocation({ startBlock: 0, ordinal: 1, count: 1, fingerprints: ['a'.repeat(64)] }),
+    ).toThrow();
   });
 
   it('rejects malformed strings', () => {
@@ -115,6 +136,11 @@ describe('location format', () => {
       'tb1:1:',
       'tb1:01:' + 'a'.repeat(64),
       'tb1:1:' + 'A'.repeat(64),
+      'tb2:1:' + 'a'.repeat(64),
+      'tb2:1:1/1:' + 'a'.repeat(64),
+      'tb2:1:0/0:' + 'a'.repeat(64),
+      'tb2:1:01/2:' + 'a'.repeat(64),
+      'tb3:1:0/1:' + 'a'.repeat(64),
     ]) {
       expect(parseLocation(bad)).toBeNull();
     }

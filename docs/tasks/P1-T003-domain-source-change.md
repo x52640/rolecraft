@@ -85,3 +85,9 @@ npm run verify
 - 判定（`evaluate.ts`）：`checkExcerpt` → unchanged／block_changed／excerpt_missing／unverifiable（位置格式錯、同版本雜湊不同、版本倒退）／source_removed（刪除、已撤銷、待確認）；`evaluateClaimSources` 任一片段非 unchanged／source_removed → 待複核；全部 source_removed → 來源已移除；狀態只升不降；版本或雜湊變了的文件列入 `documentsToReanalyze`；缺來源現況丟錯不預設成移除。`isUsableForGeneration`：待複核、矛盾不可；來源已移除只有使用者確認過的可以。
 - 矛盾標記（`conflict.ts`）：`SourceConflictMark`（跨文件／同文件、事實項、≥2 片段、說明）＋`applyConflictMarks`；標記不合法或指向不存在事實項丟錯。
 - 已知限制：空行之後新增的更正、Setext 標題（`===`／`---` 底線）改字不會讓既有區塊變更，靠 `documentsToReanalyze` 觸發 pipeline 重新分析找矛盾（R2 原文設計）；矛盾解除（使用者確認）不在本 Task。
+
+### 對抗驗證修正
+
+- 重複區塊：同一文件有兩份標題路徑與原文都相同的區塊時，改、撤回或刪除被引用那份仍判沒變。位置升版 `tb2:<起始區塊序號>:<第幾份>/<共幾份>:<指紋,…>`：判定時相同指紋序列的份數不同 → 區塊有變；份數相同取第幾份，多於一份時起始序號也要相同（無法證明是同一份就待複核）。舊 `tb1` 視為第 0 份／共 1 份，新文件裡同序列超過一份即判區塊有變。ADR-0006 第 2 項與 `claim.ts` location 註解同步。
+- 片段首尾換行／分隔字元：`createSourceExcerpt` 接受 `'完成登入\n'` 但同版本檢查永遠判區塊有變。新增 `normalizeExcerpt`（正規化後去掉首尾空白類字元），建立（存修剪後原文）與檢查都用它；舊資料原文帶首尾換行也能正確比對。
+- 回歸測試：`adversarial.test.ts`（含 PoC：重複區塊改／撤回／刪被引用那份 → 待複核、不可生成；尾換行片段同版本 → 沒變）。

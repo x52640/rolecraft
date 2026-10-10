@@ -40,6 +40,16 @@ export function isBlankLine(line: string): boolean {
   return BLANK_LINE.test(line);
 }
 
+const EDGE_BLANK = /^[\s\u200B-\u200D\u2060\uFEFF]+|[\s\u200B-\u200D\u2060\uFEFF]+$/gu;
+
+/**
+ * 片段原文的比對形式：先正規化，再去掉首尾空白類字元（含換行、全形空白、零寬字元）。
+ * 首尾的分隔字元不屬於任何區塊，留著會讓建立與檢查對不上；建立與檢查都用這一步。
+ */
+export function normalizeExcerpt(text: string): string {
+  return normalizeText(text).replace(EDGE_BLANK, '');
+}
+
 export function blockFingerprint(headingPath: readonly string[], text: string): string {
   return sha256Hex(JSON.stringify([headingPath, text]));
 }

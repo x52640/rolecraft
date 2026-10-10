@@ -1,7 +1,8 @@
 /**
  * R2 來源變更判定：新版本文件 vs 事實項綁定的來源片段 → 事實項複核狀態。
  *
- * - 片段所在區塊（含所屬章節標題）完全沒變 → 保留原狀態。
+ * - 片段所在區塊（含所屬章節標題）完全沒變 → 保留原狀態。文件中一字不差的區塊有多份時，
+ *   份數或引用那份的位置變了也算有變（無法證明引用的那份沒被改、撤回或刪除）。
  * - 區塊有任何變更、片段消失、位置無法驗證 → 待複核（已確認的也一樣）。
  * - 來源檔被刪除或不是「已授權」→ 該片段視為來源已移除。
  * - 狀態只升不降：判定結果不會把待複核、來源矛盾自動解除，解除要走使用者確認或重新分析。
@@ -9,8 +10,14 @@
 
 import type { Claim, Id, ReviewStatus, SourceDocument, SourceExcerpt } from '@rolecraft/contracts';
 
-import { normalizeText, splitBlocks, type TextBlock } from './blocks.ts';
-import { findOccurrences, formatLocation, parseLocation } from './location.ts';
+import { normalizeExcerpt, normalizeText, splitBlocks, type TextBlock } from './blocks.ts';
+import {
+  findFingerprintRuns,
+  findOccurrences,
+  formatLocation,
+  parseLocation,
+  type ExcerptLocation,
+} from './location.ts';
 
 /** 來源文件的現況。呼叫端必須對每個被引用的文件明確給出，缺漏會丟錯（不預設成已移除）。 */
 export type SourceState =
@@ -46,10 +53,10 @@ export function checkExcerpt(excerpt: SourceExcerpt, state: SourceState): Excerp
     throw new Error(`來源文件不符：片段屬於 ${excerpt.sourceDocumentId}，收到 ${document.id}`);
   }
   const location = parseLocation(excerpt.location);
-  const excerptText = normalizeText(excerpt.text);
+  const excerptText = normalizeExcerpt(excerpt.text);
   if (
     !location ||
-    excerptText.trim().length === 0 ||
+    excerptText.length === 0 ||
     document.contentVersion < excerpt.contentVersion ||
     (document.contentVersion === excerpt.contentVersion &&
       document.contentHash !== excerpt.contentHash)
@@ -62,7 +69,7 @@ export function checkExcerpt(excerpt: SourceExcerpt, state: SourceState): Excerp
   if (positions.length === 0) return { excerpt, outcome: 'excerpt_missing' };
 
   const blocks = splitBlocks(text);
-  const run = findUnchangedRun(blocks, location.fingerprints, text, excerptText);
+  const run = findUnchangedRun(blocks, location, text, excerptText);
   if (run === null) return { excerpt, outcome: 'block_changed' };
   return {
     excerpt,
@@ -71,37 +78,39 @@ export function checkExcerpt(excerpt: SourceExcerpt, state: SourceState): Excerp
       ...excerpt,
       contentVersion: document.contentVersion,
       contentHash: document.contentHash,
-      location: formatLocation({ startBlock: run, fingerprints: location.fingerprints }),
+      location: formatLocation({ ...location, startBlock: run }),
     },
   };
 }
 
 /**
- * 找一段連續區塊，指紋依序與原位置相同，且片段原文仍完整落在這段區塊內
- * （跨區塊片段連中間的分隔空行也要一樣）。回傳起始區塊序號，找不到回傳 null。
+ * 找引用的那一段連續區塊：指紋依序與原位置相同，且片段原文仍完整落在這段區塊內
+ * （跨區塊片段連中間的分隔空行也要一樣）。相同指紋序列的份數必須與建立時相同，
+ * 取第 ordinal 份；多於一份時起始序號也必須相同。回傳起始區塊序號，不符回傳 null。
  */
 function findUnchangedRun(
   blocks: readonly TextBlock[],
-  fingerprints: readonly string[],
+  location: ExcerptLocation,
   text: string,
   excerptText: string,
 ): number | null {
-  for (let i = 0; i + fingerprints.length <= blocks.length; i++) {
-    const run = blocks.slice(i, i + fingerprints.length);
-    if (!run.every((b, k) => b.fingerprint === fingerprints[k])) continue;
-    const first = run[0];
-    const last = run.at(-1);
-    if (!first || !last) continue;
-    const span = text.slice(first.start, last.end);
-    // 片段必須碰到每一個區塊，否則位置與原文對不上（例如跨區塊片段縮成只在其中一塊）。
-    const touchesAll = findOccurrences(span, excerptText).some((at) => {
-      const start = first.start + at;
-      const end = start + excerptText.length;
-      return run.every((b) => b.start < end && b.end > start);
-    });
-    if (touchesAll) return i;
-  }
-  return null;
+  const runs = findFingerprintRuns(blocks, location.fingerprints);
+  if (runs.length !== location.count) return null;
+  const start = runs[location.ordinal];
+  if (start === undefined) return null;
+  if (location.count > 1 && start !== location.startBlock) return null;
+  const run = blocks.slice(start, start + location.fingerprints.length);
+  const first = run[0];
+  const last = run.at(-1);
+  if (!first || !last) return null;
+  const span = text.slice(first.start, last.end);
+  // 片段必須碰到每一個區塊，否則位置與原文對不上（例如跨區塊片段縮成只在其中一塊）。
+  const touchesAll = findOccurrences(span, excerptText).some((at) => {
+    const from = first.start + at;
+    const to = from + excerptText.length;
+    return run.every((b) => b.start < to && b.end > from);
+  });
+  return touchesAll ? start : null;
 }
 
 const SEVERITY: Record<ReviewStatus, number> = {

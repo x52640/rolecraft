@@ -1,5 +1,11 @@
 /** R2 來源變更判定的公開入口。 */
-export { normalizeText, splitBlocks, blockFingerprint, type TextBlock } from './blocks.ts';
+export {
+  normalizeText,
+  normalizeExcerpt,
+  splitBlocks,
+  blockFingerprint,
+  type TextBlock,
+} from './blocks.ts';
 export {
   LOCATION_SCHEME,
   formatLocation,
