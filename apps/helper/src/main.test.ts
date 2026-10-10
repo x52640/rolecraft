@@ -1,22 +1,27 @@
 // 端到端：用真實子行程跑 main.ts（模擬瀏覽器以 stdio 啟動 host），以及原始碼靜態掃描。
 // 子程序只出現在測試裡；正式原始碼不得有任何子程序／shell／檔案系統呼叫（R7）。
 import { spawn } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import { describe, expect, it } from 'vitest';
+import { createMacFolderPicker, createMacPdfPicker, type ExecFileRunner } from '@rolecraft/sources';
+import { createLocalFileStore, openDatabase } from '@rolecraft/storage';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import {
   ALLOWED,
   anyString,
   env as envelope,
   OTHER,
+  recordingLogger,
   reply,
   SECRET,
   requests,
 } from './__fixtures__/requests.ts';
-import { ALLOWED_ORIGINS_ENV, FrameDecoder, encodeFrame } from './index.ts';
+import { ALLOWED_ORIGINS_ENV, dispatch, FrameDecoder, encodeFrame } from './index.ts';
+import { createServices, nativePickers, type NativePickers } from './main.ts';
 
 const MAIN = path.join(import.meta.dirname, 'main.ts');
 
@@ -98,6 +103,117 @@ describe('main（真實 stdio 子行程）', () => {
     header.writeUInt32LE(body.length, 0);
     const result = await runHost([ALLOWED], env, Buffer.concat([header, body]));
     expect(result.code).toBe(3);
+  });
+});
+
+describe('服務組裝（createServices，P1-T043）', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'rolecraft-services-'));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  const project = path.join(dir, '專案甲');
+  mkdirSync(project);
+
+  /** 假選取器：不開對話框，記錄被呼叫次數。 */
+  function fakePickers() {
+    return {
+      folder: vi.fn(() => Promise.resolve([project])),
+      pdf: vi.fn(() =>
+        Promise.resolve({ fileName: '履歷.pdf', bytes: new TextEncoder().encode('%PDF-1.7') }),
+      ),
+    } satisfies NativePickers;
+  }
+
+  function storage() {
+    const { db } = openDatabase(':memory:');
+    return { db, fileStore: createLocalFileStore(path.join(dir, 'files')) };
+  }
+
+  const send = (services: ReturnType<typeof createServices>, op: string) =>
+    dispatch({ op, payload: {} }, services, recordingLogger()).then((r) => r.response);
+
+  it('macOS 才接原生選取器（D11）；建立時不開對話框', () => {
+    expect(nativePickers('linux')).toEqual({});
+    expect(nativePickers('win32')).toEqual({});
+    const mac = nativePickers('darwin');
+    expect(typeof mac.folder).toBe('function');
+    expect(typeof mac.pdf).toBe('function');
+  });
+
+  it('沒有 storage：sources 接選取器；resumeImport、applications 不接', async () => {
+    const pickers = fakePickers();
+    const services = createServices(null, pickers);
+    const picked = await send(services, 'sources.pick_folders');
+    expect(picked).toMatchObject({ ok: true, selection: { status: 'selected' } });
+    expect(JSON.stringify(picked)).not.toContain(dir);
+    expect(await send(services, 'import.pick_pdf')).toMatchObject({
+      ok: false,
+      error: { code: 'not_implemented' },
+    });
+    expect(await send(services, 'applications.list')).toMatchObject({
+      ok: false,
+      error: { code: 'not_implemented' },
+    });
+    expect(pickers.pdf).not.toHaveBeenCalled();
+  });
+
+  it('沒有選取器：sources.pick_folders 回 not_implemented，其餘 sources 操作可用', async () => {
+    const services = createServices(null, {});
+    expect(await send(services, 'sources.pick_folders')).toMatchObject({
+      ok: false,
+      error: { code: 'not_implemented' },
+    });
+    expect(await send(services, 'sources.list_folders')).toMatchObject({ ok: true });
+  });
+
+  it('有 storage：接上 sources、resumeImport（PDF 選取器）、applications', async () => {
+    const pickers = fakePickers();
+    const services = createServices(storage(), pickers);
+    expect(await send(services, 'sources.pick_folders')).toMatchObject({ ok: true });
+    const imported = await send(services, 'import.pick_pdf');
+    expect(imported).toMatchObject({
+      ok: true,
+      selection: { status: 'selected', displayName: '履歷.pdf' },
+    });
+    expect(pickers.pdf).toHaveBeenCalledTimes(1);
+    expect(await send(services, 'applications.list')).toEqual({ ok: true, applications: [] });
+  });
+
+  it('真實選取器＋假 osascript：回應只有檔名／名稱，不含路徑；非 PDF 回固定錯誤', async () => {
+    const pdfPath = path.join(dir, '我的履歷.pdf');
+    const fakePath = path.join(dir, 'fake.pdf');
+    writeFileSync(pdfPath, '%PDF-1.7\n%%EOF\n');
+    writeFileSync(fakePath, `not a pdf ${SECRET}`);
+    let next = pdfPath;
+    const execFile = vi.fn<ExecFileRunner>((file) =>
+      Promise.resolve(file === '/usr/bin/osascript' ? `${next}\n` : ''),
+    );
+    const folderExec = vi.fn<ExecFileRunner>(() => Promise.resolve(`1\n${project}/\n`));
+    const services = createServices(storage(), {
+      pdf: createMacPdfPicker({ execFile, platform: 'darwin' }),
+      folder: createMacFolderPicker({ execFile: folderExec, platform: 'darwin' }),
+    });
+    const ok = await send(services, 'import.pick_pdf');
+    expect(ok).toMatchObject({ ok: true, selection: { displayName: '我的履歷.pdf' } });
+    const folders = await send(services, 'sources.pick_folders');
+    expect(folders).toMatchObject({ ok: true, selection: { roots: [{ name: '專案甲' }] } });
+    next = fakePath;
+    const bad = await send(services, 'import.pick_pdf');
+    expect(bad).toMatchObject({ ok: false, error: { code: 'internal_error' } });
+    for (const response of [ok, folders, bad]) {
+      expect(JSON.stringify(response)).not.toContain(dir);
+      expect(JSON.stringify(response)).not.toContain(SECRET);
+    }
+    // 失敗後選取視窗狀態已釋放，可以再選
+    next = pdfPath;
+    expect(await send(services, 'import.pick_pdf')).toMatchObject({ ok: true });
+  });
+
+  it('有 storage 但沒有 PDF 選取器：resumeImport 不接', async () => {
+    const services = createServices(storage(), {});
+    expect(await send(services, 'import.pick_pdf')).toMatchObject({
+      ok: false,
+      error: { code: 'not_implemented' },
+    });
+    expect(await send(services, 'applications.list')).toMatchObject({ ok: true });
   });
 });
 

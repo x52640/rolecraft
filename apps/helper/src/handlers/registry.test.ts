@@ -39,23 +39,28 @@ describe('分派表（P1-T041）', () => {
     expect(source.match(/OpHandler</g)).toHaveLength(1);
   });
 
-  it.each(EDITOR_OPS)('%s 尚未實作：即使有服務也回 not_implemented', async (op) => {
-    const services: HelperServices = {
-      jobs: { submitCapture: () => Promise.resolve({ jobSnapshotId: 'j-1' }) },
-      resumeImport: {},
-      sources: {},
-      applications: {},
-      providers: {},
-      pdfExport: {},
-      resume: {},
-      messages: {
-        submitCapture: () => Promise.resolve({ messageDraftId: 'm-1' }),
-        requestDraft: () => Promise.resolve({ workJobId: 'w-1' }),
-      },
-    };
+  /** 群組服務在、但沒有編輯器操作的方法（方法選填的群組）：handler 不得假設方法存在。 */
+  const EMPTY_GROUPS: HelperServices = {
+    jobs: { submitCapture: () => Promise.resolve({ jobSnapshotId: 'j-1' }) },
+    resumeImport: {},
+    sources: {},
+    applications: {},
+    providers: {},
+    pdfExport: {},
+    resume: {},
+    messages: {
+      submitCapture: () => Promise.resolve({ messageDraftId: 'm-1' }),
+      requestDraft: () => Promise.resolve({ workJobId: 'w-1' }),
+    },
+  };
+
+  // 已實作的群組由 createServices 依環境接上（main.test.ts 驗接線）；這裡只驗「沒接上就不偽造成功」。
+  it.each(EDITOR_OPS)('%s 沒接上服務或服務缺方法：回 not_implemented', async (op) => {
     const handler = HANDLERS[op] as (payload: unknown, s: HelperServices) => Promise<unknown>;
-    const response = await handler(editorRequests[op].payload, services);
-    expect(response).toMatchObject({ ok: false, error: { code: 'not_implemented' } });
-    expect(BRIDGE_SCHEMAS[op].response.safeParse(response).success).toBe(true);
+    for (const services of [{}, EMPTY_GROUPS]) {
+      const response = await handler(editorRequests[op].payload, services);
+      expect(response).toMatchObject({ ok: false, error: { code: 'not_implemented' } });
+      expect(BRIDGE_SCHEMAS[op].response.safeParse(response).success).toBe(true);
+    }
   });
 });

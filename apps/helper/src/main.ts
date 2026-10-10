@@ -4,17 +4,24 @@
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
-import { createRepositories } from '@rolecraft/storage';
+import { createMacFolderPicker, createMacPdfPicker } from '@rolecraft/sources';
+import {
+  createApplicationRecordRepository,
+  createExportVersionRepository,
+  createRepositories,
+} from '@rolecraft/storage';
 
 import { EXIT_CODES, startHost } from './bridge/host.ts';
 import { createLineLogger } from './bridge/logger.ts';
 import { ALLOWED_ORIGINS_ENV, parseAllowedOrigins } from './bridge/origin.ts';
+import { createApplicationsService } from './handlers/applications/storage-service.ts';
 import { createClaimsService, type HelperStorage } from './handlers/claims/storage-service.ts';
 import { createExportService } from './handlers/export/export-service.ts';
+import { createResumeImportService, type PdfFilePicker } from './handlers/import/import-service.ts';
 import { createJobsService } from './handlers/jobs/storage-service.ts';
 import { createProvidersService } from './handlers/providers/providers-service.ts';
 import type { HelperServices } from './handlers/services.ts';
-import { createSourcesService } from './handlers/sources/local-sources.ts';
+import { createSourcesService, type FolderPicker } from './handlers/sources/local-sources.ts';
 import { openHelperRuntime, runtimeConfigFromEnv, type HelperRuntime } from './services/runtime.ts';
 
 /** 完整 runtime（含字型、匯出版本庫）；只有 db／fileStore 的儲存不能接匯出。 */
@@ -22,16 +29,43 @@ function isRuntime(storage: HelperStorage): storage is HelperRuntime {
   return 'loadFonts' in storage;
 }
 
+/** 系統選取器（ADR-0003）：只回給 helper 的服務，路徑不進任何回應（R7）。 */
+export interface NativePickers {
+  readonly folder?: FolderPicker;
+  readonly pdf?: PdfFilePicker;
+}
+
+/** macOS 原生選取器（實作在 @rolecraft/sources）；其他平台不接（D11），對應操作回「尚未支援」。 */
+export function nativePickers(platform: NodeJS.Platform = process.platform): NativePickers {
+  if (platform !== 'darwin') return {};
+  return { folder: createMacFolderPicker(), pdf: createMacPdfPicker() };
+}
+
 /**
  * 服務組裝：各操作的服務由對應 Task 接上；沒接上的 handler 回「尚未支援」。
  * 沒有本機儲存（尚未設定資料區）時，依賴儲存的服務一律不接。
+ * pickers 只供測試替換（不開真的對話框）。
  */
-export function createServices(storage: HelperStorage | null = null): HelperServices {
+export function createServices(
+  storage: HelperStorage | null = null,
+  pickers: NativePickers = nativePickers(),
+): HelperServices {
   const repositories = storage && createRepositories(storage.db);
+  const { folder, pdf } = pickers;
   return {
     providers: createProvidersService(),
-    sources: createSourcesService(),
+    sources: createSourcesService(folder ? { picker: folder } : {}),
     ...(repositories && { jobs: createJobsService(repositories.jobSnapshots) }),
+    ...(repositories &&
+      pdf && {
+        resumeImport: createResumeImportService({ picker: pdf, profiles: repositories.profiles }),
+      }),
+    ...(storage && {
+      applications: createApplicationsService({
+        applications: createApplicationRecordRepository(storage.db, storage.fileStore),
+        exportVersions: createExportVersionRepository(storage.db, storage.fileStore),
+      }),
+    }),
     ...(storage && { claims: createClaimsService(storage) }),
     ...(storage && isRuntime(storage) && { pdfExport: createExportService(storage) }),
   };

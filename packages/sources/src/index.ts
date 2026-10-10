@@ -10,3 +10,12 @@ export {
 } from './filter.ts';
 export { SourceRegistry, type RegistryOptions } from './registry.ts';
 export { createNodeFolderAccess, type NodeFolderAccessOptions } from './node-folder-access.ts';
+export {
+  createMacFolderPicker,
+  createMacPdfPicker,
+  DEFAULT_MAX_PDF_BYTES,
+  PickerError,
+  type ExecFileRunner,
+  type PickedPdfFile,
+  type PickerFailure,
+} from './picker/index.ts';
