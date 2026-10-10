@@ -137,7 +137,22 @@ const valid = {
   ],
   RunCheckRecord: [
     RunCheckRecord,
-    { id: 'r-1', provider: 'codex', model: 'gpt', checkedAt: T, subscriptionOnly: 'passed' },
+    {
+      id: 'r-1',
+      provider: 'codex',
+      model: 'gpt',
+      trigger: 'run_start',
+      checkedAt: T,
+      items: {
+        subscriptionLogin: { outcome: 'passed', basis: 'login status' },
+        environmentSanitized: { outcome: 'passed', basis: 'env' },
+        cliConfig: { outcome: 'passed', basis: 'config' },
+        executionMode: { outcome: 'passed', basis: 'mode' },
+      },
+      removedEnvVarNames: ['OPENAI_API_KEY'],
+      subscriptionOnly: 'passed',
+      executed: true,
+    },
   ],
   WorkJob: [
     WorkJob,

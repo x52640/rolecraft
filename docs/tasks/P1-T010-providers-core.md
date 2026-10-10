@@ -7,7 +7,7 @@ specs: ["providers.md"]
 track: providers
 primary_repo: rolecraft
 write_paths: ["packages/providers/src/core/", "packages/providers/src/fake/", "packages/providers/src/index.ts"]
-contract_change: none
+contract_change: additive
 expected_commit: "feat(P1-T010): providers：適配介面、環境清理與 R6 紀錄"
 ---
 # providers：適配介面、環境清理與 R6 紀錄
@@ -74,9 +74,23 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：適配介面、環境清理、命令／子程序啟動器、R6 流程與紀錄、尚未支援適配器、fake adapter、測試
+- 已通過驗證：`npm run verify` 綠（Vitest 19 檔 186 測試）
+- 下一步：協調者收官（高風險 Task，E3 對抗驗證）
 - Blocker：無
 
 ## 完成結果
+
+- `packages/providers/src/core/`：
+  - `adapter.ts`：ProviderAdapter 介面（偵測安裝、登入／資格、模型、`verifySubscriptionRoute`、執行、取消用 AbortSignal、錯誤分類 quota_exhausted／transient／other／cancelled）；`SupportStatus`（supported／not_supported「尚未支援」／cannot_confirm「無法確認」）。
+  - `billing-env.ts`：計費環境變數**唯一清單**（Anthropic、OpenAI／Codex、Google／Vertex、AWS／Bedrock、Azure，附來源）＋關鍵字（API_KEY 等）與前綴兜底；不分大小寫、`-` 視同 `_`。
+  - `environment.ts`：白名單帶出＋黑名單優先；適配器政策放行或設定計費變數直接丟錯；只回報被移除的名稱，不記值。
+  - `command.ts`：`defineCommand` 只收字面值（型別層拒絕寬型別 string、執行時登記表＋凍結）；唯一變數是 `MODEL_SLOT`（模型 ID 嚴格格式，不得 `-` 開頭）；`API_KEY_MODE_FLAGS`（claude `--bare`）。
+  - `process.ts`：`createLauncher` 綁定清理後環境與空暫存工作目錄，`shell: false`，提示只走 stdin，輸出上限、取消。適配器拿不到原始環境。
+  - `run-check.ts`：`runWithSubscriptionCheck` 每次重查 R6，任一項非 passed（含 unknown、丟錯、尚未支援、模型 ID 不合法、命令含禁用旗標）就不執行；回傳經 contracts 驗證的 RunCheckRecord。
+  - `connection.ts`：安裝精靈用 `checkConnection` → ProviderConnection（不能免除執行前確認）。
+  - `unsupported.ts`：`createUnsupportedAdapter`。
+- `packages/providers/src/fake/fake-adapter.ts`：腳本式假適配器（文字／各類錯誤／等取消），記錄呼叫。
+- contracts（ADR-0006 第 6 項定案）：RunCheckRecord 加 trigger、items（四項各結果＋依據）、removedEnvVarNames、executed；schema 強制不變式。
+- 偏離：為配合 RunCheckRecord 新欄位，改了 `packages/contracts/src/entities/entities.test.ts` 的合法樣本（write_paths 外，否則既有測試會紅）。
+- 留給 P1-T011：codex、antigravity 的 API key 模式旗標與專屬環境變數未查證；各家 CLI 設定檔（apiKeyHelper、config.toml 等）偵測由各家適配器實作 `cliConfig`。
