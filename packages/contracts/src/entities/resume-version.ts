@@ -54,6 +54,16 @@ export const SectionItemKind = z.enum([
 ]);
 export type SectionItemKind = z.infer<typeof SectionItemKind>;
 
+/**
+ * 逐段接受狀態（F07、ADR-0006 第 9 項，P1-T024 定）：生成段落一開始是 pending；
+ * accepted＝接受修改稿（只接受措辭，不確認任何事實項，R1）；rejected＝退回。
+ */
+export const SectionDecision = z.enum(['pending', 'accepted', 'rejected']);
+export type SectionDecision = z.infer<typeof SectionDecision>;
+
+/** 修改理由簡述上限（字元）。 */
+export const SECTION_RATIONALE_MAX_CHARS = 300;
+
 /** 履歷的一段。 */
 export const ResumeSection = z.strictObject({
   id: Id,
@@ -71,6 +81,10 @@ export const ResumeSection = z.strictObject({
   placement: SectionPlacement.optional(),
   /** 項目類型（P1-T040）；省略視為一般段落 */
   itemKind: SectionItemKind.optional(),
+  /** 修改理由簡述（F07；模型整理，資料不是事實依據）。選填：使用者新寫的段落沒有 */
+  rationale: z.string().max(SECTION_RATIONALE_MAX_CHARS).optional(),
+  /** 逐段接受狀態（F07）。選填：缺省視同 pending */
+  decision: SectionDecision.optional(),
 });
 export type ResumeSection = z.infer<typeof ResumeSection>;
 
