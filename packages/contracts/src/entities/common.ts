@@ -30,7 +30,8 @@ export type ContentHash = z.infer<typeof ContentHash>;
 /** RoleCraft 產生的內容雜湊：SHA-256 小寫 hex。 */
 export const Sha256Hash = z.string().regex(/^[0-9a-f]{64}$/);
 
-export const NonEmptyText = z.string().min(1);
+/** 至少一個非空白字元；只有空白（含全形空白）不算內容（codex review P1-T001，R10）。原文不修剪。 */
+export const NonEmptyText = z.string().regex(/\S/u, '不可只有空白');
 
 /** 求職平台（jobs-and-messages.md「求職平台」表）。 */
 export const Platform = z.enum([

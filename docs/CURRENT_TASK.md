@@ -6,6 +6,7 @@
 ## 進行中
 
 - P1-T011 驗證：Claude CLI 隔離與訂閱登入（`docs/tasks/P1-T011-spike-claude-cli.md`）
+- P1-T033 修正 codex review 對 P1-T001、P1-T005、P1-T006 的發現（`docs/tasks/P1-T033-codex-review-fixes-1.md`）
 
 ## ready
 

@@ -183,3 +183,15 @@ describe('R9 服務與模型記錄', () => {
     expect(() => createWorkRun('j', ['a', 'a'])).toThrow(RangeError);
   });
 });
+
+describe('codex review P1-T005', () => {
+  it('輸入多帶的 unitId 不會蓋掉選定的單元', () => {
+    const run = createWorkRun('job-x', ['u1', 'u2']);
+    const input = { attemptId: 'a1', ...CLAUDE, unitId: 'u2' };
+    const started = ok(startUnit(run, input));
+    expect(started.unitId).toBe('u1');
+    expect(started.active?.unitId).toBe('u1');
+    const done = ok(completeUnit(started, 'a1', 'out'));
+    expect(done.job.units.map((u) => u.status)).toEqual(['completed', 'pending']);
+  });
+});

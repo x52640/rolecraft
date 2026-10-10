@@ -36,7 +36,8 @@ export function startUnit(run: WorkRun, input: StartUnitInput): Transition<{ uni
     unitId: unit.id,
     run: {
       job: replaceUnit(run.job, recorded),
-      active: { unitId: unit.id, ...input },
+      // 選定的單元 ID 放最後，輸入多帶的 unitId 不能蓋掉它（codex review P1-T005）
+      active: { ...input, unitId: unit.id },
     },
   };
 }

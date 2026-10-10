@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -61,5 +61,29 @@ describe('local file store', () => {
     const { hash } = store.put(pdf);
     writeFileSync(path.join(root, 'sha256', hash.slice(0, 2), hash), 'tampered');
     expect(() => store.get(hash)).toThrow(/雜湊不符/);
+  });
+});
+
+describe('codex review P1-T006', () => {
+  it('既有檔案損壞時 put 會修復，不回報假成功', () => {
+    const { hash } = store.put(pdf);
+    const target = path.join(root, 'sha256', hash.slice(0, 2), hash);
+    writeFileSync(target, 'corrupted');
+    expect(() => store.get(hash)).toThrow(StorageError);
+    store.put(pdf);
+    expect(store.get(hash)).toEqual(pdf);
+  });
+
+  it('寫入失敗時不留下暫存檔', () => {
+    const { hash } = store.put(pdf);
+    const dir = path.join(root, 'sha256', hash.slice(0, 2));
+    writeFileSync(path.join(dir, hash), 'corrupted');
+    chmodSync(dir, 0o500);
+    try {
+      expect(() => store.put(pdf)).toThrow();
+    } finally {
+      chmodSync(dir, 0o700);
+    }
+    expect(readdirSync(dir).filter((f) => f.endsWith('.tmp'))).toEqual([]);
   });
 });

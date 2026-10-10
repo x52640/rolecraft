@@ -62,11 +62,17 @@ export function createLocalFileStore(root: string): FileStore {
     put(content) {
       const hash = sha256Hex(content);
       const target = pathOf(hash);
-      if (!existsSync(target)) {
+      // 既有檔案內容不符雜湊（損壞或被外部修改）就原子覆寫，不回報假成功（codex review P1-T006）
+      if (!existsSync(target) || sha256Hex(readFileSync(target)) !== hash) {
         mkdirSync(path.dirname(target), { recursive: true });
         const temp = `${target}.${randomUUID()}.tmp`;
-        writeFileSync(temp, content, { flag: 'wx' });
-        renameSync(temp, target);
+        try {
+          writeFileSync(temp, content, { flag: 'wx' });
+          renameSync(temp, target);
+        } catch (error) {
+          rmSync(temp, { force: true });
+          throw error;
+        }
       }
       return { hash, byteLength: content.byteLength };
     },

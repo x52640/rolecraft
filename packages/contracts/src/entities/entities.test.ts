@@ -1,3 +1,4 @@
+import { NonEmptyText } from './common.ts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -217,5 +218,14 @@ describe('entity schemas', () => {
     expect(WorkJob.safeParse({ ...job, pauseReason: null }).success).toBe(false);
     expect(WorkJob.safeParse({ ...job, status: 'running' }).success).toBe(false);
     expect(WorkJob.safeParse({ ...job, status: 'stopped', pauseReason: null }).success).toBe(false);
+  });
+});
+
+describe('NonEmptyText（codex review P1-T001）', () => {
+  it.each(['', ' ', '\n\t', '　　'])('拒絕只有空白：%j', (value) => {
+    expect(NonEmptyText.safeParse(value).success).toBe(false);
+  });
+  it('接受含內容的文字且不修剪', () => {
+    expect(NonEmptyText.parse('  工程師 ')).toBe('  工程師 ');
   });
 });

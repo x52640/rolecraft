@@ -11,6 +11,10 @@ export function transaction<T>(db: DatabaseSync, fn: () => T): T {
   db.exec(`SAVEPOINT ${name}`);
   try {
     const result = fn();
+    // async 函式回傳 Promise 時，後續的失敗無法回滾（codex review P1-T006）
+    if (result !== null && typeof (result as { then?: unknown })?.then === 'function') {
+      throw new TypeError('transaction 不接受 async 函式');
+    }
     db.exec(`RELEASE ${name}`);
     return result;
   } catch (error) {
