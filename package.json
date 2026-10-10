@@ -16,8 +16,11 @@
     "lint": "eslint --max-warnings 0 .",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "verify:docs": "node -e \"console.log('verify:docs: 尚未實作（P0-T002 補上）')\"",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run verify:docs"
+    "test:docs": "node --test \"scripts/docs/*.test.mjs\"",
+    "verify:docs": "node scripts/docs/cli.mjs verify",
+    "task:index": "node scripts/docs/cli.mjs index",
+    "task:close": "node scripts/docs/cli.mjs close",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run test:docs && npm run verify:docs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,18 +1,18 @@
 # Current Task
 
-上限 100 行，只放指標。任務總表：`docs/tasks/`（P0-T002 之後由 `task:index` 產生 `docs/tasks/INDEX.md`）。
+上限 100 行，只放指標。任務總表：`docs/tasks/INDEX.md`（`npm run task:index` 產生）。
 
 <!-- index:start -->
 ## 進行中
 
-- P0-T002 文件閘門腳本（`docs/tasks/P0-T002-docs-tooling.md`）
-- P1-T001 contracts 核心資料物件
-- P1-T013 驗證：橋接通訊方式
-- P1-T026 驗證：中文 PDF 匯出方式
+- P0-T002 文件閘門腳本：verify:docs、task:index、task:close（`docs/tasks/P0-T002-docs-tooling.md`）
+- P1-T001 contracts：核心資料物件與橋接 schema（`docs/tasks/P1-T001-contracts-core.md`）
+- P1-T013 驗證：橋接通訊方式（Q3）與資料夾選取機制（`docs/tasks/P1-T013-spike-bridge.md`）
+- P1-T026 驗證：中文 PDF 匯出方式（`docs/tasks/P1-T026-spike-pdf-export.md`）
 
 ## ready
 
-（無）
+- 無
 <!-- index:end -->
 
 ## 主樹基準
