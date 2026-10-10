@@ -73,9 +73,13 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：預算公式、估算器、分段、拆批與測試
+- 已通過驗證：`npm run verify` 綠（domain 新增 18 測試）
+- 下一步：協調者收官
 - Blocker：無
 
 ## 完成結果
+
+- `packages/domain/src/budget/`：`formula.ts`（`computeInputBudget` 上限－輸出預留－工具開銷預留，非整數／負數／扣完不剩回失敗；`fitsBudget` 剛好等於算在內）、`estimate.ts`（保守估算器）、`segment.ts`（`splitByTokens` 單片段再分段，優先換行→句末標點→空白，不切代理對）、`batches.ts`（`planBatches` 依序裝箱，每批記錄估算值、所用預算、來源 id 與 [start,end) 位置）。`index.ts` 只加一行 `export *`。
+- 高估係數（檔頭文件化，非官方計量）：ASCII 每 3 字元 1 token（進位）；UTF-8 2／3／4 位元組碼位分別 1／2／3 token（中文每字 2）。每片段另加包裝預留 16 token。估算對串接次可加，所以逐片段加總不會低估整批。
+- 暫行（spec 未定）：來源位置用 UTF-16 code unit 半開區間；固定內容（指令、全域摘要、歷史）以字串傳入、每批都計入；空片段略過；失敗原因 `fixed_exceeds_budget`／`budget_too_small`。
