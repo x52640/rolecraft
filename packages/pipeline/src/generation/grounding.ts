@@ -1,7 +1,8 @@
 /**
  * 段落文字的依據檢查（R1 檢查 3 的生成端加嚴）：段落中的網址、網域、數字、倍數／比例詞
  * 都必須出現在所引用事實項的內容（或使用者確認文字）中；段落也不得出現職缺快照的公司或職稱
- * （這些由系統帶入，不由模型寫）。比對前一律 NFKC、去零寬字元，避免全形或隱藏字元繞過。
+ * （這些由系統帶入，不由模型寫）。比對前一律正規化（normalizeForGrounding），避免全形、隱藏字元
+ * 或「[.]」「 dot 」之類寫法繞過。
  * 寧可多丟，不放行。
  */
 import type { Claim } from '@rolecraft/contracts';
@@ -10,11 +11,26 @@ import { extractNumbers, numberKeys } from '@rolecraft/domain';
 import { extractUrls } from '../analysis/urls.ts';
 import type { SectionDropReason } from './types.ts';
 
-const ZERO_WIDTH = /[\u200B-\u200D\u2060\uFEFF]/gu;
+/** 所有格式字元（\p{Cf}：零寬、軟連字號、蒙古文母音分隔、tag 字元等）與組合字形連接符 U+034F。 */
+const INVISIBLE = /[\p{Cf}\u034F]/gu;
+/** 中日文句點變體（NFKC 後仍不是「.」的）：當成點，避免「example。com」繞過網域檢查。 */
+const IDEOGRAPHIC_DOTS = /[\u3002\uFF61\uFE52]/gu;
+/** 「[.]」「(.)」「[dot]」「(dot)」寫法。 */
+const BRACKET_DOT = /\s*[[(]\s*(?:\.|dot)\s*[\])]\s*/giu;
+/** 「 dot 」寫法（前後要有空白）。 */
+const SPACED_DOT = /\s+dot\s+/giu;
 
-/** NFKC＋去零寬字元。 */
+/**
+ * NFKC＋去隱形字元＋點的變體一律轉成「.」。寧可多丟：中文句號也會變成點，
+ * 所以「TypeScript。Next」這種寫法可能被當成網域而丟段。
+ */
 export function normalizeForGrounding(text: string): string {
-  return text.normalize('NFKC').replace(ZERO_WIDTH, '');
+  return text
+    .normalize('NFKC')
+    .replace(INVISIBLE, '')
+    .replace(IDEOGRAPHIC_DOTS, '.')
+    .replace(BRACKET_DOT, '.')
+    .replace(SPACED_DOT, '.');
 }
 
 /** 常見檔名副檔名：`README.md`、`Node.js` 之類不當成網域。 */

@@ -75,8 +75,8 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：pipeline/messages、helper messages 服務與 handler、editor 訊息頁與路由
-- 已通過驗證：`npm run verify` 綠（Vitest 2450 通過、13 略過；test:docs 15）
+- 最後完成：對抗驗證修正（承諾字眼、隱形字元、點的變體網域、聯絡方式）
+- 已通過驗證：`npm run verify` 綠（Vitest 2551 通過、13 略過；test:docs 15）
 - 下一步：協調者收官
 - Blocker：無
 
@@ -92,4 +92,15 @@ npm run verify
 - 測試：pipeline 67（格式 10 種不合格、依據 8 種丟棄、承諾 18 種擋＋4 種放行、意圖不明 6 種、送出前檢查、runner：注入承諾不寫入且有上限重試、401 不重試、額度、R6、未確認不送、取消）；helper 15＋5（dispatch＋記憶體 SQLite＋fake adapter；Claude 執行端用假 spawn 與 P1-T011 實錄）；editor 8（意圖不明不送、輪詢拿草稿、編輯儲存複製、沒有送出按鈕、重新產生要再確認、逾時提示、原文純文字）。
 - 保守選擇／待擁有者裁定：(1) 草稿連「詢問」薪資、時間、到職日也擋（字眼一出現就丟），要談由使用者自己補寫；「上班」「立即」「pay」等也會誤擋，寧可多丟；(2) 意圖只收三個固定值，不由模型推測；(3) 關聯職缺未確認就不產生（R10）；(4) 產生期間使用者改過草稿就不覆蓋，結果丟棄；(5) 預算用保守固定值（上下文 200k、輸出預留 8k、工具開銷預留 40k）。
 - 殘餘：(1) contracts 沒有工作狀態查詢操作，編輯器只能輪詢 `messages.get`（每 3 秒、最多 60 次），暫停／被擋／檢查不過時畫面只能說「還沒拿到新草稿」，無法說明原因（需 contract_change 加 work 狀態或草稿狀態欄位）；(2) 草稿執行端自建一個 Claude 服務，沒和 providers 的檢查共用同一個版本閘門（無保存介面時兩者都只接受已驗證版本、不自動重新驗證，暫無實際衝突；共用需改 providers 服務組裝）；(3) 選定模型靠 providers 候選清單順序對回常數，兩邊清單若不同就不排入；(4) 暫停的草稿工作沒有續跑入口，使用者只能重新產生；(5) 手動驗證（真實 Claude 帳號產生草稿）未做，需擁有者。
+
+### 對抗驗證修正
+
+| 缺陷 | 修正 | 測試 |
+| --- | --- | --- |
+| （major）承諾字眼不全 | `commitments.ts` 補：時間（晚間、午後、早晨、清晨、凌晨、黃昏、夜間、假日、平日、上／中／下旬、過年、節後；morning、afternoon、evening、noon、weekday(s)、asap、as soon as possible、right away、月份名與縮寫、序數詞與 1st 等）；到職（加入、開始、即可、交接、離職；begin、join、start、available 各變化）；薪資（收入、年收、月收；package、income、pay range）。提示同步列出會被作廢的字眼 | `check.test.ts`：各類補詞都擋；婉拒、詢問、接受各一則正常草稿仍通過 |
+| （major）隱形字元可拆字繞過 | `grounding.ts` `normalizeForGrounding` 改為 NFKC＋移除所有 `\p{Cf}`（含 U+00AD、U+2063、U+180E、tag 字元）與 U+034F；承諾比對另對「去掉所有空白」的版本再跑一次。P1-T024 段落檢查同步受惠，generation 既有測試全綠 | `grounding.test.ts`、`check.test.ts`：「到 職」、軟連字號、U+2063、U+180E、U+034F、tag 字元拆字都擋 |
+| （minor）全形句點與 [.]／ dot 寫法的網域、聯絡帳號 | 正規化時 U+3002、U+FF61、U+FE52、`[.]`、`(.)`、`[dot]`、`(dot)`、「 dot 」一律轉「.」；`commitments.ts` 另擋 email 樣式（@、(at)、[at]、「 at 」）與 LINE／WeChat／Telegram／WhatsApp／微信＋ID 帳號樣式（新丟棄原因 `contact_info`） | `grounding.test.ts`、`check.test.ts`：evil。com、evil｡com、evil[.]com、evil dot com、軟連字號網域都丟；五種 email 寫法、六種帳號寫法都擋 |
+
+- 設計邊界：不含數字、網址、倍數詞的捏造經歷（例如「我帶過大型團隊」）無法用確定性規則判斷，靠提示限制與使用者審閱把關；草稿不會自動送出（D7）。
+- 待擁有者裁定（誤殺）：「加入」「開始」「即可」「離職」會擋掉「期待加入貴團隊」這類常見接受邀約說法，提示已要求模型改用「進一步了解」「後續安排」；英文的月份 may、序數 first／second、start、join 也會誤擋英文草稿。中文句號轉成點，「TypeScript。Next」這種寫法可能被當成網域而丟段（P1-T024 段落也一樣）。是否放寬待裁定。
 

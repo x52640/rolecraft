@@ -89,7 +89,7 @@ describe('commitmentProblem（不承諾時間、薪資、到職日）', () => {
     ['可以立刻到職', 'commits_start_date'],
     ['下個月就能報到', 'commits_time'],
     ['能夠報到', 'commits_start_date'],
-    ['I can start on the 1st', 'commits_start_date'],
+    ['I can start on the 1st', 'commits_time'],
     ['到​職', 'commits_start_date'],
   ])('%s → %s', (draft, problem) => {
     expect(commitmentProblem(draft)).toBe(problem);
@@ -107,4 +107,74 @@ describe('commitmentProblem（不承諾時間、薪資、到職日）', () => {
   it('checkDraft rejects commitments even when everything else is grounded', () => {
     expect(check('感謝邀約，我這週下午都可以。')).toEqual({ ok: false, problem: 'commits_time' });
   });
+});
+
+describe('對抗驗證補強：承諾字眼、隱形字元、聯絡方式', () => {
+  it.each([
+    ['晚間可以聊聊', 'commits_time'],
+    ['午後方便', 'commits_time'],
+    ['清晨、凌晨、黃昏都行', 'commits_time'],
+    ['假日也可以', 'commits_time'],
+    ['平日都在', 'commits_time'],
+    ['下旬再說', 'commits_time'],
+    ['過年後', 'commits_time'],
+    ['節後聯繫', 'commits_time'],
+    ['Good morning, see you in the afternoon', 'commits_time'],
+    ['any weekday works', 'commits_time'],
+    ['I can reply ASAP', 'commits_time'],
+    ['as soon as possible', 'commits_time'],
+    ['right away', 'commits_time'],
+    ['in March', 'commits_time'],
+    ['on the 3rd', 'commits_time'],
+    ['the fifteenth', 'commits_time'],
+    ['期望年收再談', 'commits_salary'],
+    ['目前收入', 'commits_salary'],
+    ['the package looks fine', 'commits_salary'],
+    ['what is the pay range', 'commits_salary'],
+    ['很期待加入貴團隊', 'commits_start_date'],
+    ['可以開始了', 'commits_start_date'],
+    ['回覆即可', 'commits_start_date'],
+    ['需要交接', 'commits_start_date'],
+    ['正在辦理離職', 'commits_start_date'],
+    ['I could begin soon', 'commits_start_date'],
+    ['happy to join', 'commits_start_date'],
+    ['I can start', 'commits_start_date'],
+    ['I am available', 'commits_start_date'],
+    ['到 職', 'commits_start_date'],
+    ['到­職', 'commits_start_date'],
+    ['到⁣職', 'commits_start_date'],
+    ['到᠎職', 'commits_start_date'],
+    ['到͏職', 'commits_start_date'],
+    ['到\u{E0041}職', 'commits_start_date'],
+    ['薪 資', 'commits_salary'],
+    ['me@example.org', 'contact_info'],
+    ['me (at) example (dot) org', 'contact_info'],
+    ['me [at] example [.] org', 'contact_info'],
+    ['me at example dot org', 'contact_info'],
+    ['LINE ID：abc123', 'contact_info'],
+    ['line: my.id', 'contact_info'],
+    ['WeChat ID abc_1', 'contact_info'],
+    ['Telegram: @someone', 'contact_info'],
+    ['WhatsApp 帳號 abc', 'contact_info'],
+    ['微信號：abc123', 'contact_info'],
+  ])('%s → %s', (draft, problem) => {
+    expect(commitmentProblem(draft)).toBe(problem);
+  });
+
+  it.each([
+    '謝謝您的邀約，目前暫時沒有轉換工作的規劃，希望未來有機會合作，再次感謝。',
+    '感謝您的來信與說明。目前我想專注在現有的工作上，這次先婉拒，祝徵才順利。',
+    '感謝您的來信。想請問這個職位主要負責哪些產品？團隊目前的分工與技術棧為何？',
+    '謝謝您的邀約，我對這個職缺很有興趣，想進一步了解職務內容，請告知後續安排方式。',
+  ])('正常的婉拒／詢問／接受草稿仍通過：%s', (draft) => {
+    expect(commitmentProblem(draft)).toBeNull();
+    expect(check(draft).ok).toBe(true);
+  });
+
+  it.each(['請看 evil。com', '請看 evil｡com', '請看 evil[.]com', '請看 evil dot com', 'evil­.com'])(
+    '隱形字元與點的變體不能繞過網域檢查：%s',
+    (draft) => {
+      expect(check(draft)).toEqual({ ok: false, problem: 'link_not_in_claims' });
+    },
+  );
 });

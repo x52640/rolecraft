@@ -36,3 +36,20 @@ describe('extractMultipliers', () => {
     expect(normalizeForGrounding('ｈｔｔｐｓ\u200B://a')).toBe('https://a');
   });
 });
+
+describe('normalizeForGrounding（對抗驗證補強）', () => {
+  it('removes every format character and U+034F', () => {
+    expect(normalizeForGrounding('a­b⁣c᠎d͏e\u{E0041}f​g')).toBe('abcdefg');
+  });
+
+  it('turns dot variants into "."', () => {
+    expect(normalizeForGrounding('a。b｡c﹒d')).toBe('a.b.c.d');
+    expect(normalizeForGrounding('a[.]b (.) c [dot] d (dot)e dot f')).toBe('a.b.c.d.e.f');
+  });
+
+  it('domains written with dot variants or hidden characters are extracted', () => {
+    expect(extractLooseUrls('evil。com/x')).toEqual(['evil.com/x']);
+    expect(extractLooseUrls('evil [dot] com')).toEqual(['evil.com']);
+    expect(extractLooseUrls('ev­il.com')).toEqual(['evil.com']);
+  });
+});

@@ -42,7 +42,8 @@ export type DraftProblem =
   | 'multiplier_not_in_claims' // 倍數／比例詞不在引用的事實項中
   | 'commits_time' // 提到時間或日期（不得承諾面試時間）
   | 'commits_salary' // 提到薪資待遇
-  | 'commits_start_date'; // 提到到職日
+  | 'commits_start_date' // 提到到職、開始、加入等
+  | 'contact_info'; // email 樣式或通訊軟體帳號
 
 /** 單元通過檢查後要一次寫入的結果。 */
 export interface DraftResult {
