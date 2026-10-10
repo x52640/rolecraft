@@ -5,7 +5,6 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T025 editor：逐段對照、接受與匯出前檢查（`docs/tasks/P1-T025-resume-editor-ui.md`）
 - P1-T029 招募訊息回覆草稿（手動貼上）（`docs/tasks/P1-T029-message-drafts.md`）
 
 ## ready

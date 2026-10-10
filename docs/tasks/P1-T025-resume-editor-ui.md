@@ -1,7 +1,7 @@
 ---
 id: P1-T025
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T024", "P1-T023"]
 specs: ["resume-output.md", "evidence-model.md"]
 track: editor
