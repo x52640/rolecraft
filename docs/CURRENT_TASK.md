@@ -5,7 +5,6 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T023 editor：事實項檢視與確認（`docs/tasks/P1-T023-claims-review-ui.md`）
 - P1-T024 pipeline：職缺匹配與段落生成（`docs/tasks/P1-T024-pipeline-resume-gen.md`）
 - P1-T040 helper：匯出接線（`docs/tasks/P1-T040-helper-export-wiring.md`）
 

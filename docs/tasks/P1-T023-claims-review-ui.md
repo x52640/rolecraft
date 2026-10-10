@@ -1,7 +1,7 @@
 ---
 id: P1-T023
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T022", "P1-T016"]
 specs: ["evidence-model.md"]
 track: editor
