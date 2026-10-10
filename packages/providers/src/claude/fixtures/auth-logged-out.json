@@ -1,0 +1,8 @@
+{
+  "loggedIn": false,
+  "authMethod": "none",
+  "apiProvider": "firstParty",
+  "analyticsDisabled": false,
+  "projectsDirectory": "/tmp/rolecraft-claude-spike-4gXcsT/home/.claude/projects",
+  "configDirectory": "/tmp/rolecraft-claude-spike-4gXcsT/home/.claude"
+}

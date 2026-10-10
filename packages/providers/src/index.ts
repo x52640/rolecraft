@@ -1,4 +1,4 @@
-/** @rolecraft/providers 公開入口：適配介面、環境清理、R6 確認紀錄（D2、D12、R5、R6）。 */
+/** @rolecraft/providers 公開入口：適配介面、環境清理、R6 確認紀錄、Claude 適配器（D2、D12、R5、R6）。 */
 export const PACKAGE_NAME = '@rolecraft/providers';
 
 export type {
@@ -46,6 +46,23 @@ export {
   runWithSubscriptionCheck,
 } from './core/run-check.ts';
 export { createUnsupportedAdapter } from './core/unsupported.ts';
+export {
+  type ClaudeAdapter,
+  type ClaudeAdapterOptions,
+  createClaudeAdapter,
+} from './claude/adapter.ts';
+export {
+  CLAUDE_ENVIRONMENT,
+  CLAUDE_FORBIDDEN_FLAGS,
+  CLAUDE_MODEL_CANDIDATES,
+  CLAUDE_VERIFIED_VERSION,
+  findForbiddenClaudeArgs,
+} from './claude/constants.ts';
+export { createClaudeStreamGuard, type StreamGuardOptions } from './claude/guard.ts';
+export { locateClaude } from './claude/locate.ts';
+export { MODEL_PROBE_PROMPT, type ModelProbeResult, verifyClaudeModel } from './claude/models.ts';
+export type { ClaudeRunInfo } from './claude/result.ts';
+export type { StreamViolation } from './claude/stream.ts';
 export {
   createFakeAdapter,
   type FakeAdapter,
