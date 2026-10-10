@@ -69,7 +69,12 @@ export const editorRequests = {
   'claims.get': { op: 'claims.get', payload: { claimId: ID } },
   'claims.confirm': {
     op: 'claims.confirm',
-    payload: { claimId: ID, text: '完成登入功能', completion: 'user_confirmed_done' },
+    payload: {
+      claimId: ID,
+      text: '完成登入功能',
+      completion: 'user_confirmed_done',
+      expectedReviewStatus: 'normal',
+    },
   },
   'claims.update': { op: 'claims.update', payload: { claimId: ID, text: '完成登入功能' } },
   'claims.reject': { op: 'claims.reject', payload: { claimId: ID } },

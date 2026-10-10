@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { Claim } from '../../entities/claim.ts';
+import { Claim, ReviewStatus } from '../../entities/claim.ts';
 import { NonEmptyText } from '../../entities/common.ts';
 import { ProjectEvidence } from '../../entities/project-evidence.ts';
 import { Ack, EmptyPayload, OpaqueId, bridgeOp } from '../common.ts';
@@ -40,6 +40,8 @@ export const CLAIMS_SCHEMAS = {
   /**
    * 確認事實項：text 是使用者確認當下看到（可一併修正）的內容，helper 記錄確認時間與這段文字（R1）。
    * 確認時間由 helper 決定，不由呼叫端給。
+   * expectedReviewStatus 是畫面當時顯示的複核狀態；helper 在同一交易比對，不符就拒絕不寫入（R2），
+   * 避免使用者對著過時的畫面把待複核、來源矛盾清回正常。
    */
   'claims.confirm': {
     request: bridgeOp(
@@ -48,6 +50,7 @@ export const CLAIMS_SCHEMAS = {
         claimId: OpaqueId,
         text: NonEmptyText,
         completion: ConfirmableCompletion.optional(),
+        expectedReviewStatus: ReviewStatus,
       }),
     ),
     response: withFailure(Ack),

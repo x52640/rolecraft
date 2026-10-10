@@ -13,6 +13,8 @@ function confirmPayload(claim: Claim, choice: CompletionChoice) {
   return {
     claimId: claim.id,
     text: claim.text,
+    // 畫面當時看到的複核狀態：helper 比對不符就拒絕（R2），之後重新讀取
+    expectedReviewStatus: claim.reviewStatus,
     ...(needsCompletion(claim) && choice !== '' ? { completion: choice } : {}),
   };
 }
@@ -118,7 +120,9 @@ export function useClaimsReview() {
           op: 'claims.update',
           payload: { claimId: claim.id, text },
         });
-        return res.ok ? '已修改；原本的確認已失效，請重新確認。' : errorOf(res);
+        return res.ok
+          ? '已修改；原本的確認已失效，舊來源不再替新內容背書，請對照原文重新確認。'
+          : errorOf(res);
       }),
     reject: (claim: Claim) =>
       run([claim.id], async () => {

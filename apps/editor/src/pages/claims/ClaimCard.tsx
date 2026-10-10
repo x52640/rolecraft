@@ -71,7 +71,7 @@ export function ClaimCard(props: ClaimCardProps) {
               修改內容
               <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} />
             </label>
-            <p className="claim-hint">儲存後原本的確認會失效，需要重新確認。</p>
+            <p className="claim-hint">儲存後原本的確認會失效、改為待複核，需要對照原文重新確認。</p>
             <button
               type="button"
               disabled={busy || draft.trim() === ''}
@@ -116,7 +116,7 @@ export function ClaimCard(props: ClaimCardProps) {
             </button>
             {askingDelete ? (
               <span role="group" aria-label="確認刪除">
-                刪除後不會再用於生成；引用它且尚未投遞的匯出版本會一併刪除。
+                刪除後不會再用於生成；引用它且尚未投遞的匯出版本會一併刪除，已投遞的匯出版本會保留（含此事實項的副本）。
                 <button
                   type="button"
                   disabled={busy}

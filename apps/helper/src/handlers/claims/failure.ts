@@ -5,6 +5,7 @@ import type { ClaimsWriteResult } from './service.ts';
 const MESSAGES = {
   not_found: '找不到這個事實項或專案',
   rejected: '這個動作不適用於該事實項',
+  stale: '事實項的複核狀態已改變，請重新讀取並對照原文後再確認',
 } as const;
 
 /** 事實項操作失敗：一律 invalid_request，訊息是固定文字，不回填請求內容。 */

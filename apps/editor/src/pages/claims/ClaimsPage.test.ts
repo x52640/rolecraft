@@ -110,7 +110,12 @@ describe('<ClaimsPage />', () => {
     expect(helper.writes()).toEqual([
       {
         op: 'claims.confirm',
-        payload: { claimId: 'c-feature', text: '支援 PDF 匯出', completion: 'user_confirmed_done' },
+        payload: {
+          claimId: 'c-feature',
+          text: '支援 PDF 匯出',
+          completion: 'user_confirmed_done',
+          expectedReviewStatus: 'normal',
+        },
       },
     ]);
   });
@@ -122,7 +127,11 @@ describe('<ClaimsPage />', () => {
     expect(within(role).queryByRole('combobox')).toBeNull();
     fireEvent.click(within(role).getByRole('button', { name: '確認此項' }));
     await screen.findByText('已確認。');
-    expect(helper.writes()[0]?.payload).toEqual({ claimId: 'c-role', text: '負責後端' });
+    expect(helper.writes()[0]?.payload).toEqual({
+      claimId: 'c-role',
+      text: '負責後端',
+      expectedReviewStatus: 'normal',
+    });
   });
 
   it('批次確認：待複核不能勾；功能沒選完成狀態時一項都不送', async () => {
@@ -144,8 +153,13 @@ describe('<ClaimsPage />', () => {
     fireEvent.click(screen.getByRole('button', { name: '批次確認所選（2）' }));
     await screen.findByText('已確認 2 項。');
     expect(helper.writes().map((w) => w.payload)).toEqual([
-      { claimId: 'c-feature', text: '支援 PDF 匯出', completion: 'planned' },
-      { claimId: 'c-role', text: '負責後端' },
+      {
+        claimId: 'c-feature',
+        text: '支援 PDF 匯出',
+        completion: 'planned',
+        expectedReviewStatus: 'normal',
+      },
+      { claimId: 'c-role', text: '負責後端', expectedReviewStatus: 'normal' },
     ]);
   });
 
@@ -171,6 +185,9 @@ describe('<ClaimsPage />', () => {
     expect(within(role).getByRole('group', { name: '確認刪除' }).textContent).toContain(
       '尚未投遞的匯出版本會一併刪除',
     );
+    expect(within(role).getByRole('group', { name: '確認刪除' }).textContent).toContain(
+      '已投遞的匯出版本會保留（含此事實項的副本）',
+    );
     fireEvent.click(within(role).getByRole('button', { name: '確定刪除' }));
     await screen.findByText(/已刪除/);
     expect(helper.writes()).toEqual([{ op: 'claims.reject', payload: { claimId: 'c-role' } }]);
@@ -190,6 +207,40 @@ describe('<ClaimsPage />', () => {
       /你已於 .* 確認此內容/,
     );
     expect(card('負責全端').textContent).toContain('確認後內容已改變，需要重新確認');
+  });
+
+  it('畫面狀態過時：helper 拒絕確認後顯示原因並重新讀取', async () => {
+    let lists = 0;
+    const sent: Sent[] = [];
+    const transport: BridgeTransport = {
+      send(raw) {
+        const req = raw as Sent;
+        sent.push(req);
+        if (req.op === 'claims.list_projects') {
+          return Promise.resolve({
+            ok: true,
+            projects: [{ id: 'p1', name: 'RoleCraft', summary: '', claimIds: [] }],
+          });
+        }
+        if (req.op === 'claims.list') {
+          lists += 1;
+          const claim = lists === 1 ? ROLE : { ...ROLE, reviewStatus: 'source_conflict' };
+          return Promise.resolve({ ok: true, claims: [claim] });
+        }
+        return Promise.resolve({
+          ok: false,
+          error: { code: 'invalid_request', message: '事實項的複核狀態已改變，請重新讀取' },
+        });
+      },
+    };
+    renderPage({ transport, sent, writes: () => [] });
+    const role = await screen.findByRole('article', { name: '負責後端' });
+    fireEvent.click(within(role).getByRole('button', { name: '確認此項' }));
+    await screen.findByText(/複核狀態已改變/);
+    await waitFor(() => expect(card('負責後端').textContent).toContain('來源矛盾'));
+    expect(sent.find((r) => r.op === 'claims.confirm')?.payload).toMatchObject({
+      expectedReviewStatus: 'normal',
+    });
   });
 
   it('helper 未接上：顯示錯誤，不顯示任何事實項', async () => {

@@ -20,7 +20,7 @@ export const COMPLETION_LABELS: Record<CompletionStatus, string> = {
 
 /** 複核狀態（R2）：正常不另外標示。 */
 export const REVIEW_LABELS: Record<Exclude<ReviewStatus, 'normal'>, string> = {
-  needs_review: '待複核：來源區塊已變更，請對照原文後重新確認；處理前不會用於生成',
+  needs_review: '待複核：內容或來源已變更，請對照原文後重新確認；處理前不會用於生成',
   source_removed: '來源已移除：依據只剩你的確認',
   source_conflict: '來源矛盾：目前按「未知」處理，請對照原文後確認',
 };

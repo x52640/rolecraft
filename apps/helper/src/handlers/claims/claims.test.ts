@@ -1,82 +1,25 @@
 // claims.* 端到端：dispatch → handler → storage 實作（真實 SQLite，記憶體資料庫＋暫存檔案區）。
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import type { BridgeRequest, Claim } from '@rolecraft/contracts';
-import { createLocalFileStore, createRepositories, openDatabase } from '@rolecraft/storage';
+import type { Claim } from '@rolecraft/contracts';
+import { createLocalFileStore, createRepositories } from '@rolecraft/storage';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { recordingLogger } from '../../__fixtures__/requests.ts';
 import { dispatch } from '../../bridge/dispatch.ts';
 import { createServices } from '../../main.ts';
-import type { HelperServices } from '../services.ts';
+import { CONFIRMED_AT, INVALID, P, openClaimsDb, type ClaimsDb } from './__fixtures__/claims-db.ts';
 import { createClaimsService } from './storage-service.ts';
 
-const CONFIRMED_AT = '2026-10-10T08:00:00.000Z';
-const P = 'project-1';
-
-function claim(id: string, over: Partial<Claim> = {}): Claim {
-  return {
-    id,
-    type: 'feature',
-    text: '支援 PDF 匯出',
-    completionStatus: 'documented_done',
-    basis: {
-      sourceExcerpts: [
-        {
-          sourceDocumentId: 'doc-1',
-          contentVersion: 1,
-          contentHash: 'a'.repeat(64),
-          location: 'tb2:0:1/1:x',
-          text: '已完成 PDF 匯出',
-        },
-      ],
-      userConfirmation: null,
-    },
-    reviewStatus: 'normal',
-    ...over,
-  };
-}
-
-let dir: string;
-let db: ReturnType<typeof openDatabase>['db'];
-let services: HelperServices;
-
+let t: ClaimsDb;
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'rolecraft-claims-'));
-  db = openDatabase(':memory:').db;
-  const fileStore = createLocalFileStore(path.join(dir, 'files'));
-  services = { claims: createClaimsService({ db, fileStore, now: () => CONFIRMED_AT }) };
-  const claims = createRepositories(db).claims;
-  claims.save(claim('c-feature'));
-  const role: Claim = { ...claim('c-role'), type: 'personal_role', text: '負責後端' };
-  delete role.completionStatus;
-  claims.save(role);
-  claims.save(claim('c-review', { reviewStatus: 'needs_review' }));
-  claims.save(claim('c-removed', { reviewStatus: 'source_removed' }));
-  createRepositories(db).projectEvidence.save({
-    id: P,
-    name: 'RoleCraft',
-    summary: '履歷編輯器',
-    claimIds: ['c-feature', 'c-role', 'c-review', 'c-removed'],
-  });
+  t = openClaimsDb();
 });
+afterEach(() => t.cleanup());
 
-afterEach(() => {
-  db.close();
-  rmSync(dir, { recursive: true, force: true });
-});
-
-async function send(request: BridgeRequest | Record<string, unknown>): Promise<unknown> {
-  return (await dispatch(request, services, recordingLogger())).response;
-}
-
-function stored(id: string): Claim | null {
-  return createRepositories(db).claims.get(id);
-}
-
-const INVALID = { ok: false, error: { code: 'invalid_request' } };
+const send: ClaimsDb['send'] = (request) => t.send(request);
+const stored: ClaimsDb['stored'] = (id) => t.stored(id);
+const N = { expectedReviewStatus: 'normal' } as const;
 
 describe('服務接線', () => {
   it('沒有 storage 時不接上，回 not_implemented', async () => {
@@ -89,8 +32,8 @@ describe('服務接線', () => {
   });
 
   it('有 storage 時 createServices 接上 claims', async () => {
-    const fileStore = createLocalFileStore(path.join(dir, 'other'));
-    const wired = createServices({ db, fileStore });
+    const fileStore = createLocalFileStore(path.join(t.dir, 'other'));
+    const wired = createServices({ db: t.db, fileStore });
     const { response } = await dispatch(
       { op: 'claims.list_projects', payload: {} },
       wired,
@@ -129,7 +72,12 @@ describe('確認（R1、D14）', () => {
   it('功能確認完成：時間由 helper 決定，記錄當下文字，狀態變使用者確認完成', async () => {
     const ok = await send({
       op: 'claims.confirm',
-      payload: { claimId: 'c-feature', text: '支援 PDF 匯出', completion: 'user_confirmed_done' },
+      payload: {
+        claimId: 'c-feature',
+        text: '支援 PDF 匯出',
+        completion: 'user_confirmed_done',
+        ...N,
+      },
     });
     expect(ok).toEqual({ ok: true });
     expect(stored('c-feature')).toMatchObject({
@@ -145,6 +93,7 @@ describe('確認（R1、D14）', () => {
         claimId: 'c-feature',
         text: 'x',
         completion: 'user_confirmed_done',
+        ...N,
         confirmedAt: '2020-01-01T00:00:00Z',
       },
     });
@@ -156,7 +105,7 @@ describe('確認（R1、D14）', () => {
     for (const completion of ['documented_done', 'unknown']) {
       const res = await send({
         op: 'claims.confirm',
-        payload: { claimId: 'c-feature', text: '支援 PDF 匯出', completion },
+        payload: { claimId: 'c-feature', text: '支援 PDF 匯出', completion, ...N },
       });
       expect(res).toMatchObject(INVALID);
     }
@@ -167,13 +116,13 @@ describe('確認（R1、D14）', () => {
     expect(
       await send({
         op: 'claims.confirm',
-        payload: { claimId: 'c-feature', text: '支援 PDF 匯出' },
+        payload: { claimId: 'c-feature', text: '支援 PDF 匯出', ...N },
       }),
     ).toMatchObject(INVALID);
     expect(
       await send({
         op: 'claims.confirm',
-        payload: { claimId: 'c-role', text: '負責後端', completion: 'user_confirmed_done' },
+        payload: { claimId: 'c-role', text: '負責後端', completion: 'user_confirmed_done', ...N },
       }),
     ).toMatchObject(INVALID);
     expect(stored('c-feature')?.basis.userConfirmation).toBeNull();
@@ -181,7 +130,10 @@ describe('確認（R1、D14）', () => {
   });
 
   it('確認時一併修正文字：內容與確認文字都是修正後的', async () => {
-    await send({ op: 'claims.confirm', payload: { claimId: 'c-role', text: '負責後端與部署' } });
+    await send({
+      op: 'claims.confirm',
+      payload: { claimId: 'c-role', text: '負責後端與部署', ...N },
+    });
     expect(stored('c-role')).toMatchObject({
       text: '負責後端與部署',
       basis: { userConfirmation: { text: '負責後端與部署' } },
@@ -191,8 +143,10 @@ describe('確認（R1、D14）', () => {
 
   it('待複核經確認回到正常；來源已移除維持標示', async () => {
     const payload = { text: '支援 PDF 匯出', completion: 'planned' as const };
-    await send({ op: 'claims.confirm', payload: { claimId: 'c-review', ...payload } });
-    await send({ op: 'claims.confirm', payload: { claimId: 'c-removed', ...payload } });
+    const review = { claimId: 'c-review', expectedReviewStatus: 'needs_review', ...payload };
+    const removed = { claimId: 'c-removed', expectedReviewStatus: 'source_removed', ...payload };
+    expect(await send({ op: 'claims.confirm', payload: review })).toEqual({ ok: true });
+    expect(await send({ op: 'claims.confirm', payload: removed })).toEqual({ ok: true });
     expect(stored('c-review')).toMatchObject({
       reviewStatus: 'normal',
       completionStatus: 'planned',
@@ -202,14 +156,14 @@ describe('確認（R1、D14）', () => {
 
   it('不存在的事實項：invalid_request', async () => {
     expect(
-      await send({ op: 'claims.confirm', payload: { claimId: 'ghost', text: 'x' } }),
+      await send({ op: 'claims.confirm', payload: { claimId: 'ghost', text: 'x', ...N } }),
     ).toMatchObject(INVALID);
   });
 
   it('預設確認時間是合法的 UTC 時間', async () => {
-    const fileStore = createLocalFileStore(path.join(dir, 'f2'));
-    const real = createClaimsService({ db, fileStore });
-    await real.confirm({ claimId: 'c-role', text: '負責後端' });
+    const fileStore = createLocalFileStore(path.join(t.dir, 'f2'));
+    const real = createClaimsService({ db: t.db, fileStore });
+    await real.confirm({ claimId: 'c-role', text: '負責後端', ...N });
     expect(stored('c-role')?.basis.userConfirmation?.confirmedAt).toMatch(
       /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/,
     );
@@ -220,11 +174,16 @@ describe('修改：原確認失效', () => {
   beforeEach(async () => {
     await send({
       op: 'claims.confirm',
-      payload: { claimId: 'c-feature', text: '支援 PDF 匯出', completion: 'user_confirmed_done' },
+      payload: {
+        claimId: 'c-feature',
+        text: '支援 PDF 匯出',
+        completion: 'user_confirmed_done',
+        ...N,
+      },
     });
   });
 
-  it('改內容 → 確認清除、使用者確認完成退回未知', async () => {
+  it('改內容 → 確認清除、轉待複核、使用者確認完成退回未知', async () => {
     expect(
       await send({
         op: 'claims.update',
@@ -234,6 +193,7 @@ describe('修改：原確認失效', () => {
     expect(stored('c-feature')).toMatchObject({
       text: '支援 PDF 與 Word 匯出',
       completionStatus: 'unknown',
+      reviewStatus: 'needs_review',
       basis: { userConfirmation: null },
     });
   });
@@ -250,16 +210,18 @@ describe('否決', () => {
       ok: true,
     });
     expect(stored('c-role')).toBeNull();
-    expect(createRepositories(db).projectEvidence.get(P)?.claimIds).not.toContain('c-role');
+    expect(createRepositories(t.db).projectEvidence.get(P)?.claimIds).not.toContain('c-role');
     expect(await send({ op: 'claims.get', payload: { claimId: 'c-role' } })).toMatchObject(INVALID);
-    const row = db.prepare("SELECT kind FROM deleted_materials WHERE material_id = 'c-role'").get();
+    const row = t.db
+      .prepare("SELECT kind FROM deleted_materials WHERE material_id = 'c-role'")
+      .get();
     expect(row).toEqual({ kind: 'claim' });
   });
 
   it('否決後不能再確認或修改', async () => {
     await send({ op: 'claims.reject', payload: { claimId: 'c-role' } });
     expect(
-      await send({ op: 'claims.confirm', payload: { claimId: 'c-role', text: '負責後端' } }),
+      await send({ op: 'claims.confirm', payload: { claimId: 'c-role', text: '負責後端', ...N } }),
     ).toMatchObject(INVALID);
     expect(
       await send({ op: 'claims.update', payload: { claimId: 'c-role', text: '負責後端' } }),

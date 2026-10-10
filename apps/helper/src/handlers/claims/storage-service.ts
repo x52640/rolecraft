@@ -28,14 +28,20 @@ export interface ClaimsServiceOptions extends HelperStorage {
 const OK: ClaimsWriteResult = { ok: true };
 const NOT_FOUND: ClaimsWriteResult = { ok: false, reason: 'not_found' };
 const REJECTED: ClaimsWriteResult = { ok: false, reason: 'rejected' };
+const STALE: ClaimsWriteResult = { ok: false, reason: 'stale' };
 
 /**
- * 修改內容後的事實項：確認紀錄失效（R1）。原本是「使用者確認完成」的，
- * 已沒有確認依據，退回「未知」（D4：沒有依據的一律視為未知），要重新確認。
+ * 修改內容後的事實項（R1、R2）：確認紀錄失效，而且舊來源片段不再替新文字背書——
+ * 複核狀態改待複核（來源已移除維持標示），有完成狀態的一律退回「未知」，直到使用者重新確認。
  */
 export function withEditedText(claim: Claim, text: string): Claim {
-  const next: Claim = { ...claim, text, basis: { ...claim.basis, userConfirmation: null } };
-  if (claim.completionStatus === 'user_confirmed_done') next.completionStatus = 'unknown';
+  const next: Claim = {
+    ...claim,
+    text,
+    basis: { ...claim.basis, userConfirmation: null },
+    reviewStatus: claim.reviewStatus === 'source_removed' ? 'source_removed' : 'needs_review',
+  };
+  if (claim.completionStatus !== undefined) next.completionStatus = 'unknown';
   return Claim.parse(next);
 }
 
@@ -45,12 +51,15 @@ export function createClaimsService(options: ClaimsServiceOptions): ClaimsServic
   const { claims, projectEvidence: projects } = createRepositories(db);
 
   /** 讀出→改→寫回放在同一交易，避免與其他寫入交錯。 */
-  function modify(claimId: string, change: (claim: Claim) => Claim | null): ClaimsWriteResult {
+  function modify(
+    claimId: string,
+    change: (claim: Claim) => Claim | ClaimsWriteResult,
+  ): ClaimsWriteResult {
     return transaction(db, () => {
       const claim = claims.get(claimId);
       if (claim === null) return NOT_FOUND;
       const next = change(claim);
-      if (next === null) return REJECTED;
+      if ('ok' in next) return next;
       claims.save(next);
       return OK;
     });
@@ -73,12 +82,14 @@ export function createClaimsService(options: ClaimsServiceOptions): ClaimsServic
     confirm(payload) {
       return Promise.resolve(
         modify(payload.claimId, (claim) => {
+          // 畫面看到的複核狀態與目前不同（例如期間轉成待複核、來源矛盾）：拒絕，不寫入（R2）
+          if (claim.reviewStatus !== payload.expectedReviewStatus) return STALE;
           const result = confirmClaim(claim, {
             confirmedAt: now(),
             text: payload.text,
             ...(payload.completion === undefined ? {} : { completion: payload.completion }),
           });
-          return result.ok ? result.value : null;
+          return result.ok ? result.value : REJECTED;
         }),
       );
     },
@@ -92,15 +103,19 @@ export function createClaimsService(options: ClaimsServiceOptions): ClaimsServic
     },
 
     reject(claimId) {
-      if (claims.get(claimId) === null) return Promise.resolve(NOT_FOUND);
-      // D19：刪除原件並記錄已刪素材；含其副本的未投遞匯出版本一併刪除、已投遞的保留。
-      deleteMaterial(db, fileStore, { kind: 'claim', id: claimId });
-      transaction(db, () => {
+      // 先在自己的交易移除各專案的引用，再刪素材；第二步失敗時重試仍能完成（D19）。
+      const unlinked = transaction(db, () => {
+        let count = 0;
         for (const project of projects.list()) {
           if (!project.claimIds.includes(claimId)) continue;
           projects.save({ ...project, claimIds: project.claimIds.filter((id) => id !== claimId) });
+          count += 1;
         }
+        return count;
       });
+      if (claims.get(claimId) === null) return Promise.resolve(unlinked > 0 ? OK : NOT_FOUND);
+      // D19：刪除原件並記錄已刪素材；含其副本的未投遞匯出版本一併刪除、已投遞的保留。
+      deleteMaterial(db, fileStore, { kind: 'claim', id: claimId });
       return Promise.resolve(OK);
     },
   };

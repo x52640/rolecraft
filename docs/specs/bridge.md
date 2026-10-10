@@ -63,9 +63,9 @@
 | `export.list_versions`／`export.get_version` | 匯出版本清單／單一版本內容 |
 | `export.read_pdf` | 分塊讀匯出 PDF（見下「分塊」） |
 | `claims.list_projects`／`claims.list`／`claims.get` | 專案清單／某專案的事實項／單一事實項（P1-T023） |
-| `claims.confirm` | 確認事實項：請求帶使用者確認當下看到（可一併修正）的文字，功能與交付物另帶完成狀態（只能是使用者確認完成或計畫中）；helper 記錄時間與該文字（R1） |
-| `claims.update` | 修改事實項內容；既有使用者確認失效，要重新確認 |
-| `claims.reject` | 否決事實項，之後不得用於生成 |
+| `claims.confirm` | 確認事實項：請求帶使用者確認當下看到（可一併修正）的文字、畫面當時顯示的複核狀態，功能與交付物另帶完成狀態（只能是使用者確認完成或計畫中）；helper 在同一交易比對複核狀態，不符回 `invalid_request` 且不寫入（畫面應重新讀取），相符才記錄時間與該文字（R1、R2） |
+| `claims.update` | 修改事實項內容；內容有變時既有使用者確認失效、舊來源不再替新文字背書：複核狀態改待複核（來源已移除維持），完成狀態退回未知，要重新確認 |
+| `claims.reject` | 否決事實項，之後不得用於生成：先移除各專案的引用，再依 D19 刪除素材；事實項已不存在時仍清引用並回成功（可重試） |
 | `resume.generate` | 針對已確認的職缺快照產生客製履歷，回工作 id（R9）（P1-T025） |
 | `resume.list`／`resume.get` | 某職缺的履歷版本清單／版本與段落 |
 | `resume.accept_section`／`reject_section` | 接受（只接受措辭，不確認事實項）／退回修改稿 |
