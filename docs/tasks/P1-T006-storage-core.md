@@ -73,9 +73,14 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：migration 機制、0001 核心 schema、10 個 repository、檔案儲存區、ID／時間／雜湊格式定案
+- 已通過驗證：`npm run verify` 綠（Vitest 18 檔 108 測試；storage 5 檔 31 測試）
+- 下一步：協調者收官
 - Blocker：無
 
 ## 完成結果
+
+- `packages/storage/src/`：`database.ts`（`openDatabase`：`node:sqlite`、外鍵開、WAL、開啟即 migrate）、`migrate.ts`＋`migrations/0001_core.sql`、`transaction.ts`（SAVEPOINT，可巢狀）、`ids.ts`（`newId`／`nowTimestamp`／`sha256Hex`）、`errors.ts`、`repositories/`（每物件一檔＋共用 `json-table.ts`、`createRepositories`）、`files/file-store.ts`（`FileStore` 介面＋本機 SHA-256 內容定址實作）。
+- migration：`src/migrations/NNNN_名稱.sql` 依版本套用，記在 `schema_migrations`（含 checksum）；後續 Task 新增下一號檔案即可，不改既有檔。已套用檔被改、資料庫版本比程式新 → 拒絕開啟；單一 migration 失敗整個回滾。
+- 資料表：每表「索引欄＋`data` JSON」，寫入前與讀出後都用 contracts schema 驗證（讀出不合規拋 `StorageError`）。外鍵：ResumeVersion／MessageDraft → JobSnapshot；`claim_sources` 反查事實項引用的來源文件（R2 用）；`work_units` 隨 WorkJob 整筆交易替換。RunCheckRecord 只新增（觸發器擋 UPDATE、同 ID 不可重複）。ProviderConnection 以服務為鍵。
+- ADR-0006 第 1 項定案：產生端 ID＝UUID v4 小寫、時間＝UTC 毫秒 `Z`、雜湊＝SHA-256 小寫 hex；contracts 新增 `CanonicalId`／`CanonicalTimestamp`／`Sha256Hash`（additive），讀取用的 `Id`／`Timestamp`／`ContentHash` 維持寬鬆。

@@ -8,7 +8,7 @@ spec 只定語意，以下欄位細節由協調者暫定。改動要經對應 Ta
 
 | # | 項目 | 暫行做法 | 定案 Task |
 |---|---|---|---|
-| 1 | ID、雜湊、時間格式 | 非空字串；時間為含時區 ISO 8601 | P1-T006 |
+| 1 | ID、雜湊、時間格式 | **定案**：產生端 ID＝UUID v4 小寫、時間＝UTC 毫秒 `Z`（`toISOString`）、雜湊＝SHA-256 小寫 hex（contracts `CanonicalId`／`CanonicalTimestamp`／`Sha256Hash`）；讀取驗證維持寬鬆（非空字串、含時區 ISO）以相容外部輸入 | P1-T006 |
 | 2 | 來源片段位置 `location` | 字串 | P1-T003（區塊切法決定格式） |
 | 3 | Claim 內容 `text` | 新增欄位（spec 表格漏列，事實項必有內容） | 定案 |
 | 4 | Profile 欄位 | 欄位名→值對照；`pdfParseConfirmed` 布林 | P1-T020 |
