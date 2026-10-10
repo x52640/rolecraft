@@ -66,16 +66,28 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 變更全在 write_paths 內
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [ ] `npm run verify` 綠（範圍外兩個既有測試要協調者調整，見完成結果「需範圍外調整」）
+- [x] 變更全在 write_paths 內
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
-- Blocker：無
+- 最後完成：helper claims 服務＋handler＋接線、editor 事實項頁與測試
+- 已通過驗證：暫時套用範圍外兩處測試調整時 `npm run verify` 全綠（1882 通過、10 略過；test:docs 15）；調整已還原未提交
+- 下一步：協調者調整 `registry.test.ts`、`App.test.ts` 後收官
+- Blocker：範圍外測試（見完成結果「需範圍外調整」）
 
 ## 完成結果
+
+- 結構：helper `apps/helper/src/handlers/claims/`：`service.ts`（介面）、`storage-service.ts`（`createClaimsService({ db, fileStore, now? })`）、`failure.ts`（固定錯誤訊息）、六個 handler。editor `apps/editor/src/pages/claims/`：`ClaimsPage.tsx`、`ClaimCard.tsx`、`ClaimSources.tsx`、`useClaimsReview.ts`（資料與動作）、`labels.ts`、`claims.css`。
+- 確認（R1、D14）：時間只由 helper 的 `now()` 決定，請求多帶 `confirmedAt` 被 schema 擋；用 domain `confirmClaim` 記錄時間與確認當下文字，功能／交付物只能確認成「使用者確認完成」或「計畫中」，非功能類型帶完成狀態、功能沒帶都拒絕且不寫入。讀→改→寫在同一交易。
+- 修改：內容有變 → 清除使用者確認；原本「使用者確認完成」退回「未知」（沒有依據＝未知），要重新確認。內容沒變不動。
+- 否決：經 storage `deleteMaterial`（D19）刪除原件並記入已刪素材，再從所有專案的 `claimIds` 移除；之後 get／confirm／update 都回 invalid_request。
+- 錯誤：找不到或規則不允許一律 `invalid_request`，固定訊息、不回填 ID 或內容。
+- 接線：`createServices(storage?)` 只在提供 `{ db, fileStore }` 時接上 claims；`main()` 仍不帶 storage（資料庫位置與開啟方式尚未定案），所以實際執行時 claims 仍回 not_implemented。
+- 畫面：依專案列出事實項，每項左邊是內容、類型、完成狀態、複核狀態、確認紀錄，右邊並列來源原文（可展開收合，預設展開，標文件 ID、版本、第幾段）。「文件標示完成」註明尚未確認、不等於完成；確認後內容改過顯示需重新確認。功能／交付物的「確認為」沒有預設值，要自己選。修改要按儲存並提示確認失效；刪除要按兩次並說明未投遞匯出版本會一併刪除。批次確認只收勾選且複核正常的項目，所選功能有任一項沒選完成狀態就一項都不送。每次寫入後重新從 helper 讀取。
+- 測試：helper `claims.test.ts`（dispatch→handler→真實 SQLite，17 項：接線、讀取、確認時間由 helper 決定、不能確認成文件標示完成／未知、修改後確認失效、否決後不能再確認）；editor `ClaimsPage.test.ts`（8 項，假 transport）。
+- 保守選擇：(1) 待複核／來源矛盾／來源已移除不能批次確認，只能逐項；(2) 修改後「使用者確認完成」退回「未知」而非原本的來源狀態；(3) 否決＝D19 刪除素材，會連帶刪除引用它的未投遞匯出版本（畫面先警告）。
+- 需範圍外調整（未改）：`apps/helper/src/handlers/registry.test.ts` 仍假設 claims 全部 not_implemented，且 `claims: {}` 已不符介面（typecheck 失敗）→ 刪掉該行即可；`apps/editor/src/app/App.test.ts` 對每頁檢查「尚未實作」提示 → 事實項頁要排除。
+- 需擁有者裁定：(1) 確認請求沒帶版本，使用者看舊畫面時事實項若已轉待複核，確認仍會把它清回正常；(2) `claims.reject` 回 Ack，無法把 D19「已投遞版本保留」明示給使用者；(3) 否決後若來源文件重新分析，pipeline 可能再產生同內容的事實項（pipeline 未查已刪素材）；(4) 「點開原文位置」目前只顯示片段原文與位置，沒有讀整份文件的橋接操作；(5) 專案（ProjectEvidence）尚無產生者，pipeline 只產事實項，所以實際使用時清單會是空的；(6) helper 的資料庫位置與開啟方式。

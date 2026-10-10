@@ -1,5 +1,10 @@
 import type { OpHandler } from '../handler.ts';
 import { notImplemented } from '../services.ts';
+import { claimsFailure } from './failure.ts';
 
-/** claims.list：列出某專案的事實項。由 P1-T023 實作；接上前回 not_implemented，不偽造成功。 */
-export const claimsList: OpHandler<'claims.list'> = () => Promise.resolve(notImplemented());
+/** claims.list：列出某專案的事實項（含狀態與來源片段）。 */
+export const claimsList: OpHandler<'claims.list'> = async (payload, services) => {
+  if (!services.claims) return notImplemented();
+  const claims = await services.claims.listClaims(payload.projectId);
+  return claims === null ? claimsFailure('not_found') : { ok: true, claims };
+};

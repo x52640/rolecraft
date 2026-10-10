@@ -4,11 +4,12 @@
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
-import type { Repositories } from '@rolecraft/storage';
+import { createRepositories } from '@rolecraft/storage';
 
 import { EXIT_CODES, startHost } from './bridge/host.ts';
 import { createLineLogger } from './bridge/logger.ts';
 import { ALLOWED_ORIGINS_ENV, parseAllowedOrigins } from './bridge/origin.ts';
+import { createClaimsService, type HelperStorage } from './handlers/claims/storage-service.ts';
 import { createJobsService } from './handlers/jobs/storage-service.ts';
 import { createProvidersService } from './handlers/providers/providers-service.ts';
 import type { HelperServices } from './handlers/services.ts';
@@ -16,13 +17,15 @@ import { createSourcesService } from './handlers/sources/local-sources.ts';
 
 /**
  * 服務組裝：各操作的服務由對應 Task 接上；沒接上的 handler 回「尚未支援」。
- * 需要資料庫的服務只在傳入 repositories 時接上（資料庫位置待定，main() 目前不開資料庫）。
+ * 需要本機儲存的服務只在提供 storage 時接上（資料庫位置與開啟方式尚未定案，main() 目前不開資料庫）。
  */
-export function createServices(repositories?: Repositories): HelperServices {
+export function createServices(storage?: HelperStorage): HelperServices {
+  const repositories = storage && createRepositories(storage.db);
   return {
     providers: createProvidersService(),
-    ...(repositories && { jobs: createJobsService(repositories.jobSnapshots) }),
     sources: createSourcesService(),
+    ...(repositories && { jobs: createJobsService(repositories.jobSnapshots) }),
+    ...(storage && { claims: createClaimsService(storage) }),
   };
 }
 

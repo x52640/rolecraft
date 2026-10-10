@@ -1,5 +1,9 @@
 import type { OpHandler } from '../handler.ts';
 import { notImplemented } from '../services.ts';
+import { ackOrFailure } from './failure.ts';
 
-/** claims.reject：否決事實項。由 P1-T023 實作；接上前回 not_implemented，不偽造成功。 */
-export const claimsReject: OpHandler<'claims.reject'> = () => Promise.resolve(notImplemented());
+/** claims.reject：否決（刪除）事實項，之後不得用於生成。 */
+export const claimsReject: OpHandler<'claims.reject'> = async (payload, services) => {
+  if (!services.claims) return notImplemented();
+  return ackOrFailure(await services.claims.reject(payload.claimId));
+};

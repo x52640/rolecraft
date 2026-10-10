@@ -1,6 +1,13 @@
 // jobs.* 與 submit_job_capture：經 dispatch（含 contracts schema 驗證）打到真實 storage（記憶體 SQLite）。
 import { BRIDGE_SCHEMAS, type JobFields } from '@rolecraft/contracts';
-import { createRepositories, openDatabase, type Repositories } from '@rolecraft/storage';
+import type { DatabaseSync } from 'node:sqlite';
+
+import {
+  createLocalFileStore,
+  createRepositories,
+  openDatabase,
+  type Repositories,
+} from '@rolecraft/storage';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { recordingLogger, requests } from '../../__fixtures__/requests.ts';
@@ -35,12 +42,14 @@ const manualPaste = {
 
 let close: () => void;
 let repos: Repositories;
+let database: DatabaseSync;
 let services: HelperServices;
 let ids: number;
 
 beforeEach(() => {
   const { db } = openDatabase(':memory:');
   close = () => db.close();
+  database = db;
   repos = createRepositories(db);
   ids = 0;
   services = {
@@ -193,7 +202,8 @@ describe('服務組裝', () => {
   });
 
   it('有資料庫：jobs 接上 storage', async () => {
-    const wired = createServices(repos);
+    // 檔案儲存區 jobs 用不到；建立時不碰磁碟。
+    const wired = createServices({ db: database, fileStore: createLocalFileStore('/nonexistent') });
     const { response } = await dispatch(manualPaste, wired, recordingLogger());
     expect(response).toMatchObject({ ok: true });
     expect(repos.jobSnapshots.list()).toHaveLength(1);
