@@ -7,11 +7,14 @@ import { pathToFileURL } from 'node:url';
 import { EXIT_CODES, startHost } from './bridge/host.ts';
 import { createLineLogger } from './bridge/logger.ts';
 import { ALLOWED_ORIGINS_ENV, parseAllowedOrigins } from './bridge/origin.ts';
+import { createProvidersService } from './handlers/providers/providers-service.ts';
 import type { HelperServices } from './handlers/services.ts';
 
-/** 服務組裝：各操作的服務由對應 Task 接上；目前全部未接，handler 回「尚未支援」。 */
+/** 服務組裝：各操作的服務由對應 Task 接上；未接上的服務 handler 回「尚未支援」。 */
 export function createServices(): HelperServices {
-  return {};
+  return {
+    providers: createProvidersService(),
+  };
 }
 
 export function main(): void {

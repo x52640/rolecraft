@@ -1,0 +1,106 @@
+// Claude 的檢查與模型短驗證：只透過 @rolecraft/providers 既有的檢查路徑（P1-T012、P1-T039），
+// helper 不自己組 CLI 命令列、不讀憑證、不碰環境變數的值（只把 process.env 交給 core 清理）。
+import { randomUUID } from 'node:crypto';
+import process from 'node:process';
+
+import type { CheckOutcome, RunCheckRecord } from '@rolecraft/contracts';
+import {
+  checkConnection,
+  CLAUDE_MODEL_CANDIDATES,
+  type ClaudeService,
+  claudeRunDeps,
+  createClaudeService,
+  type RunDeps,
+  verifyClaudeModel,
+} from '@rolecraft/providers';
+
+/** 一次重新檢查的結果（不含路徑、帳號、環境變數值）。 */
+export interface ClaudeCheck {
+  readonly installed: CheckOutcome;
+  readonly login: CheckOutcome;
+  readonly eligibility: CheckOutcome;
+  /** R6 總結（訂閱登入、環境清理、CLI 設定、執行模式） */
+  readonly subscriptionOnly: CheckOutcome;
+  /** R5：CLI 版本是已驗證版本（ADR-0002 或 D22 重新驗證通過），且服務未停用 */
+  readonly isolation: CheckOutcome;
+  readonly checkedAt: string;
+}
+
+/** 模型短驗證結果。 */
+export interface ClaudeModelCheck {
+  readonly verification: CheckOutcome;
+  /** 額度用完（R9：停止、不重試） */
+  readonly quotaExhausted: boolean;
+  /** R6 確認紀錄（S9-2 證據）；版本被擋、未執行時為 null */
+  readonly record: RunCheckRecord | null;
+}
+
+export interface ClaudeProbe {
+  check(): Promise<ClaudeCheck>;
+  /** model 只能是 helper 自己的候選常數（呼叫端以 candidateId 查表取得） */
+  verifyModel(model: string): Promise<ClaudeModelCheck>;
+  /** 候選別名（CLI 沒有列模型的指令，所以是常數；可用與否要 verifyModel） */
+  readonly candidates: readonly string[];
+}
+
+export interface ClaudeProbeOptions {
+  /** 共用的 Claude 服務（版本閘門要與一般執行共用同一個才互斥）；預設自己建一個、不接保存介面 */
+  readonly service?: ClaudeService;
+  /** 測試用：覆寫執行 deps（環境、時鐘、子程序啟動函式）；一律再經 claudeRunDeps 套串流守門 */
+  readonly runDeps?: Partial<RunDeps>;
+  /** 預設 providers 的 CLAUDE_MODEL_CANDIDATES（不在 helper 另寫一份清單） */
+  readonly candidates?: readonly string[];
+}
+
+export function createClaudeProbe(options: ClaudeProbeOptions = {}): ClaudeProbe {
+  // 沒注入保存介面 → 只接受 ADR-0002 驗證版本、不做自動重新驗證（0 次模型呼叫）。
+  const service = options.service ?? createClaudeService();
+  const base = (): RunDeps => ({
+    parentEnv: process.env,
+    now: () => new Date(),
+    newId: randomUUID,
+    ...options.runDeps,
+  });
+  const deps = () => claudeRunDeps(base(), { acceptVersion: service.gate.isAccepted });
+
+  return {
+    candidates: options.candidates ?? CLAUDE_MODEL_CANDIDATES,
+
+    async check() {
+      const d = deps();
+      const report = await checkConnection(service.adapter, d);
+      const { installation, connection } = report;
+      let isolation: CheckOutcome = 'unknown';
+      if (installation.installed === 'passed') {
+        const version = await service.ensureVersion(d);
+        isolation = version.status === 'blocked' ? 'failed' : 'passed';
+      }
+      if (service.adapter.support.state !== 'supported') isolation = 'failed';
+      return {
+        installed: installation.installed,
+        login: connection.login,
+        eligibility: connection.eligibility,
+        subscriptionOnly: connection.subscriptionOnly,
+        isolation,
+        checkedAt: connection.checkedAt,
+      };
+    },
+
+    async verifyModel(model) {
+      const d = deps();
+      const version = await service.ensureVersion(d);
+      if (version.status === 'blocked') {
+        return { verification: 'unknown', quotaExhausted: false, record: null };
+      }
+      const probe = await verifyClaudeModel(service.adapter, model, d);
+      if (!probe.record.executed) {
+        return { verification: 'unknown', quotaExhausted: false, record: probe.record };
+      }
+      return {
+        verification: probe.available ? 'passed' : 'failed',
+        quotaExhausted: probe.error?.kind === 'quota_exhausted',
+        record: probe.record,
+      };
+    },
+  };
+}
