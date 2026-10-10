@@ -1,7 +1,7 @@
 ---
 id: P1-T014
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T013", "P1-T006"]
 specs: ["bridge.md", "architecture.md"]
 track: helper

@@ -8,7 +8,6 @@
 - P1-T002 domain：事實項狀態與 R1 匯出前檢查（`docs/tasks/P1-T002-domain-evidence.md`）
 - P1-T007 storage：不可變匯出版本、投遞紀錄與刪除規則（`docs/tasks/P1-T007-storage-export-versions.md`）
 - P1-T010 providers：適配介面、環境清理與 R6 紀錄（`docs/tasks/P1-T010-providers-core.md`）
-- P1-T014 helper：橋接端點與操作清單分派（`docs/tasks/P1-T014-helper-host.md`）
 
 ## ready
 
@@ -42,6 +41,7 @@
 - P1-T003 `9cd8ec9`、`8c5bb79`（實作＋對抗驗證修正）
 - P1-T016 `e1cbf9e`
 - P1-T008 `55bd7f5`、`ca51f0e`
+- P1-T014 `75d2b19`、`5f20554`
 
 ## 已知殘餘（記錄，不擋上線）
 
