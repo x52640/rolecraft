@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|
 | [P0-T001](P0-T001-monorepo-scaffold.md) | monorepo 骨架與 verify 閘門 | done | 0 | infra | — |
 | [P0-T002](P0-T002-docs-tooling.md) | 文件閘門腳本：verify:docs、task:index、task:close | done | 0 | infra | P0-T001 |
-| [P0-T003](P0-T003-codex-review-fixes.md) | 修正 codex review 對 P0-T001、P0-T002 的發現 | in_progress | 0 | infra | P0-T001、P0-T002 |
+| [P0-T003](P0-T003-codex-review-fixes.md) | 修正 codex review 對 P0-T001、P0-T002 的發現 | done | 0 | infra | P0-T001、P0-T002 |
 | [P1-T001](P1-T001-contracts-core.md) | contracts：核心資料物件與橋接 schema | done | 1 | contracts | P0-T001 |
 | [P1-T002](P1-T002-domain-evidence.md) | domain：事實項狀態與 R1 匯出前檢查 | in_progress | 1 | domain | P1-T001 |
 | [P1-T003](P1-T003-domain-source-change.md) | domain：R2 來源變更判定 | in_progress | 1 | domain | P1-T001 |

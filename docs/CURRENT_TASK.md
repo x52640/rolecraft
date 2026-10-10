@@ -5,7 +5,6 @@
 <!-- index:start -->
 ## 進行中
 
-- P0-T003 修正 codex review 對 P0-T001、P0-T002 的發現（`docs/tasks/P0-T003-codex-review-fixes.md`）
 - P1-T002 domain：事實項狀態與 R1 匯出前檢查（`docs/tasks/P1-T002-domain-evidence.md`）
 - P1-T003 domain：R2 來源變更判定（`docs/tasks/P1-T003-domain-source-change.md`）
 - P1-T004 domain：R8 輸入預算與拆批（`docs/tasks/P1-T004-domain-budget.md`）
@@ -36,8 +35,8 @@
 
 ## 待補 codex review（E4，額度恢復後逐 commit 跑）
 
-- P0-T001 `182b16a`
-- P0-T002 `9573b99`
+- P0-T001 `182b16a`（已審：1 項，P0-T003 修）
+- P0-T002 `9573b99`（已審：2 項，P0-T003 修）
 - P1-T001 `7b4da39`
 
 ## 已知殘餘（記錄，不擋上線）
