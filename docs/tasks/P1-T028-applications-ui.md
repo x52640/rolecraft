@@ -2,7 +2,7 @@
 id: P1-T028
 phase: 1
 status: blocked
-depends_on: ["P1-T027"]
+depends_on: ["P1-T027", "P1-T041"]
 specs: ["resume-output.md"]
 track: editor
 primary_repo: rolecraft

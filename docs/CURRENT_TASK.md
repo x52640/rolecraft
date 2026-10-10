@@ -5,15 +5,14 @@
 <!-- index:start -->
 ## 進行中
 
-- 無
+- P1-T022 pipeline：文件分析成事實項（`docs/tasks/P1-T022-pipeline-analysis.md`）
+- P1-T039 Claude CLI 版本變更時自動重新驗證（`docs/tasks/P1-T039-claude-auto-reverify.md`）
+- P1-T041 橋接：編輯器頁面所需操作清單（`docs/tasks/P1-T041-bridge-editor-ops.md`）
+- P1-T042 README 與開源說明文件（`docs/tasks/P1-T042-readme.md`）
 
 ## ready
 
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本
-- P1-T019 editor：職缺快照確認與手動貼上
-- P1-T020 editor：履歷 PDF 匯入與校正
-- P1-T021 editor：專案資料夾匯入與預覽
-- P1-T039 Claude CLI 版本變更時自動重新驗證
 <!-- index:end -->
 
 ## 下一步（2026-10-10 收官，等擁有者指示）

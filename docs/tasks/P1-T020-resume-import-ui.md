@@ -1,8 +1,8 @@
 ---
 id: P1-T020
 phase: 1
-status: ready
-depends_on: ["P1-T009", "P1-T016", "P1-T014"]
+status: blocked
+depends_on: ["P1-T009", "P1-T016", "P1-T014", "P1-T041"]
 specs: ["resume-import.md"]
 track: editor
 primary_repo: rolecraft
