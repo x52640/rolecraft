@@ -7,7 +7,6 @@
 
 - P1-T002 domain：事實項狀態與 R1 匯出前檢查（`docs/tasks/P1-T002-domain-evidence.md`）
 - P1-T007 storage：不可變匯出版本、投遞紀錄與刪除規則（`docs/tasks/P1-T007-storage-export-versions.md`）
-- P1-T008 sources：資料夾列舉、授權集合與安全讀檔（`docs/tasks/P1-T008-sources-authorization.md`）
 - P1-T010 providers：適配介面、環境清理與 R6 紀錄（`docs/tasks/P1-T010-providers-core.md`）
 - P1-T014 helper：橋接端點與操作清單分派（`docs/tasks/P1-T014-helper-host.md`）
 
@@ -42,6 +41,7 @@
 - P1-T026 `9ea7487`
 - P1-T003 `9cd8ec9`、`8c5bb79`（實作＋對抗驗證修正）
 - P1-T016 `e1cbf9e`
+- P1-T008 `55bd7f5`、`ca51f0e`
 
 ## 已知殘餘（記錄，不擋上線）
 
@@ -65,6 +65,8 @@
 - PDF 匯出（ADR-0005）：HTML＋CSS 交給本機 Chrome 背景列印（puppeteer-core），附 Noto Sans TC 400／700 完整字型（+14.2 MB，D17 自用可接受），匯出前用 HarfBuzz 裁字型；缺字會被 Chrome 偷補系統字型，P1-T027 要擋。依賴本機 Chrome；Arc 啟動逾時未查明、Edge 未裝。
 
 - 待開 Task「橋接 contract 升級」（contract_change）：請求 id（並行、P1-T027 分塊）、錯誤碼（not_implemented／helper_unavailable／timeout）、host 名稱 `com.rolecraft.helper` 與轉送通道 `rolecraft.bridge` 移入 contracts（目前 extension／editor／helper 各寫一份）、`open_editor` 語意；另 vitest 收 `*.test.tsx`。
+
+- sources（P1-T008）：macOS 讀檔與列舉的 symlink 競態只能縮小窗口（Node 無 openat／F_GETPATH），120 秒壓測 239 萬次 0 洩漏；徹底消除需原生模組。
 
 ## 治理
 
