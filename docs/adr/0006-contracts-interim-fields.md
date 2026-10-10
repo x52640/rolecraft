@@ -14,7 +14,7 @@ spec 只定語意，以下欄位細節由協調者暫定。改動要經對應 Ta
 | 4 | Profile 欄位 | 欄位名→值對照；`pdfParseConfirmed` 布林 | P1-T020 |
 | 5 | 投遞狀態、回覆意圖 | 自由文字 | P1-T028、P1-T029 |
 | 6 | ProviderConnection／RunCheckRecord | passed／failed／unknown；R6 欄位待補 | P1-T010 |
-| 7 | WorkJob／WorkUnit 狀態 | running／paused／completed；單元 pending／completed；重試次數在單元；暫時性錯誤重試用盡的暫停原因未定 | P1-T005 |
+| 7 | WorkJob／WorkUnit 狀態 | 定案：工作 running／paused／completed；單元 pending／completed；重試次數在單元；暫停原因 quota_exhausted／user_cancelled／retries_exhausted（暫時性錯誤重試用盡）／interrupted（執行中輔助程式關閉、重開後還原）；所有暫停只能由使用者續跑（D21）。進行中嘗試（attemptId）只在記憶體，不持久化 | P1-T005（已定案） |
 | 8 | 橋接操作清單 | 只有 bridge.md R7 舉的 4 個；編輯器需要的操作由各 Task 先改 bridge.md 再加（additive） | P1-T014 起逐項 |
 | 9 | ResumeVersion | 段落 `origin`（generated／user_written）；修改理由與逐段接受狀態未建；原始履歷不是 ResumeVersion（由 Profile 表示） | P1-T024、P1-T025 |
 | 10 | JobSnapshot | 手動貼上 URL 可為 null；平台無「其他」 | P1-T019 |

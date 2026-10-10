@@ -9,7 +9,7 @@ export const WorkUnitStatus = z.enum([
 ]);
 export type WorkUnitStatus = z.infer<typeof WorkUnitStatus>;
 
-/** 工作狀態（R9）。spec 只明列「已暫停」，running／completed 為推論，待確認。 */
+/** 工作狀態（R9；P1-T005 定案）。paused 只能由使用者續跑回到 running（D21）。 */
 export const WorkJobStatus = z.enum([
   'running', // 執行中
   'paused', // 已暫停
@@ -17,10 +17,12 @@ export const WorkJobStatus = z.enum([
 ]);
 export type WorkJobStatus = z.infer<typeof WorkJobStatus>;
 
-/** 暫停原因（R9）。 */
+/** 暫停原因（R9；P1-T005 定案）。全部都只能由使用者主動續跑（D21）。 */
 export const PauseReason = z.enum([
   'quota_exhausted', // 額度耗盡
   'user_cancelled', // 使用者取消
+  'retries_exhausted', // 暫時性錯誤自動重試用盡
+  'interrupted', // 執行中輔助程式關閉，重開後還原
 ]);
 export type PauseReason = z.infer<typeof PauseReason>;
 
