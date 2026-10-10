@@ -12,6 +12,7 @@ import { ALLOWED_ORIGINS_ENV, parseAllowedOrigins } from './bridge/origin.ts';
 import { createJobsService } from './handlers/jobs/storage-service.ts';
 import { createProvidersService } from './handlers/providers/providers-service.ts';
 import type { HelperServices } from './handlers/services.ts';
+import { createSourcesService } from './handlers/sources/local-sources.ts';
 
 /**
  * 服務組裝：各操作的服務由對應 Task 接上；沒接上的 handler 回「尚未支援」。
@@ -21,6 +22,7 @@ export function createServices(repositories?: Repositories): HelperServices {
   return {
     providers: createProvidersService(),
     ...(repositories && { jobs: createJobsService(repositories.jobSnapshots) }),
+    sources: createSourcesService(),
   };
 }
 

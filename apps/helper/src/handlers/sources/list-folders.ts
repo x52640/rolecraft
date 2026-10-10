@@ -1,6 +1,9 @@
 import type { OpHandler } from '../handler.ts';
 import { notImplemented } from '../services.ts';
 
-/** sources.list_folders：列出已加入的資料夾。由 P1-T021 實作；接上前回 not_implemented，不偽造成功。 */
-export const sourcesListFolders: OpHandler<'sources.list_folders'> = () =>
-  Promise.resolve(notImplemented());
+/** sources.list_folders：已加入的資料夾與待確認／已授權數量。 */
+export const sourcesListFolders: OpHandler<'sources.list_folders'> = (_payload, services) => {
+  const service = services.sources;
+  if (!service?.listFolders) return Promise.resolve(notImplemented());
+  return Promise.resolve({ ok: true, roots: service.listFolders() });
+};
