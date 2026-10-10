@@ -10,5 +10,6 @@
     "@rolecraft/contracts": "0.0.0",
     "@rolecraft/domain": "0.0.0",
     "@rolecraft/providers": "0.0.0"
-  }
+  },
+  "license": "MIT"
 }
