@@ -39,7 +39,11 @@ export const SourceExcerpt = z.strictObject({
   sourceDocumentId: Id,
   contentVersion: z.int().min(1),
   contentHash: ContentHash,
-  /** 片段在文件中的位置。格式 spec 未定（頁碼／區塊），暫為字串。 */
+  /**
+   * 片段在文件中的位置（ADR-0006 第 2 項）：`tb1:<起始區塊序號>:<區塊指紋,…>`，
+   * 由 @rolecraft/domain `createSourceExcerpt` 產生；格式不符時 R2 判定一律視為無法驗證（待複核）。
+   * schema 只要求非空字串，格式驗證在 domain。
+   */
   location: NonEmptyText,
   /** 片段原文 */
   text: NonEmptyText,

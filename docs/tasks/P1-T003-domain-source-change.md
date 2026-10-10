@@ -73,9 +73,15 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：`packages/domain/src/source-change/` 實作與測試；ADR-0006 第 2 項定案；`claim.ts` 只改 location 註解
+- 已通過驗證：`npm run verify` 綠（Vitest 16 檔 127 測試，其中 source-change 49 個）
+- 下一步：協調者收官前跑 E3 對抗驗證
 - Blocker：無
 
 ## 完成結果
+
+- 區塊切分（`blocks.ts`）：空行（只含空白類字元，含全形空白、NBSP、零寬字元）或 ATX 標題分隔，標題自成一塊；CRLF／CR→LF、去開頭 BOM，其餘原樣比對；指紋＝SHA-256(JSON [章節標題路徑, 區塊原文])，標題改字或區塊搬到別章節都算變更。SHA-256 自帶純函式（不用 node:、Web Crypto 只有非同步）。
+- 片段位置（`location.ts`）：`tb1:<起始區塊序號>:<指紋,…>`，跨區塊依序列出；`createSourceExcerpt`／`locateExcerpt` 遇到片段出現在不同區塊時回 ambiguous，要求指定第幾次出現，不自行猜。
+- 判定（`evaluate.ts`）：`checkExcerpt` → unchanged／block_changed／excerpt_missing／unverifiable（位置格式錯、同版本雜湊不同、版本倒退）／source_removed（刪除、已撤銷、待確認）；`evaluateClaimSources` 任一片段非 unchanged／source_removed → 待複核；全部 source_removed → 來源已移除；狀態只升不降；版本或雜湊變了的文件列入 `documentsToReanalyze`；缺來源現況丟錯不預設成移除。`isUsableForGeneration`：待複核、矛盾不可；來源已移除只有使用者確認過的可以。
+- 矛盾標記（`conflict.ts`）：`SourceConflictMark`（跨文件／同文件、事實項、≥2 片段、說明）＋`applyConflictMarks`；標記不合法或指向不存在事實項丟錯。
+- 已知限制：空行之後新增的更正、Setext 標題（`===`／`---` 底線）改字不會讓既有區塊變更，靠 `documentsToReanalyze` 觸發 pipeline 重新分析找矛盾（R2 原文設計）；矛盾解除（使用者確認）不在本 Task。
