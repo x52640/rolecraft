@@ -1,7 +1,7 @@
 ---
 id: P1-T027
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T026", "P1-T007"]
 specs: ["resume-output.md"]
 track: pdf

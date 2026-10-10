@@ -5,16 +5,16 @@
 <!-- index:start -->
 ## 進行中
 
-- 無
+- P1-T012 providers：Claude 適配器（`docs/tasks/P1-T012-provider-claude.md`）
+- P1-T027 pdf-export：中文模板與匯出檢查（`docs/tasks/P1-T027-pdf-export.md`）
+- P1-T034 橋接 contract 升級：請求 id、錯誤碼、共用常數（`docs/tasks/P1-T034-bridge-contract-v2.md`）
 
 ## ready
 
-- P1-T012 providers：Claude 適配器
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本
 - P1-T019 editor：職缺快照確認與手動貼上
 - P1-T020 editor：履歷 PDF 匯入與校正
 - P1-T021 editor：專案資料夾匯入與預覽
-- P1-T027 pdf-export：中文模板與匯出檢查
 <!-- index:end -->
 
 ## 下一步（2026-10-10 協調者建議）
@@ -77,7 +77,7 @@
 - 擴充功能（P1-T015）：橋接無請求 id，客戶端一次一則；Native Messaging host 名稱 `com.rolecraft.helper`（暫在 extension，應移至 contracts）；錯誤碼尚無「helper 未安裝」「逾時」（P1-T016／T030 需要時加）；擴充功能 ID 未固定（P1-T031）；`open_editor` 經 helper 的語意待定義；站點註冊表只有職缺頁路徑。
 - PDF 匯出（ADR-0005）：HTML＋CSS 交給本機 Chrome 背景列印（puppeteer-core），附 Noto Sans TC 400／700 完整字型（+14.2 MB，D17 自用可接受），匯出前用 HarfBuzz 裁字型；缺字會被 Chrome 偷補系統字型，P1-T027 要擋。依賴本機 Chrome；Arc 啟動逾時未查明、Edge 未裝。
 
-- 待開 Task「橋接 contract 升級」（contract_change）：請求 id（並行、P1-T027 分塊）、錯誤碼（not_implemented／helper_unavailable／timeout）、host 名稱 `com.rolecraft.helper` 與轉送通道 `rolecraft.bridge` 移入 contracts（目前 extension／editor／helper 各寫一份）、`open_editor` 語意；另 vitest 收 `*.test.tsx`。
+- 橋接 contract 升級已建為 P1-T034。
 
 - sources（P1-T008）：macOS 讀檔與列舉的 symlink 競態只能縮小窗口（Node 無 openat／F_GETPATH），120 秒壓測 239 萬次 0 洩漏；徹底消除需原生模組。
 
