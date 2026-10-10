@@ -1,132 +1,195 @@
 /**
- * 從文字擷取數字（R1 檢查 3）：阿拉伯數字（含全形、千分位、小數、k／M／B）、
- * 中文數字（含大寫、簡體、阿拉伯數字＋中文單位）、英文數字詞、百分比。
- * 每個數字換算成「種類＋數值」的 key，段落與來源用同一把尺比對。
+ * 從文字擷取數字（R1 檢查 3），原則是 fail closed：
+ * 任何看起來像數量的片段，能確定換算出精確值的才給可比對的 key（種類＋數值），
+ * 其餘（約數、未知後綴、有歧義的分隔、形似字母、其他文字系統）一律 key=null，必須改寫或逐段確認。
+ * 段落與來源用同一把尺比對，所以寫法不同但數值相同（30% ＝ 百分之三十 ＝ 三成）算相符。
  */
+import { exclusionSpans, type Span } from './number-exclusions.ts';
 import {
-  CN_NUMERAL_CLASS,
-  CN_UNIT_CLASS,
-  EN_WORD_PATTERN,
-  cnUnitValue,
-  isCnDigit,
-  parseChineseNumber,
-  parseEnglishNumber,
-} from './numerals.ts';
+  MARK_HUNDRED_PERCENT,
+  MARK_PERCENT_OF,
+  MARK_POINTS,
+  normalizeNumbers,
+} from './number-normalize.ts';
+import {
+  APPROX_SUFFIX,
+  LETTER,
+  makeToken,
+  percentLikeSuffix,
+  percentOfStart,
+  stickyAt,
+  unparseable,
+  type Hit,
+  type NumberKind,
+  type NumberToken,
+} from './number-token.ts';
+import { chineseAt, englishAt, lookalikeAt } from './number-words.ts';
+import { CN_NUMERAL_CLASS, CN_UNIT_CLASS, EN_SCALES, cnUnitValue } from './numerals.ts';
 
-export interface NumberToken {
-  /** 原文（正規化後） */
-  readonly text: string;
-  /** 比對用 key；無法解析時為 null，一律視為找不到出處 */
-  readonly key: string | null;
-}
+export type { NumberToken } from './number-token.ts';
+export { isBlankForNumbers } from './number-normalize.ts';
 
-/** 看起來像數字的拉丁／西里爾／希臘字母（O→0、l／I→1），只在緊鄰數字時換掉。 */
-const HOMOGLYPH_ZERO = 'OoОоΟο';
-const HOMOGLYPH_ONE = 'lIІі';
-const HOMOGLYPH_CLASS = `[${HOMOGLYPH_ZERO}${HOMOGLYPH_ONE}]`;
-const HOMOGLYPH_NEAR_DIGIT = new RegExp(
-  `(?<=\\d[,.]?)${HOMOGLYPH_CLASS}|${HOMOGLYPH_CLASS}(?=[,.]?\\d)`,
-  'gu',
-);
+const CORE = /\d+(?:[.,]\d+)*(?:[eE][+-]?\d+)?/uy;
+/** 10 000：空白分隔的千分位和「10 個、000」分不開。 */
+const SPACE_GROUP = / \d{3}(?!\d)/uy;
+const CARET = /\s*\^\s*\d+/uy;
+const CN_UNITS_AFTER = new RegExp(`\\s*(${CN_UNIT_CLASS}+)`, 'uy');
+/** 1萬5、3千5百：單位後又接數字，口語省略的寫法不猜。 */
+const DIGIT_AFTER_UNIT = new RegExp(`(?:\\d|${CN_NUMERAL_CLASS})+`, 'uy');
+const CHENG = /\s*成(\d(?!\d))?/uy;
+const LATIN_MULTIPLIER = /\s?(bn|mn|k|m|b|w)(?![A-Za-z0-9])/iuy;
+const SCALE_WORD = /[\s-]*(dozen|hundred|thousand|million|billion|trillion)(s?)(?![A-Za-z])/iuy;
+const TIMES = /\s?[x×](?![A-Za-z0-9])/iuy;
+const LETTER_SUFFIX = new RegExp(`[${LETTER}][${LETTER}0-9]*`, 'uy');
+/** 數字前緊貼字母（EC2、K8s、IPv6、H.264）：產品或規格名，整串字面比對。 */
+const LETTERS_BEFORE = new RegExp(`[${LETTER}]+[._-]?$`, 'u');
+const IDENT_REST = /[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*/uy;
 
-function replaceHomoglyphs(text: string): string {
-  let current = text;
-  for (;;) {
-    const next = current.replace(HOMOGLYPH_NEAR_DIGIT, (ch) =>
-      HOMOGLYPH_ZERO.includes(ch) ? '0' : '1',
-    );
-    if (next === current) return current;
-    current = next;
+const LATIN_VALUE: Readonly<Record<string, number>> = {
+  k: 1e3,
+  m: 1e6,
+  b: 1e9,
+  bn: 1e9,
+  mn: 1e6,
+  w: 1e4,
+};
+
+/** 核心數字串 → 數值；版本號回傳字串 key；有歧義回傳 null。 */
+function parseCore(core: string): number | string | null {
+  if (/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/u.test(core)) {
+    // 1.000：歐式千分位還是小數，分不出來
+    if (/^\d{1,3}\.\d{3}$/u.test(core)) return null;
+    return Number(core);
   }
+  if (/^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/u.test(core)) return Number(core.replaceAll(',', ''));
+  if (/^\d+(?:\.\d+){2,}$/u.test(core)) {
+    return /^\d{1,3}(?:\.\d{3})+$/u.test(core) ? null : `v${core}`;
+  }
+  return null;
 }
 
-/** 正規化：全形轉半形（NFKC）、去掉零寬等格式字元與組合符號、數字旁的形似字母。 */
-export function normalizeForNumbers(text: string): string {
-  const stripped = text.normalize('NFKC').replace(/[\p{Cf}\p{Mn}\p{Me}]/gu, '');
-  return replaceHomoglyphs(stripped);
+function identifierAt(text: string, i: number): Hit | null {
+  const before = LETTERS_BEFORE.exec(text.slice(0, i));
+  if (!before) return null;
+  const start = i - before[0].length;
+  // 1920x1080 的 x 是乘號，不是識別字
+  if (/^[x×][._-]?$/iu.test(before[0]) && /\d$/u.test(text.slice(0, start))) return null;
+  const rest = stickyAt(IDENT_REST, text, i);
+  const end = i + (rest?.[0].length ?? 1);
+  const raw = text.slice(start, end);
+  return { token: { text: raw, key: `id:${raw.toLowerCase()}` }, end };
 }
 
-const PERCENT_SUFFIX = String.raw`(\s*(?:%|‰|percent\b|per\s+cent\b|pct\b))?`;
-const ARABIC = String.raw`(\d+(?:,\d{3})*(?:\.\d+)?)\s*(${CN_UNIT_CLASS}*)([kmb](?![a-z]))?`;
-const CHINESE = `(${CN_NUMERAL_CLASS}+(?:[點点]${CN_NUMERAL_CLASS}+)?)`;
-const ENGLISH = String.raw`\b(${EN_WORD_PATTERN}(?:[\s-]+(?:and[\s-]+)?${EN_WORD_PATTERN})*)\b`;
-
-const NUMBER_RE = new RegExp(
-  `(百分之)?(?:${ARABIC}|${CHINESE}|${ENGLISH})${PERCENT_SUFFIX}`,
-  'giu',
-);
-
-/** 非 ASCII 的十進位數字（NFKC 後仍存在，例如阿拉伯—印度數字）：無法解析。 */
-const OTHER_DECIMAL_DIGIT = /(?![0-9])\p{Nd}+/gu;
-
-const LATIN_SUFFIX: Readonly<Record<string, number>> = { k: 1e3, m: 1e6, b: 1e9 };
-
-/** 單一中文單位字前後出現這些字時才算數量（數萬、上千、十人）。 */
-const VAGUE_PREFIX = /[數数上近逾破約约幾几好成]$/u;
-const QUANTITY_SUFFIX = /^[人名位家筆笔次件元塊块倍]/u;
-
-function canonical(value: number): string {
-  return String(Number(value.toPrecision(12)));
+/** 數字後的量級：中文單位、k／M／bn、英文量級詞、倍數 x。回傳新結尾與倍率；有歧義時倍率為 null。 */
+function multiplierAt(text: string, at: number): { end: number; factor: number | null } {
+  let end = at;
+  let factor = 1;
+  const cn = stickyAt(CN_UNITS_AFTER, text, end);
+  if (cn) {
+    end += cn[0].length;
+    for (const unit of cn[1] ?? '') factor *= cnUnitValue(unit) ?? Number.NaN;
+    const trailing = stickyAt(DIGIT_AFTER_UNIT, text, end);
+    if (trailing) return { end: end + trailing[0].length, factor: null };
+    return { end, factor };
+  }
+  const latin = stickyAt(LATIN_MULTIPLIER, text, end);
+  if (latin) {
+    const value = LATIN_VALUE[(latin[1] ?? '').toLowerCase()];
+    return { end: end + latin[0].length, factor: value ?? null };
+  }
+  for (let word = stickyAt(SCALE_WORD, text, end); word; word = stickyAt(SCALE_WORD, text, end)) {
+    end += word[0].length;
+    factor *= EN_SCALES[(word[1] ?? '').toLowerCase()] ?? Number.NaN;
+  }
+  if (end !== at) return { end, factor };
+  const times = stickyAt(TIMES, text, end);
+  return { end: end + (times?.[0].length ?? 0), factor };
 }
 
-function parseArabic(digits: string, units: string, latin: string | undefined): number {
-  let value = Number(digits.replaceAll(',', ''));
-  for (const unit of units) value *= cnUnitValue(unit) ?? 1;
-  if (latin !== undefined) value *= LATIN_SUFFIX[latin.toLowerCase()] ?? 1;
-  return value;
-}
+function arabicAt(text: string, i: number): Hit | null {
+  if (!/\d/u.test(text[i] ?? '')) return null;
+  const ident = identifierAt(text, i);
+  if (ident) return ident;
+  const core = stickyAt(CORE, text, i);
+  if (!core) return null;
+  let end = i + core[0].length;
+  const parsed = parseCore(core[0]);
+  if (typeof parsed === 'string') return { token: { text: core[0], key: parsed }, end };
 
-/** 中文數字片段是否該算成數字（排除「統一」「十分」這類詞）。 */
-function chineseRunCounts(
-  run: string,
-  before: string,
-  after: string,
-  hasPercent: boolean,
-): boolean {
-  if (hasPercent) return true;
-  const chars = [...run];
-  if (chars.some((c) => isCnDigit(c)) && !(chars.length === 1 && (run === '一' || run === '壹'))) {
+  let value: number | null = parsed;
+  const percentOf = percentOfStart(text, i);
+  let kind: NumberKind = percentOf === null ? '#' : '%';
+  const fail = (match: RegExpExecArray | null): boolean => {
+    if (!match) return false;
+    end += match[0].length;
+    value = null;
     return true;
+  };
+  if (/^\d{1,3}$/u.test(core[0]) && fail(stickyAt(SPACE_GROUP, text, end))) {
+    return { token: unparseable(text.slice(i, end)), end };
   }
-  if (chars.length >= 2) return true;
-  // 單一個「一」或單一個單位字：只有搭配數量詞才算
-  return VAGUE_PREFIX.test(before) || QUANTITY_SUFFIX.test(after);
+  fail(stickyAt(CARET, text, end));
+
+  const suffix = percentLikeSuffix(text, end);
+  const cheng = stickyAt(CHENG, text, end);
+  if (suffix) {
+    kind = suffix.kind;
+    end = suffix.end;
+    if (value !== null) value *= suffix.scale;
+  } else if (cheng) {
+    kind = '%';
+    end += cheng[0].length;
+    if (value !== null) value = value * 10 + Number(cheng[1] ?? 0);
+  } else {
+    const mult = multiplierAt(text, end);
+    end = mult.end;
+    value = value === null || mult.factor === null ? null : value * mult.factor;
+    // 5GB、100ms、3D：未知的字母後綴
+    const letters = stickyAt(LETTER_SUFFIX, text, end);
+    if (letters && !/^[x×]\d/iu.test(text.slice(end, end + 2))) fail(letters);
+  }
+  fail(stickyAt(APPROX_SUFFIX, text, end));
+  return { token: makeToken(text.slice(percentOf ?? i, end), kind, value), end };
 }
 
-export function extractNumbers(text: string): NumberToken[] {
-  const normalized = normalizeForNumbers(text);
-  const tokens: NumberToken[] = [];
-  for (const m of normalized.matchAll(OTHER_DECIMAL_DIGIT)) {
-    tokens.push({ text: m[0], key: null });
+/** 沒有被數字吃掉的標記：百分百 → 100%；百分之後面接數字就交給數字；其餘（數個百分點）無法辨識。 */
+function markerAt(text: string, i: number): Hit | null {
+  const ch = text[i];
+  if (ch === MARK_HUNDRED_PERCENT) return { token: makeToken(ch, '%', 100), end: i + 1 };
+  if (ch === MARK_PERCENT_OF) {
+    const next = text.slice(i + 1).trimStart()[0] ?? '';
+    if (/\d/u.test(next) || new RegExp(CN_NUMERAL_CLASS, 'u').test(next) || /[a-z]/iu.test(next)) {
+      return { token: null, end: i + 1 };
+    }
+    return { token: unparseable(ch), end: i + 1 };
   }
-  for (const m of normalized.matchAll(NUMBER_RE)) {
-    const [whole, percentPrefix, digits, units, latin, cnRun, enRun, percentSuffix] = m;
-    const suffix = percentSuffix?.trim() ?? '';
-    const hasPercent = percentPrefix !== undefined || suffix !== '';
-    const start = m.index;
-    const before = normalized.slice(Math.max(0, start - 1), start);
-    const after = normalized.slice(start + whole.length, start + whole.length + 1);
+  if (ch === MARK_POINTS) return { token: unparseable(ch), end: i + 1 };
+  return null;
+}
 
-    let value: number | null;
-    if (digits !== undefined) {
-      value = parseArabic(digits, units ?? '', latin);
-    } else if (cnRun !== undefined) {
-      if (!chineseRunCounts(cnRun, before, after, hasPercent)) continue;
-      value = parseChineseNumber(cnRun);
-    } else if (enRun !== undefined) {
-      if (enRun.toLowerCase() === 'one' && !hasPercent) continue;
-      value = parseEnglishNumber(enRun);
-    } else {
+function scanAt(text: string, i: number, spans: readonly Span[]): Hit | null {
+  return (
+    arabicAt(text, i) ??
+    chineseAt(text, i, spans) ??
+    englishAt(text, i, spans) ??
+    lookalikeAt(text, i) ??
+    markerAt(text, i)
+  );
+}
+
+export function extractNumbers(input: string): NumberToken[] {
+  const { text, unparseable: rejected } = normalizeNumbers(input);
+  const tokens: NumberToken[] = rejected.map((raw) => unparseable(raw));
+  const spans = exclusionSpans(text);
+  let i = 0;
+  while (i < text.length) {
+    const hit = scanAt(text, i, spans);
+    if (hit === null) {
+      i += 1;
       continue;
     }
-
-    if (value === null || !Number.isFinite(value)) {
-      tokens.push({ text: whole, key: null });
-      continue;
-    }
-    const kind = suffix === '‰' ? '%' : hasPercent ? '%' : '#';
-    const scaled = suffix === '‰' ? value / 10 : value;
-    tokens.push({ text: whole, key: `${kind}${canonical(scaled)}` });
+    if (hit.token !== null) tokens.push(hit.token);
+    i = Math.max(hit.end, i + 1);
   }
   return tokens;
 }

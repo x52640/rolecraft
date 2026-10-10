@@ -10,6 +10,8 @@ import {
   type ClaimCitation,
 } from '@rolecraft/contracts';
 
+import { isUsableForGeneration } from '../source-change/index.ts';
+
 import {
   SECTION_CONFIRMABLE,
   type ExportCheckKind,
@@ -17,7 +19,7 @@ import {
   type ExportIssue,
   type ExportIssueCode,
 } from './issues.ts';
-import { extractNumbers, normalizeForNumbers, numberKeys } from './numbers.ts';
+import { extractNumbers, isBlankForNumbers, numberKeys } from './numbers.ts';
 
 export interface ExportCheckInput {
   readonly sections: readonly ResumeSection[];
@@ -62,18 +64,28 @@ function profileNumberKeys(raw: unknown): Set<string> {
   return numberKeys(texts.join('\n'));
 }
 
-/** 寫成已完成時，事實項必須是使用者確認完成、確認文字與現在內容一致、不在待複核或來源矛盾。 */
+/**
+ * 事實項能不能被段落引用（協調者裁定，重用 R2 的 isUsableForGeneration）：
+ * 待複核、來源矛盾、來源已移除且未經使用者確認、完全沒有依據的，引用它的段落一律不能匯出，
+ * 不論寫成哪種完成程度，也不能用逐段確認繞過。
+ */
+function unusableReason(claim: Claim): string | null {
+  const { sourceExcerpts, userConfirmation } = claim.basis;
+  if (sourceExcerpts.length === 0 && userConfirmation === null) {
+    return '事實項沒有任何來源或使用者確認，不能引用';
+  }
+  if (!isUsableForGeneration(claim)) {
+    return `事實項處於「${claim.reviewStatus}」，到事實項上處理前不能引用`;
+  }
+  return null;
+}
+
+/** 寫成已完成時，事實項必須是使用者確認完成、確認文字與現在內容一致（複核狀態由 unusableReason 把關）。 */
 function completedViolation(claim: Claim): { code: ExportIssueCode; message: string } | null {
   if (claim.completionStatus !== 'user_confirmed_done') {
     return {
       code: 'completed_not_user_confirmed',
       message: `事實項狀態是「${claim.completionStatus ?? '無'}」，未經使用者確認完成，不能寫成已完成`,
-    };
-  }
-  if (claim.reviewStatus === 'needs_review' || claim.reviewStatus === 'source_conflict') {
-    return {
-      code: 'completed_under_review',
-      message: `事實項處於「${claim.reviewStatus}」，處理前不能寫成已完成`,
     };
   }
   const confirmation = claim.basis.userConfirmation;
@@ -150,6 +162,8 @@ function checkCitation(
     }
     return null;
   }
+  const unusable = unusableReason(claim);
+  if (unusable !== null) out.add('claim_usability', 'claim_unusable', unusable, { claimId });
   const hasCompletion = CLAIM_TYPES_WITH_COMPLETION.includes(claim.type);
   if (!hasCompletion) {
     if (statedCompletion === 'completed') {
@@ -224,7 +238,7 @@ function checkSection(
   }
   const section = parsed.data;
   // 正規化後是空白（含零寬字元）的段落不會輸出任何內容
-  if (normalizeForNumbers(section.text).trim() === '') return [];
+  if (isBlankForNumbers(section.text)) return [];
 
   const out = new SectionIssues(section.id);
   checkIntegrity(section, out);

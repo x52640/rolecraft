@@ -4,6 +4,7 @@
 export type ExportCheckKind =
   | 'citation_exists' // 檢查 1：引用的事實項存在
   | 'completion' // 檢查 2：宣稱完成程度合法（D14）
+  | 'claim_usability' // 引用的事實項待複核、來源矛盾、來源已移除未確認或沒有依據（協調者裁定）
   | 'numbers' // 檢查 3：數字有出處
   | 'no_citation' // 沒有任何引用的段落
   | 'citation_integrity' // 生成段落的引用被移除或生成紀錄缺失
@@ -15,7 +16,7 @@ export type ExportIssueCode =
   | 'completion_not_stated'
   | 'completion_not_applicable'
   | 'completed_not_user_confirmed'
-  | 'completed_under_review'
+  | 'claim_unusable'
   | 'completed_confirmation_stale'
   | 'number_unsourced'
   | 'number_unparseable'
@@ -33,7 +34,7 @@ export interface ExportIssue {
   readonly number?: string;
   readonly message: string;
   /**
-   * 能否用逐段確認處理。檢查 2 與引用完整性一律不行（R1），
+   * 能否用逐段確認處理。檢查 2、事實項不可用與引用完整性一律不行（R1），
    * 只能改寫、刪除或到事實項上確認。
    */
   readonly resolvableBySectionConfirmation: boolean;

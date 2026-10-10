@@ -66,7 +66,7 @@ describe('S9-7 檢查 2：不得把未確認的事寫成已完成', () => {
         [generated('完成搜尋功能', [{ claimId: 'c1', statedCompletion: 'completed' }])],
         [feature('c1', '搜尋功能', { reviewStatus })],
       );
-      expect(codes(r)).toEqual(['completed_under_review']);
+      expect(codes(r)).toEqual(['claim_unusable']);
     },
   );
 
@@ -92,7 +92,12 @@ describe('S9-7 檢查 2：不得把未確認的事寫成已完成', () => {
       ],
       [noRecord, stale],
     );
-    expect(codes(r)).toEqual(['completed_confirmation_stale', 'completed_confirmation_stale']);
+    // noRecord 完全沒有依據，另外也不能被引用
+    expect(codes(r)).toEqual([
+      'claim_unusable',
+      'completed_confirmation_stale',
+      'completed_confirmation_stale',
+    ]);
   });
 
   it('檢查 2 不通過不能用逐段確認繞過', () => {

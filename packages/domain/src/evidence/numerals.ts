@@ -1,7 +1,7 @@
 /**
  * 中文數字與英文數字詞轉數值（R1 檢查 3 用）。
  * 原則：同一個解析器同時套在段落與來源上，只要兩邊寫法換算後數值相同就算相符；
- * 解析不了的寫法寧可多抓（之後要逐段確認），不可漏抓。
+ * 寫法有歧義（三五個、十二三、萬億順序錯）一律回傳 null，由呼叫端當成無法辨識而擋下。
  */
 
 const CN_DIGITS: Readonly<Record<string, number>> = {
@@ -42,16 +42,17 @@ const CN_SMALL_UNITS: Readonly<Record<string, number>> = {
   仟: 1000,
 };
 
-/** 萬、億這類分節單位。 */
+/** 萬、億、兆這類分節單位。 */
 const CN_BIG_UNITS: Readonly<Record<string, number>> = {
   萬: 1e4,
   万: 1e4,
   億: 1e8,
   亿: 1e8,
+  兆: 1e12,
 };
 
-/** 廿、卅：二十、三十。 */
-const CN_TENS_SHORTHAND: Readonly<Record<string, number>> = { 廿: 20, 卅: 30 };
+/** 廿、卅、卌：二十、三十、四十。 */
+const CN_TENS_SHORTHAND: Readonly<Record<string, number>> = { 廿: 20, 卅: 30, 卌: 40 };
 
 const ALL_CN = [
   ...Object.keys(CN_DIGITS),
@@ -60,57 +61,73 @@ const ALL_CN = [
   ...Object.keys(CN_TENS_SHORTHAND),
 ].join('');
 
-/** 中文數字字元（含大寫、簡體、廿卅），用來組 regex。 */
+/** 中文數字字元（含大寫、簡體、廿卅卌），用來組 regex。 */
 export const CN_NUMERAL_CLASS = `[${ALL_CN}]`;
 
 /** 中文單位字元，接在阿拉伯數字後面時要相乘（例如 3萬、1.5億）。 */
 export const CN_UNIT_CLASS = `[${Object.keys(CN_SMALL_UNITS).join('')}${Object.keys(CN_BIG_UNITS).join('')}]`;
 
+/** 中文數字字（不含單位）。 */
+export const CN_DIGIT_CLASS = `[${Object.keys(CN_DIGITS).join('')}]`;
+
 export function isCnDigit(ch: string): boolean {
   return ch in CN_DIGITS;
+}
+
+export function cnDigitValue(ch: string): number | undefined {
+  return CN_DIGITS[ch];
 }
 
 export function cnUnitValue(ch: string): number | undefined {
   return CN_SMALL_UNITS[ch] ?? CN_BIG_UNITS[ch];
 }
 
-/** 中文整數（不含小數點）。無法解析回傳 null。 */
+/** 逐字寫的數字（二〇二三）：四位以上或含零才算；兩三位（三五、七八）是約數，回傳 null。 */
+function parseDigitSequence(chars: readonly string[]): number | null {
+  if (chars.length < 4 && !chars.some((c) => CN_DIGITS[c] === 0)) return null;
+  return Number(chars.map((c) => CN_DIGITS[c]).join(''));
+}
+
+/** 中文整數（不含小數點）。無法解析或有歧義回傳 null。 */
 export function parseChineseInteger(run: string): number | null {
   const chars = [...run];
   if (chars.length === 0) return null;
-  // 沒有單位、多位數字逐字寫：二〇二三 → 2023
-  if (chars.length > 1 && chars.every((c) => isCnDigit(c))) {
-    return Number(chars.map((c) => CN_DIGITS[c]).join(''));
-  }
+  if (chars.length > 1 && chars.every((c) => isCnDigit(c))) return parseDigitSequence(chars);
   let total = 0;
   let section = 0;
   let digit: number | null = null;
   let lastUnit = 0;
+  let lastSmall = Infinity;
+  let lastBig = Infinity;
   let zeroAfterUnit = false;
   for (const ch of chars) {
     const d = CN_DIGITS[ch];
-    const small = CN_SMALL_UNITS[ch];
+    const small = CN_SMALL_UNITS[ch] ?? CN_TENS_SHORTHAND[ch];
     const big = CN_BIG_UNITS[ch];
-    const tens = CN_TENS_SHORTHAND[ch];
     if (d !== undefined) {
+      // 兩個數字字相連（十二三、三五萬）是約數
+      if (digit !== null && digit !== 0) return null;
       if (d === 0) zeroAfterUnit = true;
       digit = d;
-    } else if (tens !== undefined) {
-      section += tens;
-      digit = null;
-      lastUnit = 10;
-      zeroAfterUnit = false;
     } else if (small !== undefined) {
-      section += (digit ?? 1) * small;
+      if (small >= lastSmall) return null;
+      const tens = CN_TENS_SHORTHAND[ch];
+      if (tens !== undefined && digit !== null) return null;
+      section += tens ?? (digit ?? 1) * small;
       digit = null;
       lastUnit = small;
+      lastSmall = small;
       zeroAfterUnit = false;
     } else if (big !== undefined) {
+      // 萬億、萬…億這類順序錯亂的寫法不猜
+      if (big >= lastBig) return null;
       section += digit ?? 0;
       total += (section === 0 ? 1 : section) * big;
       section = 0;
       digit = null;
       lastUnit = big;
+      lastBig = big;
+      lastSmall = Infinity;
       zeroAfterUnit = false;
     } else {
       return null;
@@ -182,32 +199,34 @@ const EN_UNITS: Readonly<Record<string, number>> = {
   ninety: 90,
 };
 
-const EN_SCALES: Readonly<Record<string, number>> = {
+/** 英文量級詞；dozen 和 hundred 一樣只乘目前這節。 */
+export const EN_SCALES: Readonly<Record<string, number>> = {
+  dozen: 12,
   hundred: 100,
   thousand: 1e3,
   million: 1e6,
   billion: 1e9,
+  trillion: 1e12,
 };
 
-/** 英文數字詞（小寫）regex 片段。 */
-export const EN_WORD_PATTERN = `(?:${[...Object.keys(EN_UNITS), ...Object.keys(EN_SCALES)].join('|')})`;
+const EN_WORDS = [...Object.keys(EN_UNITS), ...Object.keys(EN_SCALES)];
 
-/** 英文數字詞序列：two hundred thousand → 200000。 */
-export function parseEnglishNumber(run: string): number | null {
-  const words = run
-    .toLowerCase()
-    .split(/[\s-]+/u)
-    .filter((w) => w !== '' && w !== 'and');
+/** 英文數字詞（小寫，量級詞與 tens 可帶複數 s）regex 片段。 */
+export const EN_WORD_PATTERN = `(?:${EN_WORDS.join('|')}|tens)s?`;
+
+/** 英文數字詞序列：two hundred thousand → 200000。複數量級詞由呼叫端判成約數。 */
+export function parseEnglishNumber(words: readonly string[]): number | null {
   if (words.length === 0) return null;
   let total = 0;
   let current = 0;
-  for (const w of words) {
-    const unit = EN_UNITS[w];
+  for (const raw of words) {
+    const w = raw.toLowerCase().replace(/s$/u, '');
+    const unit = EN_UNITS[raw.toLowerCase()];
     const scale = EN_SCALES[w];
     if (unit !== undefined) {
       current += unit;
-    } else if (scale === 100) {
-      current = (current === 0 ? 1 : current) * 100;
+    } else if (scale !== undefined && scale < 1000) {
+      current = (current === 0 ? 1 : current) * scale;
     } else if (scale !== undefined) {
       total += (current === 0 ? 1 : current) * scale;
       current = 0;
