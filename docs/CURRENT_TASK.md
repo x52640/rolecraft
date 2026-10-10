@@ -5,7 +5,7 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T037 codex 補審修正：providers 取消終止與 Claude spike 腳本（`docs/tasks/P1-T037-review-fixes-providers.md`）
+- 無
 
 ## ready
 

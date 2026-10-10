@@ -30,5 +30,5 @@
 
 - 待開「helper 匯出接線」Task：helper 呼叫 `exportResumePdf` → `exports.create()`；從 Profile＋ResumeVersion 組 ResumeDocument 的規則（contracts ResumeSection 缺段落歸屬／項目類型，可能需加欄位）；R1 結果與 document 同一份內容的測試；可順帶接 `sweepStorage` 與 Claude stream guard。字型打包與 OFL.txt 來源固定留 P1-T031。模板禁用 CSS `position`（會打亂 PDF 文字順序，已有測試）。
 
-- Claude 適配器（P1-T012）：要真正強制「init 異常立即終止」與「取消時終止整個程序群組」需改 core（提供包裝 spawn 的掛點、取消改送程序群組）；目前 helper 必須用 `claudeRunDeps` 取得 deps。上下文上限與 CLI 版本經 `executeDetailed` 取得，core 的 `ExecutionResult` 尚未擴充。
+- Claude 適配器（P1-T012）：要真正強制「init 異常立即終止」需改 core（提供包裝 spawn 的掛點；取消與輸出超量已改為終止整個程序群組，P1-T037）；目前 helper 必須用 `claudeRunDeps` 取得 deps。上下文上限與 CLI 版本經 `executeDetailed` 取得，core 的 `ExecutionResult` 尚未擴充。
 - 待擁有者決定：Claude CLI 自動更新後，A＝停用直到人工重跑 P1-T011 spike；B＝自動重跑注入測試（約 3–5 次極短呼叫）通過即繼續。目前實作為 A（版本嚴格比對）。
