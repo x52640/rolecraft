@@ -1,7 +1,7 @@
 ---
 id: P1-T007
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T006"]
 specs: ["resume-output.md"]
 track: storage
