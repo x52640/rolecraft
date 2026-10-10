@@ -15,12 +15,13 @@
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本
 <!-- index:end -->
 
-## 下一步（2026-10-10 收官，等擁有者指示）
+## 下一步（2026-10-10 交接）
 
-1. 候選（皆不需擁有者資料）：P1-T019、P1-T021、P1-T039（D22，高風險需對抗驗證）、「helper 匯出接線」（待建，見 RESIDUALS.md）、README。
-2. P1-T017、P1-T020 等擁有者提供 104 頁面／PDF。
-3. repo 已公開於 https://github.com/x52640/rolecraft（MIT）；只有擁有者說「推」才 push。本機 git email 已設 noreply。
-4. 歷史改寫（2026-10-10）留下的本機 `refs/original` 與 scratchpad bundle 待擁有者同意後清除。
+1. **交接時仍在跑的 4 個工作者**（各自在 `.claude/worktrees/agent-*`，完成會在該 worktree 留一個 commit，尚未併入 main）：P1-T041 橋接編輯器操作、P1-T022 pipeline 分析、P1-T039 CLI 自動重新驗證、P1-T042 README。新 session 先跑 `git worktree list` 與 `git -C <worktree> log -1` 檢查；有 commit 就用 `scripts/coordinator/gate.sh` 合併；T041、T022、T039 是高風險，收官前用 `scripts/coordinator/adversarial-verify.workflow.js` 跑對抗驗證；沒 commit 的就移除 worktree、重開該 Task。
+2. 之後：第二波（等 T041）P1-T019、T020、T021、T028、T030、T040；第三波 P1-T023、T024、T025、T029。
+3. 需擁有者：P1-T017（104 頁面）、P1-T020 手動驗證（104 PDF）、T031、T032。
+4. repo 公開於 https://github.com/x52640/rolecraft；只有擁有者說「推」才 push。本機 git email 已設 noreply。
+5. 歷史改寫留下的本機 `refs/original` 待擁有者同意後清除。
 
 ## 主樹基準
 
