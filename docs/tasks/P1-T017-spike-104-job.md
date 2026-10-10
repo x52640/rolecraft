@@ -1,7 +1,7 @@
 ---
 id: P1-T017
 phase: 1
-status: blocked
+status: ready
 depends_on: ["P1-T015"]
 specs: ["jobs-and-messages.md", "open-verifications.md"]
 track: extension
@@ -77,6 +77,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：讀必讀入口後開工
-- Blocker：等待相依：P1-T015；需擁有者：登入 104、開幾個職缺頁協助存樣本
+- Blocker：無；手動驗證需擁有者：登入 104、開幾個職缺頁協助存樣本
 
 ## 完成結果

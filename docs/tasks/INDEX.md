@@ -17,23 +17,23 @@
 | [P1-T008](P1-T008-sources-authorization.md) | sources：資料夾列舉、授權集合與安全讀檔 | done | 1 | sources | P1-T001 |
 | [P1-T009](P1-T009-resume-import-pdf.md) | resume-import：PDF 文字層擷取 | done | 1 | import | P1-T001 |
 | [P1-T010](P1-T010-providers-core.md) | providers：適配介面、環境清理與 R6 紀錄 | done | 1 | providers | P1-T001 |
-| [P1-T011](P1-T011-spike-claude-cli.md) | 驗證：Claude CLI 隔離與訂閱登入 | blocked | 1 | providers | P1-T010 |
+| [P1-T011](P1-T011-spike-claude-cli.md) | 驗證：Claude CLI 隔離與訂閱登入 | ready | 1 | providers | P1-T010 |
 | [P1-T012](P1-T012-provider-claude.md) | providers：Claude 適配器 | blocked | 1 | providers | P1-T011 |
 | [P1-T013](P1-T013-spike-bridge.md) | 驗證：橋接通訊方式（Q3）與資料夾選取機制 | done | 1 | bridge | P0-T001 |
 | [P1-T014](P1-T014-helper-host.md) | helper：橋接端點與操作清單分派 | done | 1 | helper | P1-T013、P1-T006 |
 | [P1-T015](P1-T015-extension-skeleton.md) | extension：MV3 骨架與橋接客戶端 | done | 1 | extension | P1-T013、P1-T001 |
 | [P1-T016](P1-T016-editor-skeleton.md) | editor：React 骨架與路由 | done | 1 | editor | P1-T015 |
-| [P1-T017](P1-T017-spike-104-job.md) | 驗證：104 職缺頁條款與 DOM 樣本 | blocked | 1 | extension | P1-T015 |
+| [P1-T017](P1-T017-spike-104-job.md) | 驗證：104 職缺頁條款與 DOM 樣本 | ready | 1 | extension | P1-T015 |
 | [P1-T018](P1-T018-extension-104-extractor.md) | extension：104 職缺頁擷取 | blocked | 1 | extension | P1-T017、P1-T014 |
-| [P1-T019](P1-T019-job-snapshot-ui.md) | editor：職缺快照確認與手動貼上 | blocked | 1 | editor | P1-T016、P1-T014 |
-| [P1-T020](P1-T020-resume-import-ui.md) | editor：履歷 PDF 匯入與校正 | blocked | 1 | editor | P1-T009、P1-T016、P1-T014 |
-| [P1-T021](P1-T021-project-import-ui.md) | editor：專案資料夾匯入與預覽 | blocked | 1 | editor | P1-T008、P1-T016、P1-T014 |
+| [P1-T019](P1-T019-job-snapshot-ui.md) | editor：職缺快照確認與手動貼上 | ready | 1 | editor | P1-T016、P1-T014 |
+| [P1-T020](P1-T020-resume-import-ui.md) | editor：履歷 PDF 匯入與校正 | ready | 1 | editor | P1-T009、P1-T016、P1-T014 |
+| [P1-T021](P1-T021-project-import-ui.md) | editor：專案資料夾匯入與預覽 | ready | 1 | editor | P1-T008、P1-T016、P1-T014 |
 | [P1-T022](P1-T022-pipeline-analysis.md) | pipeline：文件分析成事實項 | blocked | 1 | pipeline | P1-T002、P1-T003、P1-T004、P1-T005、P1-T012、P1-T008 |
 | [P1-T023](P1-T023-claims-review-ui.md) | editor：事實項檢視與確認 | blocked | 1 | editor | P1-T022、P1-T016 |
 | [P1-T024](P1-T024-pipeline-resume-gen.md) | pipeline：職缺匹配與段落生成 | blocked | 1 | pipeline | P1-T022、P1-T019 |
 | [P1-T025](P1-T025-resume-editor-ui.md) | editor：逐段對照、接受與匯出前檢查 | blocked | 1 | editor | P1-T024、P1-T023 |
 | [P1-T026](P1-T026-spike-pdf-export.md) | 驗證：中文 PDF 匯出方式 | done | 1 | pdf | P0-T001 |
-| [P1-T027](P1-T027-pdf-export.md) | pdf-export：中文模板與匯出檢查 | blocked | 1 | pdf | P1-T026、P1-T007 |
+| [P1-T027](P1-T027-pdf-export.md) | pdf-export：中文模板與匯出檢查 | ready | 1 | pdf | P1-T026、P1-T007 |
 | [P1-T028](P1-T028-applications-ui.md) | editor：投遞紀錄 | blocked | 1 | editor | P1-T027 |
 | [P1-T029](P1-T029-message-drafts.md) | 招募訊息回覆草稿（手動貼上） | blocked | 1 | pipeline | P1-T024、P1-T016 |
 | [P1-T030](P1-T030-install-wizard-ui.md) | editor：供應商狀態與設定精靈 | blocked | 1 | editor | P1-T012、P1-T016、P1-T014 |

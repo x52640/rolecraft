@@ -1,7 +1,7 @@
 ---
 id: P1-T019
 phase: 1
-status: blocked
+status: ready
 depends_on: ["P1-T016", "P1-T014"]
 specs: ["jobs-and-messages.md"]
 track: editor
@@ -77,6 +77,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：讀必讀入口後開工
-- Blocker：等待相依：P1-T016、P1-T014
+- Blocker：無
 
 ## 完成結果

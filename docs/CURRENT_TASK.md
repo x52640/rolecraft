@@ -9,12 +9,23 @@
 
 ## ready
 
-- 無
+- P1-T011 驗證：Claude CLI 隔離與訂閱登入
+- P1-T017 驗證：104 職缺頁條款與 DOM 樣本
+- P1-T019 editor：職缺快照確認與手動貼上
+- P1-T020 editor：履歷 PDF 匯入與校正
+- P1-T021 editor：專案資料夾匯入與預覽
+- P1-T027 pdf-export：中文模板與匯出檢查
 <!-- index:end -->
+
+## 下一步（2026-10-10 協調者建議）
+
+1. 先建並跑「橋接 contract 升級」Task（見已知殘餘），與 P1-T011、P1-T027 平行。
+2. 升級完成後再平行開 P1-T019、P1-T021；P1-T017、P1-T020 等擁有者提供資料。
+3. 高風險 Task 照 plan.md E3 跑對抗驗證（2 review＋2 verify）。
 
 ## 主樹基準
 
-- `npm run verify` 綠；Vitest 12 檔 23 測試（P0-T001 後）。TypeScript ~6.0.3（typescript-eslint 8.71 不支援 7.x）。
+- `npm run verify` 綠；Vitest 886 測試通過、1 略過（只在 RUN_RACE=1 跑）；test:docs 14（2026-10-10 P1-T002 收官後）。TypeScript ~6.0.3（typescript-eslint 8.71 不支援 7.x）。
 
 ## 待專案擁有者
 
