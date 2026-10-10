@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { CaptureMethod, Id, NonEmptyText, Platform } from '../entities/common.ts';
 import { linkedInManualOnly } from '../entities/job-snapshot.ts';
+import { OpaqueId } from './common.ts';
 import { withFailure } from './operations.ts';
 
 /**
@@ -15,7 +16,7 @@ export const SubmitMessageCaptureRequest = z.strictObject({
       platform: Platform,
       captureMethod: CaptureMethod,
       selectedMessageText: NonEmptyText,
-      jobSnapshotId: Id.nullable(),
+      jobSnapshotId: OpaqueId.nullable(),
     })
     .refine(linkedInManualOnly.check, linkedInManualOnly.params),
 });

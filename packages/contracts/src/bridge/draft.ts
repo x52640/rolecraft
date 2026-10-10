@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { Id } from '../entities/common.ts';
+import { OpaqueId } from './common.ts';
 import { withFailure } from './operations.ts';
 
 /**
@@ -10,7 +11,7 @@ import { withFailure } from './operations.ts';
 export const RequestDraftRequest = z.strictObject({
   op: z.literal('request_draft'),
   payload: z.strictObject({
-    messageDraftId: Id,
+    messageDraftId: OpaqueId,
     replyIntent: z.string(),
   }),
 });

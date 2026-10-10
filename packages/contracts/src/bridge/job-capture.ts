@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { CaptureMethod, Id, Platform, Timestamp } from '../entities/common.ts';
 import { JobFields, linkedInManualOnly } from '../entities/job-snapshot.ts';
+import { HttpUrl } from './common.ts';
 import { withFailure } from './operations.ts';
 
 /**
@@ -13,7 +14,7 @@ export const SubmitJobCaptureRequest = z.strictObject({
   payload: z
     .strictObject({
       platform: Platform,
-      url: z.url().nullable(),
+      url: HttpUrl.nullable(),
       captureMethod: CaptureMethod,
       capturedAt: Timestamp,
       fields: JobFields,

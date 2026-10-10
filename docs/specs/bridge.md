@@ -23,7 +23,8 @@
 
 **共同規則（P1-T041）**：
 
-- 請求指向既有物件只用 helper 配發的不透明 ID（1–128 個英數、`_`、`-`，開頭須英數；不能是路徑、旗標或模型名稱）。helper 只拿它查自己的資料，查不到回 `invalid_request`。
+- 請求指向既有物件只用 helper 配發的不透明 ID（1–128 個英數、`_`、`-`，開頭須英數，所以不可能是路徑或旗標），含既有擷取操作的 `messageDraftId`、`jobSnapshotId` 與巢狀的事實項引用。helper 只拿它查自己配發的清單，不把請求字串直接當成模型參數或其他參數；查不到回 `invalid_request`。
+- 職缺網址只收 http／https（`file:`、`javascript:`、`data:` 等一律拒）。
 - 檔案、資料夾只能經 helper 開系統選取器進入（ADR-0003）；請求沒有任何路徑欄位，回應只給不透明 ID 與名稱（不含上層路徑）。
 - 時間戳記（確認時間等）由 helper 決定，不由呼叫端給。
 - 編輯器操作以「群組.動作」命名；群組對應 helper `src/handlers/<群組>/`，每個操作一個 handler 檔。尚未實作的回 `not_implemented`。

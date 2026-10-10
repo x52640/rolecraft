@@ -7,7 +7,7 @@ import { withFailure } from '../operations.ts';
 
 /**
  * providers.*：供應商狀態與設定精靈（F01、R5、R6、S9-1、S9-3；P1-T030）。
- * 請求只能指定服務（封閉列舉）與 helper 列過的候選 ID；不接受模型名稱、CLI 參數或路徑（R7）。
+ * 請求只能指定服務（封閉列舉）與 helper 列過的候選 ID；helper 只拿它查自己配發的清單，不把請求字串直接當成模型參數（R7）。
  * （鍵名用 service／candidate，不用 provider／model，配合 contracts 的禁用鍵名檢查。）
  */
 

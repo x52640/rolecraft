@@ -8,6 +8,7 @@ import {
   BridgeOperation,
   BridgeRequest,
   CONTENT_SCRIPT_OPERATIONS,
+  MAX_IDS_PER_REQUEST,
   OpaqueId,
 } from '../index.ts';
 import { editorRequests } from './__fixtures__/editor-requests.ts';
@@ -100,7 +101,7 @@ describe('個別規則', () => {
     expect(BridgeRequest.safeParse(withPayload({ authorize: tooMany })).success).toBe(false);
   });
 
-  it('providers：服務是封閉列舉；候選 ID 不得是模型名稱以外的任意字串', () => {
+  it('providers：服務是封閉列舉；候選 ID 不得帶旗標或空白', () => {
     const req = editorRequests['providers.select_candidate'];
     const svc = { ...req, payload: { ...req.payload, service: 'openai-api' } };
     expect(BridgeRequest.safeParse(svc).success).toBe(false);
@@ -143,6 +144,72 @@ describe('個別規則', () => {
     expect(res.safeParse({ ok: true, extra: 1 }).success).toBe(false);
     const fail = { ok: false, error: { code: 'not_implemented', message: 'x' } };
     expect(res.safeParse(fail).success).toBe(true);
+  });
+});
+
+describe('對抗驗證修正：請求 ID 一律 OpaqueId、職缺網址限 http(s)', () => {
+  const BAD_IDS = ['../etc/passwd', '/etc/passwd', '-rf', '--help', 'a b', ''];
+
+  it('resume.edit_section：巢狀 claimId 拒路徑／旗標，引用超量被拒，引用多帶欄位被拒', () => {
+    const req = editorRequests['resume.edit_section'];
+    const withCitations = (citations: unknown[]) => ({
+      ...req,
+      payload: { ...req.payload, citations },
+    });
+    for (const claimId of BAD_IDS) {
+      expect(BridgeRequest.safeParse(withCitations([{ claimId }])).success, claimId).toBe(false);
+    }
+    const id = req.payload.citations[0].claimId;
+    const many = Array.from({ length: MAX_IDS_PER_REQUEST + 1 }, () => ({ claimId: id }));
+    expect(BridgeRequest.safeParse(withCitations(many)).success).toBe(false);
+    const atLimit = many.slice(1);
+    expect(BridgeRequest.safeParse(withCitations(atLimit)).success).toBe(true);
+    expect(BridgeRequest.safeParse(withCitations([{ claimId: id, path: '/x' }])).success).toBe(
+      false,
+    );
+  });
+
+  it('request_draft.messageDraftId 與 submit_message_capture.jobSnapshotId 拒路徑／旗標', () => {
+    for (const bad of BAD_IDS) {
+      const draft = { op: 'request_draft', payload: { messageDraftId: bad, replyIntent: 'x' } };
+      expect(BridgeRequest.safeParse(draft).success, bad).toBe(false);
+      const msg = {
+        op: 'submit_message_capture',
+        payload: {
+          platform: 'cake',
+          captureMethod: 'manual_paste',
+          selectedMessageText: '您好',
+          jobSnapshotId: bad,
+        },
+      };
+      expect(BridgeRequest.safeParse(msg).success, bad).toBe(false);
+    }
+  });
+
+  it('既有擷取格式仍相容：短 ID 與 null', () => {
+    for (const messageDraftId of ['m', 'm-1', '0f8fa5c4-3b1e-4c56-9d1a-7a2b9c3d4e5f']) {
+      const draft = { op: 'request_draft', payload: { messageDraftId, replyIntent: 'x' } };
+      expect(BridgeRequest.safeParse(draft).success).toBe(true);
+    }
+  });
+
+  it('submit_job_capture.url：file:、javascript:、data: 被拒，http(s) 與 null 通過', () => {
+    const job = (url: string | null) => ({
+      op: 'submit_job_capture',
+      payload: {
+        platform: '104',
+        url,
+        captureMethod: 'manual_paste',
+        capturedAt: '2026-10-10T08:00:00+08:00',
+        fields: editorRequests['jobs.update'].payload.fields,
+      },
+    });
+    for (const url of ['file:///etc/passwd', 'javascript:alert(1)', 'data:text/html,<b>x</b>']) {
+      expect(BridgeRequest.safeParse(job(url)).success, url).toBe(false);
+    }
+    for (const url of ['https://www.104.com.tw/job/abc', 'http://example.com/job', null]) {
+      expect(BridgeRequest.safeParse(job(url)).success, String(url)).toBe(true);
+    }
   });
 });
 

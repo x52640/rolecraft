@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 import { Id, NonEmptyText, Timestamp } from '../../entities/common.ts';
-import { ClaimCitation, ResumeVersion } from '../../entities/resume-version.ts';
-import { Ack, OpaqueId, bridgeOp } from '../common.ts';
+import { ResumeVersion } from '../../entities/resume-version.ts';
+import { Ack, BridgeClaimCitation, MAX_IDS_PER_REQUEST, OpaqueId, bridgeOp } from '../common.ts';
 import { withFailure } from '../operations.ts';
 
 /**
@@ -92,7 +92,10 @@ export const RESUME_SCHEMAS = {
   'resume.edit_section': {
     request: bridgeOp(
       'resume.edit_section',
-      SectionRef.extend({ text: z.string(), citations: z.array(ClaimCitation) }),
+      SectionRef.extend({
+        text: z.string(),
+        citations: z.array(BridgeClaimCitation).max(MAX_IDS_PER_REQUEST),
+      }),
     ),
     response: withFailure(Ack),
   },
