@@ -7,7 +7,6 @@
 
 - P1-T002 domain：事實項狀態與 R1 匯出前檢查（`docs/tasks/P1-T002-domain-evidence.md`）
 - P1-T003 domain：R2 來源變更判定（`docs/tasks/P1-T003-domain-source-change.md`）
-- P1-T004 domain：R8 輸入預算與拆批（`docs/tasks/P1-T004-domain-budget.md`）
 - P1-T005 domain：R9 工作單元狀態機（`docs/tasks/P1-T005-domain-work-job.md`）
 - P1-T006 storage：SQLite schema 與 repository（`docs/tasks/P1-T006-storage-core.md`）
 - P1-T008 sources：資料夾列舉、授權集合與安全讀檔（`docs/tasks/P1-T008-sources-authorization.md`）
@@ -39,6 +38,7 @@
 - P0-T002 `9573b99`（已審：2 項，P0-T003 修）
 - P1-T001 `7b4da39`
 - P1-T013 `3265187`
+- P1-T004 `f569c68`
 
 ## 已知殘餘（記錄，不擋上線）
 
@@ -51,6 +51,8 @@
 - 手動改 Task status 後必須跑 `npm run task:index`，否則 verify:docs 擋（產生物新鮮度檢查）。
 
 - 橋接（ADR-0003）：只由 service worker 持有 Native Messaging 連線，頁面經它轉送（避免多個 host 行程同寫 SQLite）；host→瀏覽器單則 1 MB，大資料要分塊（P1-T014、P1-T027）；編輯器必須是擴充功能頁（P1-T016）。
+
+- 來源位置單位：budget（P1-T004）用 UTF-16 索引 [start, end)；P1-T003 定案片段位置格式時要統一。
 
 ## 治理
 

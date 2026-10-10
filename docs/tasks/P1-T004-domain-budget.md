@@ -1,7 +1,7 @@
 ---
 id: P1-T004
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T001"]
 specs: ["runtime-and-budget.md"]
 track: domain
