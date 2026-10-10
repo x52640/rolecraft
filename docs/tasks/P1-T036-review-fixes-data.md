@@ -1,7 +1,7 @@
 ---
 id: P1-T036
 phase: 1
-status: in_progress
+status: done
 depends_on: []
 specs: ["sources-and-authorization.md", "resume-import.md", "resume-output.md"]
 track: data

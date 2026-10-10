@@ -5,7 +5,6 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T036 codex 補審修正：storage、sources、resume-import（`docs/tasks/P1-T036-review-fixes-data.md`）
 - P1-T037 codex 補審修正：providers 取消終止與 Claude spike 腳本（`docs/tasks/P1-T037-review-fixes-providers.md`）
 
 ## ready
