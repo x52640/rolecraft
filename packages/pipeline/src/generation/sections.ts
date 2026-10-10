@@ -1,7 +1,8 @@
 /**
  * 模型輸出 → 履歷版本（R1、D4、D14）。逐段對照事實項，任何一項不合就丟棄整段（不修補、不降級）：
  * - 引用必須指向這次提供的可用事實項；功能／交付物必須標完成程度且不得高於事實項狀態。
- * - 文字中的數字與網址必須出現在所引用事實項的內容（或使用者確認文字）中。
+ * - 文字中的數字、網址／網域、倍數詞必須出現在所引用事實項的內容（或使用者確認文字）中；
+ *   不得寫職缺快照的公司或職稱（grounding.ts）。
  * - 最後再過 domain 的 R1 匯出前檢查（不帶 Profile：數字只認引用的事實項）。
  * 經歷段落的公司、職稱、日期、原文從 Profile 帶入，不採用模型的任何文字。
  */
@@ -13,10 +14,10 @@ import {
   type Profile,
   type ResumeSection,
 } from '@rolecraft/contracts';
-import { checkExportReadiness, extractNumbers, numberKeys } from '@rolecraft/domain';
+import { checkExportReadiness } from '@rolecraft/domain';
 
-import { extractUrls } from '../analysis/urls.ts';
 import { completionCap, exceedsCap } from './completion.ts';
+import { groundingProblem, type JobIdentity } from './grounding.ts';
 import { claimLabel, experienceLabel } from './prompt.ts';
 import type {
   DroppedSection,
@@ -34,6 +35,8 @@ export interface SectionContext {
   /** 提示中提供的可用事實項，順序即 C1、C2… */
   readonly claims: readonly Claim[];
   readonly profile: Profile;
+  /** 職缺快照的公司與職稱：段落不得出現 */
+  readonly job: JobIdentity;
   readonly newId: () => Id;
   /** ISO 時間（版本時間） */
   readonly createdAt: string;
@@ -90,18 +93,6 @@ function resolveCitations(
   return { citations, cited };
 }
 
-/** 數字與網址只能來自引用的事實項內容與使用者確認文字。 */
-function groundingProblem(text: string, cited: readonly Claim[]): SectionDropReason | null {
-  const sources = cited.flatMap((c) => [c.text, c.basis.userConfirmation?.text ?? '']);
-  const urls = new Set(sources.flatMap(extractUrls));
-  if (extractUrls(text).some((url) => !urls.has(url))) return 'link_not_in_claims';
-  const keys = numberKeys(sources.join('\n'));
-  for (const token of extractNumbers(text)) {
-    if (token.key === null || !keys.has(token.key)) return 'number_not_in_claims';
-  }
-  return null;
-}
-
 function convertSection(
   draft: SectionDraft,
   ctx: SectionContext,
@@ -111,7 +102,7 @@ function convertSection(
   if (!placement) return 'unknown_placement';
   const resolved = resolveCitations(draft, byLabel);
   if (typeof resolved === 'string') return resolved;
-  const problem = groundingProblem(draft.text, resolved.cited);
+  const problem = groundingProblem(draft.text, resolved.cited, ctx.job);
   if (problem) return problem;
   const section: ResumeSection = {
     id: ctx.newId(),

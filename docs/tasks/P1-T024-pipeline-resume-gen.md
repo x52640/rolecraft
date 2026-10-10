@@ -74,8 +74,8 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：`packages/pipeline/src/generation/`（匹配、段落生成、修改理由、單元執行）＋ contracts ResumeSection 兩個選填欄位
-- 已通過驗證：`npm run verify` 綠（Vitest 2106 通過、10 略過；本 Task 新增 64 個測試）
+- 最後完成：對抗驗證修正（倍數詞、寬鬆網址、職缺公司名；`generation/grounding.ts`）
+- 已通過驗證：`npm run verify` 綠（Vitest 2304 通過、11 略過；generation 88 個測試）
 - 下一步：協調者收官；helper 的 `resume.generate` 接線（P1-T025）把 runner 的埠接到 storage／providers
 - Blocker：無
 
@@ -90,5 +90,13 @@ npm run verify
 - 產出 `GenerationResult`：`resumeVersion`（段落 origin generated、`generatedCitations`＝引用副本、`sectionConfirmation` null、`decision` pending、附 rationale；整份過 contracts schema）、`placements`（經歷段落的公司、職稱、起訖日期、原文全從 Profile 帶入）、`matches`（需求→事實項 ID；沒有證據或引用不存在編號的整筆丟）、`gaps`（需求＋要問使用者的問題）、`droppedSections`、`droppedMatches`。
 - 執行（`createGenerationRunner`，一個工作一個單元，`planGeneration` 建計畫）：每次送出都經呼叫端 `execute`（應包 `runWithSubscriptionCheck`），紀錄一律交 `recordRunCheck`；R6 不成立→`blocked` 不送出；other 錯誤不重試、不重送→`blocked`（狀態回到送出前）；額度→暫停；取消→暫停；格式不合格或沒有段落通過，比照暫時性錯誤有上限重試（2 次、2s→4s），用盡暫停 retries_exhausted；結果與工作狀態經 `commitUnit` 一次寫入；暫停後不自跑（D21）。
 - 測試（fake provider 經 `runWithSubscriptionCheck`）：完整流程（注入文字只在資料區塊、不可用事實項不送出、產出版本過 domain R1 檢查）；不合格輸出／全部段落誇大完成程度／引用捏造編號三種都不寫入且有上限重試；重試後合格可完成；401 不重試；額度暫停；R6 不成立不送出；快照失去確認不送出；暫停不自跑。另有輸出格式 21 種不合格、逐段 13 種丟棄原因、送出前 8 種不送出情境、提示資料區塊與公司日期不外送。
-- 保守選擇／待擁有者裁定：(1) 「文件標示完成」最高只能寫成「進行中」，「未知」最高「規劃中」（spec 只明訂不得寫成已完成；未知是否應完全禁止引用待裁定）；(2) 生成段落一律要有引用，無引用段落直接丟（spec 允許無引用段落靠逐段確認匯出，生成端不產生）；(3) 引用不存在／不可用的事實項只丟該段，沒有段落留下才整份失敗並重試；(4) 沒有可用事實項時不送出（也就不產生待補資訊）；(5) Profile 經歷只送職稱與描述，不送公司與日期；(6) 段落位置（placement）放在 pipeline 的結果型別，沒有寫進 contracts（避免與 P1-T040 的段落歸屬欄位衝突），helper 存檔時需依 P1-T040 定的欄位對應。
-- 殘餘：提示過大時只拒送，不拆批（全部可用事實項一次送出）；匹配與待補資訊沒有 contracts 型別、尚無持久化位置；helper `resume.generate` 尚未接上（P1-T025）；自我介紹與專案段落沒有原文可對照（Profile 沒有對應欄位）。
+- 保守選擇／待擁有者裁定：(1) 「文件標示完成」最高只能寫成「進行中」，「未知」最高「規劃中」（spec 只明訂不得寫成已完成；未知是否應完全禁止引用待裁定）；(2) 生成段落一律要有引用，無引用段落直接丟（spec 允許無引用段落靠逐段確認匯出，生成端不產生）；(3) 引用不存在／不可用的事實項只丟該段，沒有段落留下才整份失敗並重試；(4) 沒有可用事實項時不送出（也就不產生待補資訊）；(5) 不另送 company 與日期欄位；經歷 description 原文照送；(6) 段落位置（placement）放在 pipeline 的結果型別，沒有寫進 contracts（避免與 P1-T040 的段落歸屬欄位衝突），helper 存檔時需依 P1-T040 定的欄位對應。
+- 殘餘：提示過大時只拒送，不拆批（全部可用事實項一次送出）；匹配與待補資訊沒有 contracts 型別、尚無持久化位置；helper `resume.generate` 尚未接上（P1-T025）；自我介紹與專案段落沒有原文可對照（Profile 沒有對應欄位）；domain 的 `extractNumbers` 也不認倍數詞（翻倍、twice 等），匯出端對使用者自寫文字同樣放行，需另開 domain Task。
+
+### 對抗驗證修正
+
+| 缺陷 | 修正 | 測試 |
+| --- | --- | --- |
+| （major）倍數／比例詞（翻倍、加倍、倍增、成倍、翻番、減半、折半、中文數字＋倍、double／triple／quadruple／halve 各變化、in half、twice、thrice、N-fold）不算數字，可憑空寫出成效 | 新增 `grounding.ts` `extractMultipliers`：段落出現、但引用事實項（含確認文字）沒有相同詞（小寫、空白與連字號統一）→ 丟該段（`multiplier_not_in_claims`） | `sections.test.ts`：翻倍、減半、doubled、twice、in half、threefold 都丟；事實項有相同詞則保留；`grounding.test.ts` |
+| （major→minor）網址只抓 http／www，裸網域、全形、零寬字元可繞過 | 比對前一律 NFKC＋去零寬字元（U+200B–200D、U+2060、U+FEFF）；另抓裸網域＋路徑（`extractLooseUrls`，主機小寫，含 email 網域；頂層是常見副檔名的檔名、版本號、純數字不算），段落抽到的必須在引用事實項抽到的集合中，否則 `link_not_in_claims` | `sections.test.ts`：github.com/x、evil.com、me@evil.com、ｈｔｔｐｓ://、零寬字元拆開的網址與網域都丟；`grounding.test.ts`：README.md、Node.js、v1.2.3 不誤判 |
+| （加固）段落可寫職缺公司或職稱 | 段落文字（NFKC、去零寬、小寫、去空白後）含職缺快照的 company 或 title → 丟該段（`mentions_job_identity`）；Profile 自身公司名不擋；提示同步要求不寫職缺公司與職稱 | `sections.test.ts`：職缺公司、含空白的職稱都丟；Profile 公司保留 |

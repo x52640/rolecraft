@@ -26,6 +26,8 @@ export type PreparedGeneration =
       readonly ok: true;
       readonly prompt: string;
       readonly profile: Profile;
+      /** 職缺快照的公司與職稱（段落不得出現） */
+      readonly job: { readonly company: string; readonly title: string };
       /** 提示中的事實項（順序即 C1、C2…），驗證輸出用同一份 */
       readonly claims: readonly Claim[];
       readonly estimatedTokens: number;
@@ -68,7 +70,15 @@ export function prepareGeneration(
   );
   const estimatedTokens = estimateTokens(prompt);
   if (!fitsBudget(estimatedTokens, plan.budget)) return { ok: false, reason: 'over_budget' };
-  return { ok: true, prompt, profile: profile.data, claims, estimatedTokens };
+  const { company, title } = snapshot.data.fields;
+  return {
+    ok: true,
+    prompt,
+    profile: profile.data,
+    job: { company, title },
+    claims,
+    estimatedTokens,
+  };
 }
 
 export type PlanGenerationResult =

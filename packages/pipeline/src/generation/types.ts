@@ -97,7 +97,9 @@ export type SectionDropReason =
   | 'completion_not_applicable' // 其他類型標了完成程度
   | 'completion_exceeds_claim' // 宣稱完成程度高於事實項狀態（D14）
   | 'number_not_in_claims' // 數字不在引用的事實項中
-  | 'link_not_in_claims' // 網址不是引用事實項中的完整網址
+  | 'link_not_in_claims' // 網址或網域不是引用事實項中的完整網址
+  | 'multiplier_not_in_claims' // 倍數／比例詞（翻倍、減半、twice…）不在引用的事實項中
+  | 'mentions_job_identity' // 段落寫了職缺快照的公司或職稱
   | 'export_check_failed'; // domain R1 檢查不通過（最後一道）
 
 export interface DroppedSection {

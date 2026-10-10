@@ -147,6 +147,7 @@ export function createGenerationRunner<S>(
       jobSnapshotId: plan.jobSnapshotId,
       claims: prepared.claims,
       profile: prepared.profile,
+      job: prepared.job,
       newId: deps.newId,
       createdAt: new Date(deps.now()).toISOString(),
     });

@@ -14,6 +14,7 @@ function convert(raw: string, claims: readonly Claim[] = CLAIMS): SectionConvers
     jobSnapshotId: 'job-1',
     claims,
     profile: profile(),
+    job: { company: '乙公司', title: '資深前端工程師' },
     newId: idSource('c'),
     createdAt: T,
   });
@@ -127,6 +128,81 @@ describe('convertGeneration（R1、D14）', () => {
       section({ text: '開發登入功能 www.evil.example', citations: [cite('C1', 'planned')] }),
       'link_not_in_claims',
     ],
+    [
+      'multiplier 翻倍 (PoC)',
+      section({ text: '開發登入功能，效能翻倍', citations: [cite('C1', 'planned')] }),
+      'multiplier_not_in_claims',
+    ],
+    [
+      'multiplier 減半',
+      section({ text: '開發登入功能，成本減半', citations: [cite('C1', 'planned')] }),
+      'multiplier_not_in_claims',
+    ],
+    [
+      'multiplier doubled',
+      section({ text: 'Built login, doubled throughput', citations: [cite('C1', 'planned')] }),
+      'multiplier_not_in_claims',
+    ],
+    [
+      'multiplier twice as fast',
+      section({ text: 'Login is twice as fast', citations: [cite('C1', 'planned')] }),
+      'multiplier_not_in_claims',
+    ],
+    [
+      'multiplier cut in half',
+      section({ text: 'Cut login time in half', citations: [cite('C1', 'planned')] }),
+      'multiplier_not_in_claims',
+    ],
+    [
+      'multiplier threefold',
+      section({ text: '開發登入功能，threefold growth', citations: [cite('C1', 'planned')] }),
+      'multiplier_not_in_claims',
+    ],
+    [
+      '中文數字倍數 兩倍（數字檢查先擋）',
+      section({ text: '開發登入功能，速度提升兩倍', citations: [cite('C1', 'planned')] }),
+      'number_not_in_claims',
+    ],
+    [
+      'bare domain path',
+      section({ text: '原始碼 github.com/x', citations: [cite('C4')] }),
+      'link_not_in_claims',
+    ],
+    [
+      'bare domain',
+      section({ text: '開發登入功能，詳見 evil.com', citations: [cite('C1', 'planned')] }),
+      'link_not_in_claims',
+    ],
+    [
+      'email domain',
+      section({ text: '聯絡 me@evil.com', citations: [cite('C1', 'planned')] }),
+      'link_not_in_claims',
+    ],
+    [
+      'fullwidth scheme',
+      section({ text: '示範 ｈｔｔｐｓ://evil.example/x', citations: [cite('C4')] }),
+      'link_not_in_claims',
+    ],
+    [
+      'zero-width split url',
+      section({ text: '示範 https://exa\u200Bmple.com/de', citations: [cite('C4')] }),
+      'link_not_in_claims',
+    ],
+    [
+      'zero-width split domain',
+      section({ text: '開發登入功能 evil\u200B.com', citations: [cite('C1', 'planned')] }),
+      'link_not_in_claims',
+    ],
+    [
+      'job company',
+      section({ text: '開發登入功能，貢獻乙公司', citations: [cite('C1', 'planned')] }),
+      'mentions_job_identity',
+    ],
+    [
+      'job title (spaced, fullwidth)',
+      section({ text: '適任資深 前端工程師的登入功能', citations: [cite('C1', 'planned')] }),
+      'mentions_job_identity',
+    ],
   ];
 
   it.each(drops)('drops only the offending section: %s', (_, bad, reason) => {
@@ -166,5 +242,22 @@ describe('convertGeneration（R1、D14）', () => {
     if (!result.ok) throw new Error(result.error);
     expect(result.result.droppedMatches).toEqual([0, 1]);
     expect(result.result.matches).toEqual([{ requirement: 'C', claimIds: ['claim-confirmed'] }]);
+  });
+
+  it.each([
+    ['multiplier present in the cited claim', '登入時間翻倍縮短', '登入時間翻倍縮短', 'C1'],
+    ['file names and versions are not domains', '登入功能（README.md、Node.js）', '登入功能', 'C1'],
+    [
+      'loose url equal to the cited link',
+      '示範 example.com/demo',
+      'https://example.com/demo',
+      'C4',
+    ],
+    ['Profile company is not blocked', '在甲公司開發登入功能', '登入功能', 'C1'],
+  ])('keeps the section: %s', (_, text, claimText, label) => {
+    const claims = CLAIMS.map((c, i) => (i === 0 ? claim(c.id, { text: claimText }) : c));
+    const stated = label === 'C1' ? 'planned' : undefined;
+    const result = convert(output([section({ text, citations: [cite(label, stated)] })]), claims);
+    expect(result.ok).toBe(true);
   });
 });
