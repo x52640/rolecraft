@@ -28,7 +28,7 @@
 | [P1-T019](P1-T019-job-snapshot-ui.md) | editor：職缺快照確認與手動貼上 | blocked | 1 | editor | P1-T016、P1-T014、P1-T041 |
 | [P1-T020](P1-T020-resume-import-ui.md) | editor：履歷 PDF 匯入與校正 | blocked | 1 | editor | P1-T009、P1-T016、P1-T014、P1-T041 |
 | [P1-T021](P1-T021-project-import-ui.md) | editor：專案資料夾匯入與預覽 | blocked | 1 | editor | P1-T008、P1-T016、P1-T014、P1-T041 |
-| [P1-T022](P1-T022-pipeline-analysis.md) | pipeline：文件分析成事實項 | ready | 1 | pipeline | P1-T002、P1-T003、P1-T004、P1-T005、P1-T012、P1-T008 |
+| [P1-T022](P1-T022-pipeline-analysis.md) | pipeline：文件分析成事實項 | in_progress | 1 | pipeline | P1-T002、P1-T003、P1-T004、P1-T005、P1-T012、P1-T008 |
 | [P1-T023](P1-T023-claims-review-ui.md) | editor：事實項檢視與確認 | blocked | 1 | editor | P1-T022、P1-T016 |
 | [P1-T024](P1-T024-pipeline-resume-gen.md) | pipeline：職缺匹配與段落生成 | blocked | 1 | pipeline | P1-T022、P1-T019 |
 | [P1-T025](P1-T025-resume-editor-ui.md) | editor：逐段對照、接受與匯出前檢查 | blocked | 1 | editor | P1-T024、P1-T023 |
@@ -45,9 +45,9 @@
 | [P1-T036](P1-T036-review-fixes-data.md) | codex 補審修正：storage、sources、resume-import | done | 1 | data | — |
 | [P1-T037](P1-T037-review-fixes-providers.md) | codex 補審修正：providers 取消終止與 Claude spike 腳本 | done | 1 | providers | — |
 | [P1-T038](P1-T038-review-fixes-output.md) | codex 補審修正：pdf-export、104 擷取提示、task:close | done | 1 | output | — |
-| [P1-T039](P1-T039-claude-auto-reverify.md) | Claude CLI 版本變更時自動重新驗證 | ready | 1 | providers | P1-T012、P1-T037 |
+| [P1-T039](P1-T039-claude-auto-reverify.md) | Claude CLI 版本變更時自動重新驗證 | in_progress | 1 | providers | P1-T012、P1-T037 |
 | [P1-T040](P1-T040-helper-export-wiring.md) | helper：匯出接線 | blocked | 1 | helper | P1-T041、P1-T027、P1-T007 |
-| [P1-T041](P1-T041-bridge-editor-ops.md) | 橋接：編輯器頁面所需操作清單 | ready | 1 | bridge | P1-T034 |
+| [P1-T041](P1-T041-bridge-editor-ops.md) | 橋接：編輯器頁面所需操作清單 | in_progress | 1 | bridge | P1-T034 |
 | [P1-T042](P1-T042-readme.md) | README 與開源說明文件 | done | 1 | readme | — |
 
 ## 依賴清單

@@ -1,7 +1,7 @@
 ---
 id: P1-T022
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T002", "P1-T003", "P1-T004", "P1-T005", "P1-T012", "P1-T008"]
 specs: ["evidence-model.md", "runtime-and-budget.md", "providers.md"]
 track: pipeline
