@@ -5,7 +5,7 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T012 providers：Claude 適配器（`docs/tasks/P1-T012-provider-claude.md`）
+- 無
 
 ## ready
 
@@ -55,6 +55,7 @@
 - P1-T011 `51738d8`、`d124f79`
 - P1-T027 `e36f2cd`
 - P1-T034 `642356a`、`c61c608`
+- P1-T012 `5a23e3a`、`ec2eaf4`
 
 ## 已知殘餘（記錄，不擋上線）
 
