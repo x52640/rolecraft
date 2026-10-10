@@ -1,7 +1,7 @@
 ---
 id: P1-T033
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T001", "P1-T005", "P1-T006"]
 specs: ["architecture.md", "jobs-and-messages.md", "runtime-and-budget.md"]
 track: review

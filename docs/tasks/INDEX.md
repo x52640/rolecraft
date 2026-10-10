@@ -39,7 +39,7 @@
 | [P1-T030](P1-T030-install-wizard-ui.md) | editor：供應商狀態與設定精靈 | blocked | 1 | editor | P1-T012、P1-T016、P1-T014 |
 | [P1-T031](P1-T031-macos-installer.md) | macOS 安裝包與乾淨環境測試 | blocked | 1 | infra | P1-T030、P1-T018 |
 | [P1-T032](P1-T032-phase1-gate.md) | 第一階段驗收閘門 | blocked | 1 | infra | P1-T020、P1-T021、P1-T023、P1-T025、P1-T028、P1-T029、P1-T031 |
-| [P1-T033](P1-T033-codex-review-fixes-1.md) | 修正 codex review 對 P1-T001、P1-T005、P1-T006 的發現 | in_progress | 1 | review | P1-T001、P1-T005、P1-T006 |
+| [P1-T033](P1-T033-codex-review-fixes-1.md) | 修正 codex review 對 P1-T001、P1-T005、P1-T006 的發現 | done | 1 | review | P1-T001、P1-T005、P1-T006 |
 
 ## 依賴清單
 
