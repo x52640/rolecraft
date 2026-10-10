@@ -1,0 +1,77 @@
+.resume-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.resume-toolbar select {
+  margin-left: 0.5rem;
+}
+
+.resume-notice,
+.resume-warning {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.resume-section,
+.section-editor {
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  border-radius: 0.5rem;
+}
+
+.resume-compare {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 48rem) {
+  .resume-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+.resume-compare h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+}
+
+.resume-meta,
+.resume-hint {
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.resume-issues {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+.resume-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.section-editor textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.section-editor fieldset {
+  margin: 0.75rem 0;
+}
+
+.section-editor li select,
+.section-editor li button {
+  margin-left: 0.5rem;
+}

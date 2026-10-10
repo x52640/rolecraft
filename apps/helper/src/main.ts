@@ -20,6 +20,7 @@ import { createExportService } from './handlers/export/export-service.ts';
 import { createResumeImportService, type PdfFilePicker } from './handlers/import/import-service.ts';
 import { createJobsService } from './handlers/jobs/storage-service.ts';
 import { createProvidersService } from './handlers/providers/providers-service.ts';
+import { createResumeService } from './handlers/resume/storage-service.ts';
 import type { HelperServices } from './handlers/services.ts';
 import { createSourcesService, type FolderPicker } from './handlers/sources/local-sources.ts';
 import { openHelperRuntime, runtimeConfigFromEnv, type HelperRuntime } from './services/runtime.ts';
@@ -67,6 +68,7 @@ export function createServices(
       }),
     }),
     ...(storage && { claims: createClaimsService(storage) }),
+    ...(storage && { resume: createResumeService({ db: storage.db }) }),
     ...(storage && isRuntime(storage) && { pdfExport: createExportService(storage) }),
   };
 }

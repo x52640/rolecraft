@@ -52,6 +52,29 @@ export const ExportIssueView = z.strictObject({
 });
 export type ExportIssueView = z.infer<typeof ExportIssueView>;
 
+/**
+ * 匯出前除 R1 之外的段落阻擋（P1-T025）：生成段落要逐段把關（F07），
+ * 尚未接受或已退回的段落不能匯出；缺段落歸屬或對不到 Profile 經歷的也不能（P1-T040）。
+ */
+export const SectionBlockReason = z.enum([
+  'pending', // 修改稿尚未接受
+  'rejected', // 已退回：要改寫後接受，或刪除整段
+  'placement_missing', // 沒有段落歸屬
+  'experience_not_found', // 段落歸屬對不到個人資料的工作經歷
+]);
+export type SectionBlockReason = z.infer<typeof SectionBlockReason>;
+
+export const SectionBlockerView = z.strictObject({
+  sectionId: Id,
+  reason: SectionBlockReason,
+  message: z.string(),
+});
+export type SectionBlockerView = z.infer<typeof SectionBlockerView>;
+
+/** 段落原文（對照用）：工作經歷段落對到的 Profile 經歷描述；其他段落沒有原文。 */
+export const SectionOriginalView = z.strictObject({ sectionId: Id, text: z.string() });
+export type SectionOriginalView = z.infer<typeof SectionOriginalView>;
+
 const VersionRef = z.strictObject({ resumeVersionId: OpaqueId });
 const SectionRef = z.strictObject({ resumeVersionId: OpaqueId, sectionId: OpaqueId });
 
@@ -73,7 +96,14 @@ export const RESUME_SCHEMAS = {
   },
   'resume.get': {
     request: bridgeOp('resume.get', VersionRef),
-    response: withFailure(z.strictObject({ ok: z.literal(true), version: ResumeVersion })),
+    response: withFailure(
+      z.strictObject({
+        ok: z.literal(true),
+        version: ResumeVersion,
+        /** 有原文的段落才列（P1-T025） */
+        originals: z.array(SectionOriginalView),
+      }),
+    ),
   },
   /** 接受修改稿（只接受措辭）。 */
   'resume.accept_section': {
@@ -88,6 +118,8 @@ export const RESUME_SCHEMAS = {
   /**
    * 自行編輯段落。citations 是編輯後的完整引用；生成段落的引用只能增加不能移除（R1），
    * 要去掉引用只能刪整段（resume.delete_section）。違反時回 invalid_request。
+   * 任一既有引用的宣稱完成程度被調低（例如已完成→進行中）時，必須帶
+   * completionDowngradeAcknowledged: true（使用者已重看本段措辭），否則回 invalid_request（P1-T025）。
    */
   'resume.edit_section': {
     request: bridgeOp(
@@ -95,6 +127,7 @@ export const RESUME_SCHEMAS = {
       SectionRef.extend({
         text: z.string(),
         citations: z.array(BridgeClaimCitation).max(MAX_IDS_PER_REQUEST),
+        completionDowngradeAcknowledged: z.literal(true).optional(),
       }),
     ),
     response: withFailure(Ack),
@@ -111,7 +144,9 @@ export const RESUME_SCHEMAS = {
     request: bridgeOp('resume.confirm_section', SectionRef.extend({ text: NonEmptyText })),
     response: withFailure(Ack),
   },
-  /** R1 匯出前檢查；ready 為 false 時不得匯出。 */
+  /**
+   * 匯出前檢查；ready 為 false 時不得匯出。ready＝R1 通過且沒有段落阻擋（blockers，P1-T025）。
+   */
   'resume.check_export': {
     request: bridgeOp('resume.check_export', VersionRef),
     response: withFailure(
@@ -119,6 +154,7 @@ export const RESUME_SCHEMAS = {
         ok: z.literal(true),
         ready: z.boolean(),
         issues: z.array(ExportIssueView),
+        blockers: z.array(SectionBlockerView),
       }),
     ),
   },

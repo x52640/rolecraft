@@ -1,6 +1,12 @@
 import type { OpHandler } from '../handler.ts';
 import { notImplemented } from '../services.ts';
+import { ackOrFailure } from './failure.ts';
 
-/** resume.delete_section：刪除整段。由 P1-T025 實作；接上前回 not_implemented，不偽造成功。 */
-export const resumeDeleteSection: OpHandler<'resume.delete_section'> = () =>
-  Promise.resolve(notImplemented());
+/** resume.delete_section：刪除整段（去掉引用的唯一方式，R1）。 */
+export const resumeDeleteSection: OpHandler<'resume.delete_section'> = async (
+  payload,
+  services,
+) => {
+  if (!services.resume?.remove) return notImplemented();
+  return ackOrFailure(await services.resume.remove(payload.resumeVersionId, payload.sectionId));
+};
