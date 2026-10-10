@@ -5,10 +5,11 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T011 驗證：Claude CLI 隔離與訂閱登入（`docs/tasks/P1-T011-spike-claude-cli.md`）
+- 無
 
 ## ready
 
+- P1-T012 providers：Claude 適配器
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本
 - P1-T019 editor：職缺快照確認與手動貼上
 - P1-T020 editor：履歷 PDF 匯入與校正
@@ -53,6 +54,7 @@
 - P1-T010 `b44a8d2`、`c1c7725`、`5fc7ee4`
 - P1-T007 `af9e0d9`、`50c8639`
 - P1-T002 `8110afb`、`5b7e7db`
+- P1-T011 `51738d8`、`d124f79`
 
 ## 已知殘餘（記錄，不擋上線）
 
@@ -84,6 +86,8 @@
 - storage（P1-T007）：`sweepStorage(db, fileStore)` 要在 helper 啟動時呼叫一次（尚未接上，下一個動 helper 的 Task 處理）。素材刪除只能經 `deleteMaterial`。
 
 - 數字檢查（P1-T002）：fail-closed；數字後接未知字母（3D、5G、100ms、1080p）一律無法辨識需逐段確認，誤擋偏吵，可改整串字面比對；「一個／一套」等列入排除表（代價：「一個人完成」不檢查）。
+
+- Claude CLI（ADR-0002）：隔離模式仍開本機訊息 socket（`/tmp/cc-socks/<pid>.sock`），無旗標可關；必須用真實 HOME，CLI 每次執行會改寫 `~/.claude.json`（CLI 自身狀態）；CLI 自動更新，P1-T012 要記版本、版本變了重跑 spike。P1-T011 的對抗驗證併入 P1-T012（需真實 CLI 呼叫，避免重複耗額度）。
 
 ## 治理
 
