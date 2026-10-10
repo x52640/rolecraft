@@ -5,7 +5,6 @@
 <!-- index:start -->
 ## 進行中
 
-- P0-T002 文件閘門腳本：verify:docs、task:index、task:close（`docs/tasks/P0-T002-docs-tooling.md`）
 - P1-T001 contracts：核心資料物件與橋接 schema（`docs/tasks/P1-T001-contracts-core.md`）
 - P1-T013 驗證：橋接通訊方式（Q3）與資料夾選取機制（`docs/tasks/P1-T013-spike-bridge.md`）
 - P1-T026 驗證：中文 PDF 匯出方式（`docs/tasks/P1-T026-spike-pdf-export.md`）
@@ -30,6 +29,7 @@
 ## 待補 codex review（E4，額度恢復後逐 commit 跑）
 
 - P0-T001 `182b16a`
+- P0-T002 `9573b99`
 
 ## 已知殘餘（記錄，不擋上線）
 
@@ -38,6 +38,9 @@
 - 相依方向只有 lint 擋，typecheck 擋不住（套件 exports 指向 src）；pipeline 未啟用 Node 型別，需要 I/O 時再加。
 - `.prettierignore` 排除所有 `*.md`；文件格式交給 verify:docs。
 
+- verify:docs 只檢查 `[文字](路徑)` 連結；文件中反引號路徑不檢查（許多指向尚未建立的程式檔）。
+- 手動改 Task status 後必須跑 `npm run task:index`，否則 verify:docs 擋（產生物新鮮度檢查）。
+
 ## 治理
 
-- 進行中／ready 區塊由 `task:index` 產生（P0-T002 之前手寫）；其餘由協調者維護。
+- 進行中／ready 區塊由 `task:index` 產生；收官用 `npm run task:close -- <ID>`；其餘由協調者維護。

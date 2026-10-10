@@ -1,7 +1,7 @@
 ---
 id: P0-T002
 phase: 0
-status: in_progress
+status: done
 depends_on: ["P0-T001"]
 specs: []
 track: infra
@@ -86,5 +86,5 @@ npm run verify
 - 用 `.mjs`＋`node --test` 而非 Vitest／TS：`vitest.config.ts`、`tsconfig.json`、`eslint.config.js` 不在 write_paths；`.mjs` 走 ESLint 的 disableTypeChecked 區塊，仍受 300 行上限。
 - verify:docs 額外檢查產生物新鮮度：`INDEX.md` 與 CURRENT_TASK index 區塊必須等於 front matter 算出的內容，改 status 沒跑 task:index 會紅。
 - 連結檢查略過點開頭目錄、`node_modules`、`Spec.md`、`docs/spec-discussions/`；只認 markdown `[文字](路徑)`，code 內略過。現有文件多用反引號路徑，不在檢查範圍。
-- 單元測試 11 個（暫存目錄迷你 repo）：壞連結、重複 ID、檔名不一致、缺欄位、非法 status、壞 depends_on／specs、CURRENT_TASK 101+ 行、specs 索引不一致、產生物過期、task:close 拒絕（空白／TODO／非 in_progress／不存在）與成功路徑。
+- 單元測試 11 個（暫存目錄迷你 repo）：壞連結、重複 ID、檔名不一致、缺欄位、非法 status、壞 depends_on／specs、CURRENT_TASK 101+ 行、specs 索引不一致、產生物過期、task:close 拒絕（空白／含待辦字樣／非 in_progress／不存在）與成功路徑。
 - 實檔紅燈（已還原）：在現有文件加壞連結、複製一份 P1-T001、CURRENT_TASK 加到 102 行，`npm run verify:docs` exit 1 並列出 5 項（含 2 項產生物過期）；還原後通過。
