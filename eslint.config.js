@@ -100,6 +100,49 @@ const noRelativeCrossPackage = {
   },
 };
 
+/**
+ * no-restricted-imports 不檢查 import()：動態 import 必須是字串常值，且套用同一份相依表（codex review P0-T001）。
+ * 選項：{ allowed: 可依賴的套件名, zodAllowed: 是否可用 zod }。
+ */
+const dynamicImportBoundary = {
+  meta: {
+    type: 'problem',
+    messages: {
+      nonLiteral: '動態 import 的目標必須是字串常值，才能檢查模組邊界。',
+      forbidden: '動態 import "{{source}}" 違反模組邊界：{{reason}}（docs/specs/architecture.md）',
+    },
+    schema: [{ type: 'object' }],
+  },
+  create(context) {
+    const { allowed, zodAllowed } = context.options[0];
+    return {
+      ImportExpression(node) {
+        const source = node.source;
+        const value =
+          source.type === 'Literal'
+            ? source.value
+            : source.type === 'TemplateLiteral' && source.expressions.length === 0
+              ? source.quasis[0].value.cooked
+              : null;
+        if (typeof value !== 'string') {
+          context.report({ node: source, messageId: 'nonLiteral' });
+          return;
+        }
+        let reason = null;
+        if (value.startsWith('@rolecraft/')) {
+          const [, name, ...rest] = value.split('/');
+          if (rest.length) reason = '跨套件只能從套件入口 import';
+          else if (!allowed.includes(name)) reason = `只能依賴 ${allowed.join('、') || '（無）'}`;
+        } else if (!zodAllowed && (value === 'zod' || value.startsWith('zod/'))) {
+          reason = 'zod 只用在 @rolecraft/contracts';
+        }
+        if (reason)
+          context.report({ node: source, messageId: 'forbidden', data: { source: value, reason } });
+      },
+    };
+  },
+};
+
 export default tseslint.config(
   { ignores: ['**/node_modules/**', '**/dist/**', '**/coverage/**'] },
   js.configs.recommended,
@@ -123,11 +166,24 @@ export default tseslint.config(
   },
   {
     files: [`{packages,apps}/*/${SOURCE_GLOB}`],
-    plugins: { rolecraft: { rules: { 'no-relative-cross-package': noRelativeCrossPackage } } },
+    plugins: {
+      rolecraft: {
+        rules: {
+          'no-relative-cross-package': noRelativeCrossPackage,
+          'dynamic-import-boundary': dynamicImportBoundary,
+        },
+      },
+    },
     rules: { 'rolecraft/no-relative-cross-package': 'error' },
   },
   ...Object.keys(ALLOWED_DEPS).map((pkgDir) => ({
     files: [`${pkgDir}/${SOURCE_GLOB}`],
-    rules: { 'no-restricted-imports': restrictedImportsFor(pkgDir) },
+    rules: {
+      'no-restricted-imports': restrictedImportsFor(pkgDir),
+      'rolecraft/dynamic-import-boundary': [
+        'error',
+        { allowed: ALLOWED_DEPS[pkgDir], zodAllowed: ZOD_OWNERS.has(pkgDir) },
+      ],
+    },
   })),
 );

@@ -35,8 +35,16 @@ export function closeTask(root, id) {
   const blockers = closeBlockers(task);
   if (blockers.length) return { ok: false, errors: blockers };
   const abs = path.join(root, task.rel);
-  const updated = task.text.replace(/^status: in_progress$/m, 'status: done');
-  fs.writeFileSync(abs, updated);
+  // 只改 front matter 內的 status 行，容許引號與多餘空白（codex review P0-T002）。
+  const fmEnd = task.text.indexOf('\n---', 3);
+  const head = task.text
+    .slice(0, fmEnd)
+    .replace(/^status:[ \t]*["']?in_progress["']?[ \t]*$/m, 'status: done');
+  fs.writeFileSync(abs, head + task.text.slice(fmEnd));
+  const after = loadTasks(root).find((t) => t.data?.id === id);
+  if (after?.data?.status !== 'done') {
+    return { ok: false, errors: [`${task.rel}：status 沒有改成 done，請手動檢查 front matter`] };
+  }
   writeIndex(root);
   const errors = verifyDocs(root);
   return { ok: errors.length === 0, errors };

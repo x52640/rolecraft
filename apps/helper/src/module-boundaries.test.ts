@@ -71,3 +71,27 @@ describe('max-lines 300 for non-test source', () => {
     expect(await ruleIdsFor('packages/domain/src/x.test.ts', lines(400))).toEqual([]);
   });
 });
+
+describe('dynamic import() boundaries (codex review P0-T001)', () => {
+  const dyn = (spec: string): string => `export const m = import(${spec});\n`;
+  const RULE = 'rolecraft/dynamic-import-boundary';
+
+  it('allows a listed dependency', async () => {
+    expect(await ruleIdsFor('packages/domain/src/x.ts', dyn("'@rolecraft/contracts'"))).toEqual([]);
+  });
+
+  it.each([
+    ['packages/domain/src/x.ts', "'@rolecraft/storage'"],
+    ['packages/domain/src/x.ts', '`@rolecraft/storage`'],
+    ['packages/domain/src/x.ts', "'@rolecraft/contracts/src/index.ts'"],
+    ['packages/domain/src/x.ts', "'zod'"],
+    ['apps/editor/src/x.ts', "'@rolecraft/helper'"],
+  ])('blocks %s importing %s', async (file, spec) => {
+    expect(await ruleIdsFor(file, dyn(spec))).toContain(RULE);
+  });
+
+  it('blocks non-literal specifiers', async () => {
+    const code = "const n = 'storage';\nexport const m = import(`@rolecraft/${n}`);\n";
+    expect(await ruleIdsFor('packages/domain/src/x.ts', code)).toContain(RULE);
+  });
+});

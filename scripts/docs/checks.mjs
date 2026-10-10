@@ -34,6 +34,15 @@ export function extractLinks(text) {
   return links;
 }
 
+/** 解不開的 % 保留原字（例如檔名 100%.md），不讓整個閘門當掉（codex review P0-T002）。 */
+function safeDecode(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 /** 內部相對連結的目標檔必須存在。外部 URL 與純錨點略過。 */
 export function checkLinks(root) {
   const errors = [];
@@ -42,7 +51,7 @@ export function checkLinks(root) {
     const text = fs.readFileSync(path.join(root, rel), 'utf8');
     for (const link of extractLinks(text)) {
       if (/^[a-z][a-z0-9+.-]*:/i.test(link) || link.startsWith('#')) continue;
-      const target = decodeURIComponent(link.split('#')[0].split('?')[0]);
+      const target = safeDecode(link.split('#')[0].split('?')[0]);
       const abs = target.startsWith('/')
         ? path.join(root, target)
         : path.resolve(root, path.dirname(rel), target);

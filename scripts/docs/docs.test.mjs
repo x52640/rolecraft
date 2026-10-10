@@ -156,3 +156,27 @@ test('front matter 解析：陣列、字串、數字、壞 JSON', () => {
   assert.deepEqual(data, { a: ['x'], b: 'y', c: 1, d: 'z', e: { invalid: '[bad' } });
   assert.match(parseFrontMatter('# none').error, /缺少 front matter/);
 });
+
+test('task:close：status 帶引號或多空白也會改成 done（codex review P0-T002）', () => {
+  for (const spelling of ['status: "in_progress"', 'status:   in_progress  ']) {
+    const file = 'docs/tasks/P0-T002-next.md';
+    task('P0-T002', 'next', {
+      status: 'in_progress',
+      deps: ['P0-T001'],
+      specs: ['a.md'],
+      result: '- 全部完成',
+    });
+    write(file, read(file).replace('status: in_progress', spelling));
+    writeIndex(root);
+    assert.deepEqual(closeTask(root, 'P0-T002'), { ok: true, errors: [] });
+    assert.match(read(file), /^status: done$/m);
+  }
+});
+
+test('連結目標檔名含 % 不會讓閘門當掉（codex review P0-T002）', () => {
+  write('docs/100%.md', '# x\n');
+  write('docs/y.md', '[百分比](100%.md) [不存在](50%.md)\n');
+  const errors = verifyDocs(root);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /50%\.md/);
+});
