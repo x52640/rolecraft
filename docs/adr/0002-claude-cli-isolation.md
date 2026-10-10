@@ -53,7 +53,7 @@ safe-mode 下仍會載入 3 個**內建**外掛（`cc-plugin-agents-md`、`cc-pl
 | --- | --- |
 | isolated-injection（正式旗標，跑 2 次） | 全過：`apiKeySource: "none"`、`tools: []`、`mcp_servers: []`、只有內建外掛、0 個 tool_use、0 個 hook 事件、輸出無任何誘餌字串、markers 資料夾空的。模型回覆只摘要並說沒有執行【實測】 |
 | control-realhome（只關工具） | 誘餌確實有效：回覆帶工作目錄與祖先 CLAUDE.md 標記、專案 hooks 跑了 3 種、`.mcp.json` 被啟動、使用者外掛 codex 等被載入【實測】 |
-| usermd-isolated／usermd-control | 用擁有者真實 `~/.claude/CLAUDE.md` 當天然誘餌（問它其中獨有的外掛名）：隔離時回 `NONE`，對照時答出 `<private-token>`【實測】 |
+| usermd-isolated／usermd-control | 用擁有者真實 `~/.claude/CLAUDE.md` 當天然誘餌（請它原文輸出載入的全域指示；比對的獨有字串由執行者以環境變數 `ROLECRAFT_SPIKE_USER_MD_TOKEN` 提供，不寫進 repo）：隔離時回 `NONE`，對照時輸出了該獨有字串【實測】 |
 | tool-detector-control（給 Read） | stream-json 確實出現 `tool_use`、`permission_denied` 事件，證明偵測方法有效【實測】 |
 
 ## 3. R6 訂閱路線
@@ -61,7 +61,7 @@ safe-mode 下仍會載入 3 個**內建**外掛（`cc-plugin-agents-md`、`cc-pl
 ### R6-1 從 CLI 得知登入方式
 
 - `claude auth status --json`（不打模型、約 0.1 秒）【實測】：
-  - 訂閱：`loggedIn: true`、`authMethod: "claude.ai"`、`apiProvider: "firstParty"`、`subscriptionType: "max"`，沒有 `apiKeySource` 欄位。
+  - 訂閱：`loggedIn: true`、`authMethod: "claude.ai"`、`apiProvider: "firstParty"`、`subscriptionType`（方案名稱），沒有 `apiKeySource` 欄位。
   - 使用者設定（假 HOME）或專案設定有 apiKeyHelper：`authMethod: "api_key_helper"`、`apiKeySource: "apiKeyHelper"`（auth-fakehome-helper、auth-project-helper）。只讀設定，不會執行 helper。
 - 執行中：stream-json 第一行 `system/init` 的 `apiKeySource`。訂閱為 `"none"`；`--settings` apiKeyHelper 時為 `"apiKeyHelper"`；設定 env 有 key 時為 `"ANTHROPIC_API_KEY"`【實測】。
 
@@ -115,4 +115,4 @@ safe-mode 下仍會載入 3 個**內建**外掛（`cc-plugin-agents-md`、`cc-pl
 
 - CLI 呼叫共 **16 次**：`auth status` 6 次（不打模型）、模型呼叫 10 次（全部 haiku、極短提示，單次估算 US$0.0002–0.001）；另有 4 次本機 `--version`／`--help`。未使用 `--bare`，子程序環境不含任何 API key 變數。
 - 案例：auth-real（2 次）、auth-fakehome、auth-configdir、auth-project-helper、auth-fakehome-helper、isolated-injection（3 次，其中 1 次在加 AGENTS.md 誘餌前）、control-realhome、usermd-isolated、usermd-control、flag-settings-apikeyhelper（2 分鐘逾時被終止）、tool-detector-control（2 次；第 1 次用注入提示，模型拒絕用 Read，改成使用者直接要求後出現 tool_use）、ablation-no-setting-sources。
-- 重跑：`node scripts/spikes/claude/run.mjs` 看計畫；`node scripts/spikes/claude/run.mjs --live --case isolated-injection` 只跑一案；`--live` 不論選哪些案例，都先在真實使用者設定下跑 `auth status --json`，非訂閱登入（或受管設定檔存在）就中止、不跑任何案例（P1-T037 補上；原始 16 次實測時沒有這道強制檢查）。結果寫到 `$TMPDIR/rolecraft-claude-spike-results/`：`<case>.json` 與 `<case>.events.jsonl` 都遮蔽家目錄、email、UUID（`.events.jsonl` 逐行遮蔽是 P1-T037 補上，原始實測留下的事件檔未遮蔽）。`usermd-isolated` 自 P1-T037 起要求成功且非空的回覆才算 PASS（逾時、額度錯誤不再假通過）。`usermd-*` 依賴擁有者 CLAUDE.md 目前提到 `<private-token>`。
+- 重跑：`node scripts/spikes/claude/run.mjs` 看計畫；`node scripts/spikes/claude/run.mjs --live --case isolated-injection` 只跑一案；`--live` 不論選哪些案例，都先在真實使用者設定下跑 `auth status --json`，非訂閱登入（或受管設定檔存在）就中止、不跑任何案例（P1-T037 補上；原始 16 次實測時沒有這道強制檢查）。結果寫到 `$TMPDIR/rolecraft-claude-spike-results/`：`<case>.json` 與 `<case>.events.jsonl` 都遮蔽家目錄、email、UUID（`.events.jsonl` 逐行遮蔽是 P1-T037 補上，原始實測留下的事件檔未遮蔽）。`usermd-isolated` 自 P1-T037 起要求成功且非空的回覆才算 PASS（逾時、額度錯誤不再假通過）。`usermd-*` 需以環境變數 `ROLECRAFT_SPIKE_USER_MD_TOKEN` 提供執行者自己 `~/.claude/CLAUDE.md` 中的一段獨有字串，未設定則判 FAIL。

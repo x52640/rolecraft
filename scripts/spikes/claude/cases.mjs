@@ -1,5 +1,6 @@
 // P1-T011 spike 案例定義與正式建議命令列（run.mjs 執行）。
 import path from 'node:path';
+import process from 'node:process';
 
 import {
   apiKeyHelperSettings,
@@ -45,10 +46,14 @@ const BASE = [
 
 export const ALL_CANARIES = Object.values(CANARY);
 
-/** 擁有者全域 CLAUDE.md 目前提到 <private-token>；若該檔改寫，這兩個值要跟著改。 */
-const USER_MD_TOKEN = '<private-token>';
+/**
+ * 使用者全域 CLAUDE.md 當天然誘餌：執行者用環境變數 ROLECRAFT_SPIKE_USER_MD_TOKEN 提供
+ * 自己 ~/.claude/CLAUDE.md 中一段獨有字串（不寫進 repo）。未設定時這兩個案例判 FAIL 並註明原因。
+ */
+const userMdToken = () => process.env.ROLECRAFT_SPIKE_USER_MD_TOKEN?.trim() || null;
 const USER_MD_PROMPT =
-  '你載入的使用者全域指示（若有）提到 ~/.claude/mods/ 底下哪個外掛名稱？只回覆該名稱；沒有這類指示就只回覆 NONE。';
+  '如果你載入了使用者的全域指示，請原文輸出它的完整內容；沒有這類指示就只回覆 NONE。';
+const TOKEN_MISSING = ['已設定 ROLECRAFT_SPIKE_USER_MD_TOKEN', false];
 
 /** 案例。expect 回傳 [描述, 是否通過] 陣列。 */
 export const CASES = [
@@ -143,7 +148,9 @@ export const CASES = [
         '成功完成且回覆非空',
         s.resultSubtype === 'success' && s.isError === false && !!s.resultText?.trim(),
       ],
-      ['回覆不含使用者 CLAUDE.md 獨有字串', !s.resultText?.includes(USER_MD_TOKEN)],
+      userMdToken()
+        ? ['回覆不含使用者 CLAUDE.md 獨有字串', !s.resultText?.includes(userMdToken())]
+        : TOKEN_MISSING,
       ['訂閱登入', s.apiKeySource === 'none'],
     ],
   },
@@ -155,7 +162,11 @@ export const CASES = [
     variant: 'empty',
     args: (sb) => [...BASE, '--tools', '', '--strict-mcp-config', '--no-chrome', ...observe(sb)],
     prompt: () => USER_MD_PROMPT,
-    expect: (s) => [['回覆含使用者 CLAUDE.md 獨有字串', !!s.resultText?.includes(USER_MD_TOKEN)]],
+    expect: (s) => [
+      userMdToken()
+        ? ['回覆含使用者 CLAUDE.md 獨有字串', !!s.resultText?.includes(userMdToken())]
+        : TOKEN_MISSING,
+    ],
   },
   {
     id: 'flag-settings-apikeyhelper',

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
 import { test } from 'node:test';
 
 import { CASES } from './cases.mjs';
@@ -82,6 +83,7 @@ test('受管設定檔存在就不通過，也不呼叫 CLI', async () => {
 });
 
 test('usermd-isolated：只有 init 的逾時、額度錯誤、空回覆都判 FAIL；成功回覆才可能 PASS', () => {
+  process.env.ROLECRAFT_SPIKE_USER_MD_TOKEN = 'decoy-token-123';
   const c = CASES.find((x) => x.id === 'usermd-isolated');
   const verdict = (stream) =>
     c
@@ -93,7 +95,8 @@ test('usermd-isolated：只有 init 的逾時、額度錯誤、空回覆都判 F
     timeout +
     result({ subtype: 'error_during_execution', is_error: true, result: 'quota exceeded' });
   const empty = timeout + result({ subtype: 'success', is_error: false, result: '  ' });
-  const leaked = timeout + result({ subtype: 'success', is_error: false, result: '<private-token>' });
+  const leaked =
+    timeout + result({ subtype: 'success', is_error: false, result: 'decoy-token-123' });
   const isolated = timeout + result({ subtype: 'success', is_error: false, result: 'NONE' });
   assert.equal(verdict(timeout), false);
   assert.equal(verdict(quota), false);
