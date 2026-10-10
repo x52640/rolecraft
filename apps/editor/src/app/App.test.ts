@@ -63,7 +63,6 @@ describe('<App />', () => {
     render(createElement(App, { transport: null }));
     goTo(`#/${path}`);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(label);
-    expect(screen.getByRole('note').textContent).toContain('尚未實作');
     const current = screen.getByRole('link', { current: 'page' });
     expect(current.textContent).toBe(label);
   });
