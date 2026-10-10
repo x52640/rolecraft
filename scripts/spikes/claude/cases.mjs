@@ -137,7 +137,12 @@ export const CASES = [
     variant: 'empty',
     args: (sb) => [...ISOLATED_ARGS, ...observe(sb)],
     prompt: () => USER_MD_PROMPT,
+    // 「不含」只有在模型真的回覆時才算證據：逾時、額度錯誤、空回覆都不能判 PASS。
     expect: (s) => [
+      [
+        '成功完成且回覆非空',
+        s.resultSubtype === 'success' && s.isError === false && !!s.resultText?.trim(),
+      ],
       ['回覆不含使用者 CLAUDE.md 獨有字串', !s.resultText?.includes(USER_MD_TOKEN)],
       ['訂閱登入', s.apiKeySource === 'none'],
     ],

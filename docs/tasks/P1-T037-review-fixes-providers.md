@@ -6,7 +6,7 @@ depends_on: []
 specs: ["providers.md"]
 track: providers
 primary_repo: rolecraft
-write_paths: ["packages/providers/src/core/", "scripts/spikes/claude/", "docs/adr/0002-claude-cli-isolation.md"]
+write_paths: ["packages/providers/src/core/", "scripts/spikes/claude/", "docs/adr/0002-claude-cli-isolation.md", "packages/providers/src/claude/guard.ts", "packages/providers/src/claude/adapter.test.ts"]
 contract_change: none
 expected_commit: "fix(P1-T037): codex 補審修正：providers 取消終止與 Claude spike 腳本"
 ---
@@ -66,9 +66,14 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀分類結果與 PoC 後開工
+- 最後完成：4 項修正、回歸測試、協調者裁定的取消結果型別
+- 已通過驗證：`npm run verify` 綠（vitest 1098 過／8 略過）；`node --test scripts/spikes/claude/spike.test.mjs` 5 過；PoC（sigterm、iso）改為正確結果
+- 下一步：協調者收官（RESIDUALS 刪除「core 取消／輸出超量只對本體送訊號」）
 - Blocker：無
 
 ## 完成結果
+
+- process.ts：不把 signal 交給 spawn；子程序 detached，取消先對群組 SIGTERM，寬限期（預設 2 秒，`terminateGraceMs`）後 SIGKILL 群組；輸出超量也 SIGKILL 群組。群組終止抽到 `core/kill.ts`，guard.ts 改用它並刪除過時殘餘註解。
+- run-check.ts：開始前已取消或 R6 確認途中取消 → `status: 'cancelled'`（不是 blocked）；紀錄 executed=false，三項 unknown、依據「確認途中被取消」。
+- spike：`--live` 不論 `--case` 都先跑 auth status，非訂閱或受管設定存在就中止；usermd-isolated 要求成功且非空回覆；events.jsonl 逐行遮蔽；ADR-0002 重跑說明已更正。
+- spike 回歸測試不在 verify 內：`node --test scripts/spikes/claude/spike.test.mjs`。

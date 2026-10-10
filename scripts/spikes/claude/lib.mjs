@@ -145,13 +145,60 @@ export async function grepDebugLog(file, patterns) {
   return { exists: true, lineCount: lines.length, hits };
 }
 
-/** 把家目錄路徑換成 ~，避免報告裡出現使用者名稱以外的細節；email 也遮掉。 */
-export function redact(value) {
-  return JSON.stringify(value, null, 2)
+/** 把家目錄路徑換成 ~，email、UUID（session id 等）也遮掉。 */
+export function redactText(text) {
+  return text
     .split(os.homedir())
     .join('~')
     .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '<email>')
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<uuid>');
+}
+
+/** 報告物件 → 遮蔽後的 JSON 文字。 */
+export const redact = (value) => redactText(JSON.stringify(value, null, 2));
+
+/** stream-json 原始輸出逐行遮蔽（保留一行一個事件的 JSONL 格式）。 */
+export const redactJsonl = (stdout) => stdout.split('\n').map(redactText).join('\n');
+
+/**
+ * 判定 `claude auth status --json` 是否為訂閱登入（ADR-0002 執行前檢查）：
+ * loggedIn、authMethod=claude.ai、apiProvider=firstParty，且沒有 apiKeySource。
+ */
+export function assessAuthStatus(stdout) {
+  let status;
+  try {
+    status = JSON.parse(stdout);
+  } catch {
+    return { ok: false, reason: 'auth status 輸出不是 JSON' };
+  }
+  if (status?.loggedIn !== true) return { ok: false, reason: '未登入' };
+  if (status.authMethod !== 'claude.ai')
+    return { ok: false, reason: `authMethod=${status.authMethod}` };
+  if (status.apiProvider !== 'firstParty')
+    return { ok: false, reason: `apiProvider=${status.apiProvider}` };
+  if (status.apiKeySource !== undefined)
+    return { ok: false, reason: `apiKeySource=${status.apiKeySource}` };
+  return { ok: true, reason: `訂閱登入（${status.subscriptionType ?? '未知方案'}）` };
+}
+
+export const MANAGED_SETTINGS = '/Library/Application Support/ClaudeCode/managed-settings.json';
+
+/**
+ * 真實使用者設定下的訂閱檢查：真 HOME、空沙箱工作目錄跑 auth status（不打模型）。
+ * 受管設定檔存在 → 無法確認，一律不通過。
+ */
+export async function preflightSubscription({
+  run = runClaude,
+  sandbox,
+  managedSettings = MANAGED_SETTINGS,
+}) {
+  if (existsSync(managedSettings)) {
+    return { ok: false, reason: `受管設定存在（${managedSettings}），無法確認計費路線` };
+  }
+  const env = buildEnv({ home: os.homedir(), tmpdir: sandbox.tmp });
+  const res = await run({ args: ['auth', 'status', '--json'], env, cwd: sandbox.work });
+  if (res.code !== 0) return { ok: false, reason: `auth status 結束碼 ${res.code}` };
+  return assessAuthStatus(res.stdout);
 }
 
 export const isLive = () => process.argv.includes('--live');

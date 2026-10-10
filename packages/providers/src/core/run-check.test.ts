@@ -228,6 +228,60 @@ describe('fake adapter 錯誤路徑', () => {
     expect(out.status === 'executed' && !out.result.ok && out.result.error.kind).toBe('cancelled');
   });
 
+  it('開始前已取消 → cancelled（不是 blocked），不跑確認也不執行', async () => {
+    const fake = createFakeAdapter({ script: [{ text: '不該出現' }] });
+    let routeCalls = 0;
+    const counting: ProviderAdapter = {
+      ...fake,
+      verifySubscriptionRoute: (ctx) => {
+        routeCalls += 1;
+        return fake.verifySubscriptionRoute(ctx);
+      },
+    };
+    const out = await runWithSubscriptionCheck(
+      counting,
+      { ...req, signal: AbortSignal.abort() },
+      deps,
+    );
+    expect(out.status).toBe('cancelled');
+    expect(out.status === 'cancelled' && !out.result.ok && out.result.error.kind).toBe('cancelled');
+    expect(routeCalls).toBe(0);
+    expect(out.record.executed).toBe(false);
+    expect(out.record.subscriptionOnly).toBe('unknown');
+    expect(out.record.items.subscriptionLogin).toEqual({
+      outcome: 'unknown',
+      basis: '確認途中被取消',
+    });
+    expect(out.record.items.environmentSanitized.outcome).toBe('passed');
+  });
+
+  it('確認途中取消 → cancelled，依據寫確認途中被取消，不執行', async () => {
+    const fake = createFakeAdapter({ script: [{ text: '不該出現' }] });
+    const ac = new AbortController();
+    let executed = false;
+    const aborting: ProviderAdapter = {
+      ...fake,
+      verifySubscriptionRoute: async (ctx) => {
+        ac.abort();
+        // 被取消的子程序回報通常是 failed／unknown，不能被當成 R6 不成立
+        return {
+          ...(await fake.verifySubscriptionRoute(ctx)),
+          subscriptionLogin: { outcome: 'failed', basis: 'auth status 被終止' },
+        };
+      },
+      execute: (r) => {
+        executed = true;
+        return fake.execute(r);
+      },
+    };
+    const out = await runWithSubscriptionCheck(aborting, { ...req, signal: ac.signal }, deps);
+    expect(out.status).toBe('cancelled');
+    expect(executed).toBe(false);
+    expect(out.record.subscriptionOnly).toBe('unknown');
+    expect(out.record.items.subscriptionLogin.basis).toBe('確認途中被取消');
+    expect(() => RunCheckRecord.parse(out.record)).not.toThrow();
+  });
+
   it('execute 丟錯 → other，紀錄仍保留', async () => {
     const fake = createFakeAdapter();
     const throwing: ProviderAdapter = { ...fake, execute: () => Promise.reject(new Error('boom')) };

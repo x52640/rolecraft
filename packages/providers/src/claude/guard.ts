@@ -1,6 +1,7 @@
-import { type ChildProcess, spawn as nodeSpawn } from 'node:child_process';
+import { spawn as nodeSpawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 
+import { killProcessGroup } from '../core/kill.ts';
 import type { SpawnFn } from '../core/process.ts';
 import { StreamInspector, type StreamViolation } from './stream.ts';
 
@@ -15,9 +16,9 @@ import { StreamInspector, type StreamViolation } from './stream.ts';
  * 結束後 analyzeRun 會用同一份檢查器再判一次並丟棄輸出，所以就算漏接守門，違規輸出也不會被採用，
  * 只是無法「立即」終止。
  *
- * 程序群組：stream-json 子程序以 detached 建立（POSIX 上即 setsid，自成一個群組），
- * 終止時對 -pid 送 SIGKILL，連 CLI 開出的工具／hook 孫程序一起終止。
- * 殘餘：core 的取消（AbortSignal）與輸出超量終止仍只對 CLI 本體送訊號（kill 由 core 決定）。
+ * 程序群組：core 的 launcher 一律以 detached 建立子程序（這裡也明確帶上），
+ * 終止時用 core 的 killProcessGroup 對整個群組送 SIGKILL，連 CLI 開出的工具／hook 孫程序一起終止；
+ * core 的取消與輸出超量終止走同一套群組終止。
  */
 
 export interface StreamGuardOptions {
@@ -36,37 +37,6 @@ const isStreamJson = (args: readonly string[]): boolean => {
   return index >= 0 && args[index + 1] === 'stream-json';
 };
 
-const REKILL_INTERVAL_MS = 25;
-const REKILL_LIMIT = 80;
-
-/** 對群組送 SIGKILL；群組已不存在回 false。 */
-function signalGroup(pid: number): boolean {
-  try {
-    process.kill(-pid, 'SIGKILL');
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 終止整個程序群組；沒有 pid（測試假程序）或不支援群組訊號時只終止本體。
- * 送出當下若有程序正在 fork，新程序可能漏接訊號，所以之後每 25ms 再送一次，直到群組消失（最多約 2 秒）。
- */
-function killGroup(child: ChildProcess): void {
-  const pid = child.pid;
-  if (process.platform === 'win32' || typeof pid !== 'number' || !signalGroup(pid)) {
-    child.kill('SIGKILL');
-    return;
-  }
-  let rounds = 0;
-  const timer = setInterval(() => {
-    rounds += 1;
-    if (!signalGroup(pid) || rounds >= REKILL_LIMIT) clearInterval(timer);
-  }, REKILL_INTERVAL_MS);
-  timer.unref();
-}
-
 export function createClaudeStreamGuard(
   base: SpawnFn = nodeSpawn,
   options: StreamGuardOptions = {},
@@ -83,7 +53,7 @@ export function createClaudeStreamGuard(
     const stop = (violation: StreamViolation) => {
       if (stopped) return;
       stopped = true;
-      killGroup(child);
+      killProcessGroup(child);
       options.onViolation?.(violation);
     };
     // 在 core 掛上收集器之前先掛（同一個同步區段內），所以每個 chunk 都先經過檢查。

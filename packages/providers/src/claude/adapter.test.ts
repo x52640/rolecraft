@@ -168,7 +168,8 @@ describe('Claude adapter：執行中檢查', () => {
       { ...REQ, signal: controller.signal },
       deps,
     );
-    expect(out.status === 'executed' && !out.result.ok && out.result.error.kind).toBe('cancelled');
+    // 開始前已取消：不跑 R6 確認、不執行，回 cancelled（不是 blocked）
+    expect(out.status === 'cancelled' && !out.result.ok && out.result.error.kind).toBe('cancelled');
   });
 });
 

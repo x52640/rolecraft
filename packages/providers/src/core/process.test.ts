@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -138,4 +138,81 @@ describe('createLauncher：取消與輸出上限', () => {
     });
     expect(out.truncated).toBe(true);
   });
+
+  it('子程序忽略 SIGTERM 時，寬限期後 SIGKILL，取消仍會完成', async () => {
+    const launch = createLauncher({ provider: 'claude', env: ENV, cwd, terminateGraceMs: 100 });
+    const ac = new AbortController();
+    const started = Date.now();
+    const p = launch({
+      executablePath: NODE,
+      command: defineCommand([
+        '-e',
+        "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000); process.stdout.write('ready')",
+      ]),
+      signal: ac.signal,
+    });
+    setTimeout(() => ac.abort(), 300);
+    const out = await p;
+    expect(out.aborted).toBe(true);
+    expect(out.exitCode).toBeNull();
+    expect(Date.now() - started).toBeLessThan(3000);
+  });
+
+  it('取消會終止整個程序群組（含忽略 SIGTERM 的孫程序）', async () => {
+    const launch = createLauncher({ provider: 'claude', env: ENV, cwd, terminateGraceMs: 100 });
+    const pidFile = join(cwd, 'grandchild.pid');
+    const ac = new AbortController();
+    const p = launch({
+      executablePath: NODE,
+      command: defineCommand([
+        '-e',
+        // 孫程序同樣忽略 SIGTERM；pid 寫到工作目錄（cwd）下的 grandchild.pid
+        "const c = require('node:child_process').spawn(process.execPath, ['-e', 'process.on(`SIGTERM`, () => {}); setInterval(() => {}, 1000)'], { stdio: 'ignore' }); require('node:fs').writeFileSync('grandchild.pid', String(c.pid)); process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);",
+      ]),
+      signal: ac.signal,
+    });
+    await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true), { timeout: 3000 });
+    ac.abort();
+    const out = await p;
+    expect(out.aborted).toBe(true);
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    await vi.waitFor(() => expect(isAlive(pid)).toBe(false), { timeout: 3000 });
+  });
+
+  it('啟動前已取消：仍走同一套終止流程，標示 aborted', async () => {
+    const launch = createLauncher({ provider: 'claude', env: ENV, cwd, terminateGraceMs: 100 });
+    const out = await launch({
+      executablePath: NODE,
+      command: defineCommand([
+        '-e',
+        "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)",
+      ]),
+      signal: AbortSignal.abort(),
+    });
+    expect(out.aborted).toBe(true);
+  });
+
+  it('輸出超量也終止整個程序群組', async () => {
+    const launch = createLauncher({ provider: 'claude', env: ENV, cwd, maxOutputBytes: 1024 });
+    const pidFile = join(cwd, 'grandchild.pid');
+    const out = await launch({
+      executablePath: NODE,
+      command: defineCommand([
+        '-e',
+        "const c = require('node:child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' }); require('node:fs').writeFileSync('grandchild.pid', String(c.pid)); setInterval(() => process.stdout.write('x'.repeat(4096)), 1);",
+      ]),
+    });
+    expect(out.truncated).toBe(true);
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    await vi.waitFor(() => expect(isAlive(pid)).toBe(false), { timeout: 3000 });
+  });
 });
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}

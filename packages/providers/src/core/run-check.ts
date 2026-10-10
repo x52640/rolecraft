@@ -15,6 +15,7 @@ import { withEmptyWorkDir } from './workdir.ts';
 /**
  * R6 訂閱路線確認＋執行。每次呼叫都重新確認（不沿用安裝精靈或上一次的結果），
  * 任何一項不是 passed（含 unknown、檢查丟錯）就不執行，並留下 RunCheckRecord。
+ * 取消發生在確認開始前或確認途中 → status 'cancelled'（不是 blocked：使用者取消不是 R6 不成立）。
  */
 
 export interface RunRequest {
@@ -35,6 +36,12 @@ export interface RunDeps {
 
 export type RunOutcome =
   | { readonly status: 'blocked'; readonly record: RunCheckRecord }
+  | {
+      /** 確認開始前或確認途中被取消；未執行（record.executed=false），result 一律 cancelled */
+      readonly status: 'cancelled';
+      readonly record: RunCheckRecord;
+      readonly result: ExecutionResult;
+    }
   | {
       readonly status: 'executed';
       readonly record: RunCheckRecord;
@@ -63,6 +70,7 @@ const CHECK_KEYS = [
 const AdapterRouteChecks = RunCheckItems.omit({ environmentSanitized: true });
 
 const INVALID_REPORT = '適配器回報格式不合法';
+const CANCELLED_DURING_CHECK = '確認途中被取消';
 
 /** 總結：四項全部 passed 才 passed；有 failed 則 failed；其餘（含缺項）unknown。 */
 export function summarizeChecks(items: RunCheckItems): CheckOutcome {
@@ -162,6 +170,23 @@ export async function runWithSubscriptionCheck(
             : '父程序環境未含計費相關變數；子程序環境無殘留',
         );
 
+  // 取消不寫成 R6 失敗：三項 unknown、依據「確認途中被取消」，環境清理照實記。
+  const cancelled = (): RunOutcome => {
+    const items = { ...allUnknown(CANCELLED_DURING_CHECK), environmentSanitized };
+    return {
+      status: 'cancelled',
+      record: RunCheckRecord.parse({
+        ...base,
+        items,
+        removedEnvVarNames: [...removed],
+        subscriptionOnly: summarizeChecks(items),
+        executed: false,
+      }),
+      result: { ok: false, error: { kind: 'cancelled', message: '使用者已取消' } },
+    };
+  };
+  if (request.signal?.aborted) return cancelled();
+
   return withEmptyWorkDir(async (cwd) => {
     const launch = createLauncher({
       provider: adapter.provider,
@@ -170,6 +195,7 @@ export async function runWithSubscriptionCheck(
       ...(deps.spawn ? { spawn: deps.spawn } : {}),
     });
     const route = await routeChecks(adapter, launch, request.signal);
+    if (request.signal?.aborted) return cancelled();
     // 再用完整 schema 驗一次四項；任何不合法 → 四項都記 unknown 並擋下。
     const parsedItems = route.reportValid
       ? RunCheckItems.safeParse({ ...route.checks, environmentSanitized })
