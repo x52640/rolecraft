@@ -11,7 +11,7 @@
 - P1-T008 sources：資料夾列舉、授權集合與安全讀檔（`docs/tasks/P1-T008-sources-authorization.md`）
 - P1-T010 providers：適配介面、環境清理與 R6 紀錄（`docs/tasks/P1-T010-providers-core.md`）
 - P1-T014 helper：橋接端點與操作清單分派（`docs/tasks/P1-T014-helper-host.md`）
-- P1-T015 extension：MV3 骨架與橋接客戶端（`docs/tasks/P1-T015-extension-skeleton.md`）
+- P1-T016 editor：React 骨架與路由（`docs/tasks/P1-T016-editor-skeleton.md`）
 - P1-T026 驗證：中文 PDF 匯出方式（`docs/tasks/P1-T026-spike-pdf-export.md`）
 
 ## ready
@@ -41,6 +41,7 @@
 - P1-T005 `fb412f7`
 - P1-T009 `3c5e934`
 - P1-T006 `3eed0e7`
+- P1-T015 `859b505`
 
 ## 已知殘餘（記錄，不擋上線）
 
@@ -59,6 +60,9 @@
 - resume-import（P1-T009）：無文字層／亂碼／順序異常門檻皆 20%（暫定）；姓名只認有標籤寫法；中文 PDF 未實測，待 P1-T020 用擁有者 104 PDF 調整；欄位草稿是否進 contracts 由 P1-T020 決定。
 
 - storage（P1-T006）：外部傳入時間原樣保存（未轉 UTC），清單依寫入順序；要依時間排序或查區間時，寫入改統一 UTC。ID／雜湊讀取驗證仍寬鬆（新格式只用於自產值）。
+
+- 擴充功能（P1-T015）：橋接無請求 id，客戶端一次一則；Native Messaging host 名稱 `com.rolecraft.helper`（暫在 extension，應移至 contracts）；錯誤碼尚無「helper 未安裝」「逾時」（P1-T016／T030 需要時加）；擴充功能 ID 未固定（P1-T031）；`open_editor` 經 helper 的語意待定義；站點註冊表只有職缺頁路徑。
+- PDF 匯出（ADR-0005）：HTML＋CSS 交給本機 Chrome 背景列印（puppeteer-core），附 Noto Sans TC 400／700 完整字型（+14.2 MB，D17 自用可接受），匯出前用 HarfBuzz 裁字型；缺字會被 Chrome 偷補系統字型，P1-T027 要擋。依賴本機 Chrome；Arc 啟動逾時未查明、Edge 未裝。
 
 ## 治理
 

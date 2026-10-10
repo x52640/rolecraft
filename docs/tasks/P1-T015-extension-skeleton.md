@@ -1,7 +1,7 @@
 ---
 id: P1-T015
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T013", "P1-T001"]
 specs: ["jobs-and-messages.md", "bridge.md"]
 track: extension
