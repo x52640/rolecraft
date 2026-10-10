@@ -5,7 +5,10 @@
 <!-- index:start -->
 ## 進行中
 
-- 無
+- P1-T035 codex 補審修正：domain（預算、來源變更、數字檢查）（`docs/tasks/P1-T035-review-fixes-domain.md`）
+- P1-T036 codex 補審修正：storage、sources、resume-import（`docs/tasks/P1-T036-review-fixes-data.md`）
+- P1-T037 codex 補審修正：providers 取消終止與 Claude spike 腳本（`docs/tasks/P1-T037-review-fixes-providers.md`）
+- P1-T038 codex 補審修正：pdf-export、104 擷取提示、task:close（`docs/tasks/P1-T038-review-fixes-output.md`）
 
 ## ready
 
