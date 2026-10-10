@@ -12,7 +12,7 @@ import {
   looksBinary,
   type FilterOptions,
 } from './filter.ts';
-import { isUnderDir } from './path-rules.ts';
+import { isUnderDir, splitRelPath } from './path-rules.ts';
 import type {
   ExcludedEntry,
   FolderAccess,
@@ -151,13 +151,23 @@ export class SourceRegistry {
     this.#requireItem(itemId).status = 'revoked';
   }
 
-  /** 移除預覽中的整個子資料夾。 */
+  /**
+   * 移除預覽中的整個子資料夾。dirRelPath 必須是乾淨的相對路徑（可帶一個結尾 `/`），
+   * 且是最近列舉中某個候選檔所在的資料夾（大小寫需完全相同）；否則丟錯，不會默默撤銷 0 筆。
+   * 空字串（整個資料夾）一律拒絕：要停止讀整個資料夾請用 removeFolder。
+   */
   revokeUnder(folderId: string, dirRelPath: string): number {
     const folder = this.#requireFolder(folderId);
+    const normalized = dirRelPath.endsWith('/') ? dirRelPath.slice(0, -1) : dirRelPath;
+    const segments = splitRelPath(normalized);
+    if (!segments) throw new Error(`不合法的資料夾路徑：${JSON.stringify(dirRelPath)}`);
+    const dir = segments.join('/');
+    const known = [...folder.byPath.keys()].some((rel) => rel.startsWith(`${dir}/`));
+    if (!known) throw new Error(`列舉結果中沒有這個資料夾：${dir}`);
     let count = 0;
     for (const id of folder.byPath.values()) {
       const item = this.#items.get(id);
-      if (item && isUnderDir(item.relPath, dirRelPath)) {
+      if (item && isUnderDir(item.relPath, dir)) {
         item.status = 'revoked';
         count += 1;
       }

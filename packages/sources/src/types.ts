@@ -40,9 +40,12 @@ export type AccessReadResult =
 
 /**
  * 單一已選資料夾的存取能力。實作必須：
- * - list：不跟隨符號連結（symlink 以 kind 'symlink' 回報、不進入）。
+ * - list：不跟隨符號連結（symlink 以 kind 'symlink' 回報、不進入）；列舉途中根或子資料夾
+ *   被換成 symlink 或別的資料夾也不進入（子資料夾回報為 symlink／other，根則丟錯）。
  * - read：只讀一般檔、不跟隨符號連結、讀時確認實際路徑仍在資料夾內、
  *   大小不超過 maxBytes；任何不符回傳 ok:false，不得丟出內容。
+ * - 硬連結（hardlink）視為資料夾內的檔案：它就是資料夾內的一個目錄項目，
+ *   檔案系統無從區分「原本」與「連結」，使用者在預覽中確認的就是這個路徑。
  */
 export interface FolderAccess {
   list(): Promise<readonly RawEntry[]>;

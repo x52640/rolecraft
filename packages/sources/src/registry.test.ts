@@ -144,6 +144,18 @@ describe('SourceRegistry 授權集合', () => {
     ]);
   });
 
+  it('revokeUnder：可帶結尾斜線；不合法、空字串、未列舉或大小寫不同的路徑丟錯，不默默回 0', async () => {
+    const { registry, summary, idOf } = await setup({ 'docs/a.md': 'a', 'docs/sub/b.md': 'b' });
+    registry.authorize(idOf('docs/a.md'));
+    registry.authorize(idOf('docs/sub/b.md'));
+    for (const bad of ['', '/', './docs', 'docs//', '../docs', 'Docs', 'nope', 'docs/a.md']) {
+      expect(() => registry.revokeUnder(summary.id, bad), bad).toThrow();
+    }
+    expect(registry.items().every((i) => i.status === 'authorized')).toBe(true);
+    expect(registry.revokeUnder(summary.id, 'docs/sub/')).toBe(1);
+    expect(registry.revokeUnder(summary.id, 'docs/')).toBe(2);
+  });
+
   it('增量列舉保留授權狀態；撤銷的不會被重新列舉打回待確認；消失的不可讀', async () => {
     const { registry, folder, summary, idOf } = await setup({ 'a.md': 'a', 'b.md': 'b' });
     registry.authorize(idOf('a.md'));
