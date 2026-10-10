@@ -5,7 +5,14 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T001 contracts：核心資料物件與橋接 schema（`docs/tasks/P1-T001-contracts-core.md`）
+- P1-T002 domain：事實項狀態與 R1 匯出前檢查（`docs/tasks/P1-T002-domain-evidence.md`）
+- P1-T003 domain：R2 來源變更判定（`docs/tasks/P1-T003-domain-source-change.md`）
+- P1-T004 domain：R8 輸入預算與拆批（`docs/tasks/P1-T004-domain-budget.md`）
+- P1-T005 domain：R9 工作單元狀態機（`docs/tasks/P1-T005-domain-work-job.md`）
+- P1-T006 storage：SQLite schema 與 repository（`docs/tasks/P1-T006-storage-core.md`）
+- P1-T008 sources：資料夾列舉、授權集合與安全讀檔（`docs/tasks/P1-T008-sources-authorization.md`）
+- P1-T009 resume-import：PDF 文字層擷取（`docs/tasks/P1-T009-resume-import-pdf.md`）
+- P1-T010 providers：適配介面、環境清理與 R6 紀錄（`docs/tasks/P1-T010-providers-core.md`）
 - P1-T013 驗證：橋接通訊方式（Q3）與資料夾選取機制（`docs/tasks/P1-T013-spike-bridge.md`）
 - P1-T026 驗證：中文 PDF 匯出方式（`docs/tasks/P1-T026-spike-pdf-export.md`）
 
@@ -30,6 +37,7 @@
 
 - P0-T001 `182b16a`
 - P0-T002 `9573b99`
+- P1-T001 `7b4da39`
 
 ## 已知殘餘（記錄，不擋上線）
 
