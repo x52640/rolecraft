@@ -25,7 +25,7 @@
 | [P1-T016](P1-T016-editor-skeleton.md) | editor：React 骨架與路由 | done | 1 | editor | P1-T015 |
 | [P1-T017](P1-T017-spike-104-job.md) | 驗證：104 職缺頁條款與 DOM 樣本 | ready | 1 | extension | P1-T015 |
 | [P1-T018](P1-T018-extension-104-extractor.md) | extension：104 職缺頁擷取 | blocked | 1 | extension | P1-T017、P1-T014 |
-| [P1-T019](P1-T019-job-snapshot-ui.md) | editor：職缺快照確認與手動貼上 | in_progress | 1 | editor | P1-T016、P1-T014、P1-T041 |
+| [P1-T019](P1-T019-job-snapshot-ui.md) | editor：職缺快照確認與手動貼上 | done | 1 | editor | P1-T016、P1-T014、P1-T041 |
 | [P1-T020](P1-T020-resume-import-ui.md) | editor：履歷 PDF 匯入與校正 | done | 1 | editor | P1-T009、P1-T016、P1-T014、P1-T041 |
 | [P1-T021](P1-T021-project-import-ui.md) | editor：專案資料夾匯入與預覽 | in_progress | 1 | editor | P1-T008、P1-T016、P1-T014、P1-T041 |
 | [P1-T022](P1-T022-pipeline-analysis.md) | pipeline：文件分析成事實項 | done | 1 | pipeline | P1-T002、P1-T003、P1-T004、P1-T005、P1-T012、P1-T008 |
