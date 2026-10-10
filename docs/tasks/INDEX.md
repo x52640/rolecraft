@@ -45,6 +45,7 @@
 | [P1-T036](P1-T036-review-fixes-data.md) | codex 補審修正：storage、sources、resume-import | done | 1 | data | — |
 | [P1-T037](P1-T037-review-fixes-providers.md) | codex 補審修正：providers 取消終止與 Claude spike 腳本 | done | 1 | providers | — |
 | [P1-T038](P1-T038-review-fixes-output.md) | codex 補審修正：pdf-export、104 擷取提示、task:close | done | 1 | output | — |
+| [P1-T039](P1-T039-claude-auto-reverify.md) | Claude CLI 版本變更時自動重新驗證 | ready | 1 | providers | P1-T012、P1-T037 |
 
 ## 依賴清單
 
@@ -64,7 +65,7 @@
 - P1-T009：P1-T001 → P1-T020
 - P1-T010：P1-T001 → P1-T011
 - P1-T011：P1-T010 → P1-T012
-- P1-T012：P1-T011 → P1-T022、P1-T030
+- P1-T012：P1-T011 → P1-T022、P1-T030、P1-T039
 - P1-T013：P0-T001 → P1-T014、P1-T015
 - P1-T014：P1-T013、P1-T006 → P1-T018、P1-T019、P1-T020、P1-T021、P1-T030、P1-T034
 - P1-T015：P1-T013、P1-T001 → P1-T016、P1-T017、P1-T034
@@ -89,5 +90,6 @@
 - P1-T034：P1-T014、P1-T015、P1-T016 → —
 - P1-T035：— → —
 - P1-T036：— → —
-- P1-T037：— → —
+- P1-T037：— → P1-T039
 - P1-T038：— → —
+- P1-T039：P1-T012、P1-T037 → —
