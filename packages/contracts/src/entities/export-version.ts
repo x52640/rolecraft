@@ -17,5 +17,11 @@ export const ExportVersion = z.strictObject({
   pdfHash: ContentHash,
   citedClaims: z.array(CitedClaimCopy),
   jobSnapshot: JobSnapshot,
+  /**
+   * 匯出當下，引用事實項的依據來自哪些來源文件（P1-T007，D19）。
+   * 刪除來源文件時據此找出保存其片段副本的匯出版本。storage 新建時一定會填；
+   * 為維持 additive 設為選填。
+   */
+  sourceDocumentIds: z.array(Id).optional(),
 });
 export type ExportVersion = z.infer<typeof ExportVersion>;

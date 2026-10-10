@@ -14,3 +14,19 @@ export { StorageError } from './errors.ts';
 export { newId, nowTimestamp, sha256Hex } from './ids.ts';
 export * from './repositories/index.ts';
 export { createLocalFileStore, type FileStore, type StoredFile } from './files/file-store.ts';
+export {
+  createExportVersionRepository,
+  type ExportVersionInput,
+  type ExportVersionRepository,
+} from './export/export-version-repository.ts';
+export { assertImmutabilityGuards } from './export/guards.ts';
+export {
+  createApplicationRecordRepository,
+  type ApplicationRecordChanges,
+  type ApplicationRecordDeletion,
+  type ApplicationRecordInput,
+  type ApplicationRecordRepository,
+} from './application/application-record-repository.ts';
+export { deleteMaterial, type MaterialDeletion } from './application/material-deletion.ts';
+export { type MaterialKind, type MaterialRef } from './application/materials.ts';
+export { readInterviewInput, type InterviewInput } from './application/interview-input.ts';

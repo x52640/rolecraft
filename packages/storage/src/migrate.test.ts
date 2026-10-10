@@ -25,7 +25,17 @@ const CORE_TABLES = [
   'source_documents',
   'work_jobs',
   'work_units',
+  // 0002（P1-T007）
+  'application_records',
+  'deleted_materials',
+  'export_version_ledger',
+  'export_versions',
 ];
+
+/** 正式 migration 的全部版本與下一個可用版本（新增 migration 時測試不必跟著改）。 */
+const REAL_VERSIONS = loadMigrations().map((m) => m.version);
+const LATEST = REAL_VERSIONS.at(-1) ?? 0;
+const NEXT_FILE = `${String(LATEST + 1).padStart(4, '0')}_extra.sql`;
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
@@ -58,8 +68,8 @@ describe('migrate', () => {
   it('rebuilds the full schema from an empty database file', () => {
     const t = tempDatabase();
     cleanups.push(t.cleanup);
-    expect(t.migration.applied).toEqual([1]);
-    expect(t.migration.currentVersion).toBe(1);
+    expect(t.migration.applied).toEqual(REAL_VERSIONS);
+    expect(t.migration.currentVersion).toBe(LATEST);
     expect(tableNames(t.db)).toEqual([...CORE_TABLES, 'schema_migrations'].sort());
     expect(t.db.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
   });
@@ -70,19 +80,19 @@ describe('migrate', () => {
     t.db.close();
     const again = openDatabase(t.file);
     expect(again.migration.applied).toEqual([]);
-    expect(again.migration.currentVersion).toBe(1);
+    expect(again.migration.currentVersion).toBe(LATEST);
     again.db.close();
   });
 
   it('applies a newly added migration file without touching existing ones', () => {
     const dir = copyOfRealMigrations();
     const db = new DatabaseSync(':memory:');
-    expect(migrate(db, loadMigrations(dir)).applied).toEqual([1]);
-    writeFileSync(
-      path.join(dir, '0002_extra.sql'),
-      'CREATE TABLE extra (id TEXT PRIMARY KEY) STRICT;',
-    );
-    expect(migrate(db, loadMigrations(dir))).toEqual({ applied: [2], currentVersion: 2 });
+    expect(migrate(db, loadMigrations(dir)).applied).toEqual(REAL_VERSIONS);
+    writeFileSync(path.join(dir, NEXT_FILE), 'CREATE TABLE extra (id TEXT PRIMARY KEY) STRICT;');
+    expect(migrate(db, loadMigrations(dir))).toEqual({
+      applied: [LATEST + 1],
+      currentVersion: LATEST + 1,
+    });
     expect(tableNames(db)).toContain('extra');
     db.close();
   });
@@ -99,9 +109,9 @@ describe('migrate', () => {
   it('rejects a database newer than the code', () => {
     const dir = copyOfRealMigrations();
     const db = new DatabaseSync(':memory:');
-    writeFileSync(path.join(dir, '0002_extra.sql'), 'CREATE TABLE extra (id TEXT) STRICT;');
+    writeFileSync(path.join(dir, NEXT_FILE), 'CREATE TABLE extra (id TEXT) STRICT;');
     migrate(db, loadMigrations(dir));
-    rmSync(path.join(dir, '0002_extra.sql'));
+    rmSync(path.join(dir, NEXT_FILE));
     expect(() => migrate(db, loadMigrations(dir))).toThrow(StorageError);
     db.close();
   });

@@ -18,4 +18,4 @@ spec 只定語意，以下欄位細節由協調者暫定。改動要經對應 Ta
 | 8 | 橋接操作清單 | 只有 bridge.md R7 舉的 4 個；編輯器需要的操作由各 Task 先改 bridge.md 再加（additive） | P1-T014 起逐項 |
 | 9 | ResumeVersion | 段落 `origin`（generated／user_written）；修改理由與逐段接受狀態未建；原始履歷不是 ResumeVersion（由 Profile 表示） | P1-T024、P1-T025 |
 | 10 | JobSnapshot | 手動貼上 URL 可為 null；平台無「其他」 | P1-T019 |
-| 11 | ExportVersion | 只存 `pdfHash`，檔案由 storage 保存；D19／D20 未建模 | P1-T007、P1-T027 |
+| 11 | ExportVersion | **定案（D19 部分）**：只存 `pdfHash`，PDF 由 storage 檔案區保存；新增選填 `sourceDocumentIds`（匯出當下引用事實項的依據來源文件，storage 新建時必填，供刪除來源文件時找出含其片段副本的版本）；不可變性由 storage 觸發器保證。D20（站內履歷外部版本）仍未建模 | P1-T007（D19 已定案）、P1-T027 |

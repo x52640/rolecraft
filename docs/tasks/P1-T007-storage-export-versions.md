@@ -7,7 +7,7 @@ specs: ["resume-output.md"]
 track: storage
 primary_repo: rolecraft
 write_paths: ["packages/storage/src/export/", "packages/storage/src/application/", "packages/storage/src/index.ts", "packages/storage/src/migrations/"]
-contract_change: none
+contract_change: additive
 expected_commit: "feat(P1-T007): storage：不可變匯出版本、投遞紀錄與刪除規則"
 ---
 # storage：不可變匯出版本、投遞紀錄與刪除規則
@@ -73,9 +73,18 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：實作與測試完成，待協調者收官（含對抗驗證）
+- 已通過驗證：`npm run verify` 綠（Vitest 24 檔 181 測試）
+- 下一步：協調者收官
 - Blocker：無
 
 ## 完成結果
+
+- migration `0002_export_versions.sql`：`export_versions`、`application_records`（皆 STRICT＋WITHOUT ROWID，索引欄與 JSON 以 CHECK 綁定）、`export_version_ledger`（用過的匯出版本 ID，只增）、`deleted_materials`（D19 已刪素材紀錄）。
+- 資料庫層不可變性（觸發器，不依賴 `PRAGMA foreign_keys`）：匯出版本禁 UPDATE；同 ID 只能 INSERT 一次（擋 INSERT OR REPLACE／REPLACE INTO／upsert／刪後同 ID 重建）；被投遞紀錄引用者禁 DELETE；投遞紀錄只能指向存在的匯出版本、同 ID 只能新增一次、不能改指向。觸發器被 DROP 時 `assertImmutabilityGuards` 讓 repository 拒絕開啟。
+- `export/`：`createExportVersionRepository(db, fileStore)`（只有 create／get／list／isApplied／readPdf，無 update；create 存 PDF、產生 ID／時間／雜湊、依 claim_sources 填 `sourceDocumentIds`）。
+- `application/`：`createApplicationRecordRepository`（create 驗證匯出版本存在；update 只改起因／日期／狀態；delete 整筆刪除，若該版本因此未投遞且含已刪素材副本就一併刪除）、`deleteMaterial(db, fileStore, {kind, id})`（同一交易刪原件、記錄、刪含其副本的未投遞版本；回報保留的已投遞版本）、`readInterviewInput`（只讀投遞紀錄＋匯出版本＋PDF，附已刪素材明示清單）。素材種類：claim、source_document、resume_version、job_snapshot。
+- 會刪 PDF 檔的操作（deleteMaterial、投遞紀錄 delete）拒絕在外層交易中呼叫（檔案刪除無法回滾）；PDF 內容定址，仍被其他版本引用就不刪。
+- contracts（additive）：`ExportVersion.sourceDocumentIds` 選填；ADR-0006 第 11 列更新。
+- 偏離：改了 write_paths 外的 `packages/storage/src/migrate.test.ts`（原測試寫死只有 migration 1，新增 0002 必壞；改成依實際 migration 數計算，不改測試意圖）。
+
