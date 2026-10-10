@@ -16,15 +16,16 @@
 - P1-T039 Claude CLI 版本變更時自動重新驗證
 <!-- index:end -->
 
-## 下一步（2026-10-10，等擁有者指示）
+## 下一步（2026-10-10 收官，等擁有者指示）
 
-1. 第二輪候選：P1-T019、P1-T021（P1-T034 已完成，可平行）；「helper 匯出接線」Task 待建（見 RESIDUALS.md）。
-2. P1-T017、P1-T020 等擁有者提供資料；Claude CLI 更新策略 A／B 待擁有者決定。
-3. 高風險 Task 照 plan.md E3 跑對抗驗證（2 review＋2 verify）。
+1. 候選（皆不需擁有者資料）：P1-T019、P1-T021、P1-T039（D22，高風險需對抗驗證）、「helper 匯出接線」（待建，見 RESIDUALS.md）、README。
+2. P1-T017、P1-T020 等擁有者提供 104 頁面／PDF。
+3. repo 已公開於 https://github.com/x52640/rolecraft（MIT）；只有擁有者說「推」才 push。本機 git email 已設 noreply。
+4. 歷史改寫（2026-10-10）留下的本機 `refs/original` 與 scratchpad bundle 待擁有者同意後清除。
 
 ## 主樹基準
 
-- `npm run verify` 綠；Vitest 1092 通過、8 略過（live／Chrome／race 測試，需環境變數才跑）；test:docs 14（2026-10-10 P1-T012 收官後）。TypeScript ~6.0.3（typescript-eslint 8.71 不支援 7.x）。
+- `npm run verify` 綠；Vitest 1137 通過、9 略過（live／Chrome／race 測試，需環境變數才跑）；test:docs 15（2026-10-10 P1-T038 收官後）。TypeScript ~6.0.3（typescript-eslint 8.71 不支援 7.x）。
 
 ## 待專案擁有者
 
