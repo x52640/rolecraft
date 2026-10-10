@@ -5,16 +5,18 @@
 <!-- index:start -->
 ## 進行中
 
-- P0-T001 monorepo 骨架與 verify 閘門（`docs/tasks/P0-T001-monorepo-scaffold.md`）
+- P0-T002 文件閘門腳本（`docs/tasks/P0-T002-docs-tooling.md`）
 
 ## ready
 
-（無）
+- P1-T001 contracts 核心資料物件
+- P1-T013 驗證：橋接通訊方式
+- P1-T026 驗證：中文 PDF 匯出方式
 <!-- index:end -->
 
 ## 主樹基準
 
-- 尚無程式碼；P0-T001 完成後補：`npm run verify` 結果、測試數。
+- `npm run verify` 綠；Vitest 12 檔 23 測試（P0-T001 後）。TypeScript ~6.0.3（typescript-eslint 8.71 不支援 7.x）。
 
 ## 待專案擁有者
 
@@ -26,11 +28,14 @@
 
 ## 待補 codex review（E4，額度恢復後逐 commit 跑）
 
-（尚無；每個 Task 收官後在此加一行：Task ID＋commit hash）
+- P0-T001 `182b16a`
 
 ## 已知殘餘（記錄，不擋上線）
 
 - 全域 `~/.claude/skills/spec-discuss/codex-talk.mjs` 在非 git 目錄會失敗（缺 `--skip-git-repo-check`）；本 repo 已 git init，不再受影響。
+
+- 相依方向只有 lint 擋，typecheck 擋不住（套件 exports 指向 src）；pipeline 未啟用 Node 型別，需要 I/O 時再加。
+- `.prettierignore` 排除所有 `*.md`；文件格式交給 verify:docs。
 
 ## 治理
 

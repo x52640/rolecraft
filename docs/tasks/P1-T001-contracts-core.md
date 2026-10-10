@@ -1,7 +1,7 @@
 ---
 id: P1-T001
 phase: 1
-status: blocked
+status: ready
 depends_on: ["P0-T001"]
 specs: ["architecture.md", "evidence-model.md", "bridge.md", "resume-output.md", "jobs-and-messages.md", "runtime-and-budget.md"]
 track: contracts
@@ -81,6 +81,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：讀必讀入口後開工
-- Blocker：等待相依：P0-T001
+- Blocker：無
 
 ## 完成結果

@@ -1,7 +1,7 @@
 ---
 id: P0-T002
 phase: 0
-status: blocked
+status: in_progress
 depends_on: ["P0-T001"]
 specs: []
 track: infra
@@ -77,6 +77,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：讀必讀入口後開工
-- Blocker：等待相依：P0-T001
+- Blocker：無
 
 ## 完成結果

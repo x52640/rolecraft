@@ -1,7 +1,7 @@
 ---
 id: P1-T013
 phase: 1
-status: blocked
+status: ready
 depends_on: ["P0-T001"]
 specs: ["bridge.md", "sources-and-authorization.md", "open-verifications.md"]
 track: bridge
@@ -78,6 +78,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：讀必讀入口後開工
-- Blocker：等待相依：P0-T001；需擁有者：Arc／Edge 手動跑 echo 測試
+- Blocker：無；手動驗證需擁有者：Arc／Edge 手動跑 echo 測試
 
 ## 完成結果

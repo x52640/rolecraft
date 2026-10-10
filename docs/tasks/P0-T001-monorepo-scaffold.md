@@ -1,7 +1,7 @@
 ---
 id: P0-T001
 phase: 0
-status: in_progress
+status: done
 depends_on: []
 specs: ["architecture.md"]
 track: infra
