@@ -140,6 +140,8 @@ function arabicAt(text: string, i: number): Hit | null {
     kind = '%';
     end += cheng[0].length;
     if (value !== null) value = value * 10 + Number(cheng[1] ?? 0);
+    // 3成五、3成55：成後面又接數字，混寫不猜
+    fail(stickyAt(DIGIT_AFTER_UNIT, text, end));
   } else {
     const mult = multiplierAt(text, end);
     end = mult.end;
@@ -147,6 +149,13 @@ function arabicAt(text: string, i: number): Hit | null {
     // 5GB、100ms、3D：未知的字母後綴
     const letters = stickyAt(LETTER_SUFFIX, text, end);
     if (letters && !/^[x×]\d/iu.test(text.slice(end, end + 2))) fail(letters);
+    // 1萬%、1k percent：量級後面才接百分比
+    const after = percentLikeSuffix(text, end);
+    if (after) {
+      kind = after.kind;
+      end = after.end;
+      if (value !== null) value *= after.scale;
+    }
   }
   fail(stickyAt(APPROX_SUFFIX, text, end));
   return { token: makeToken(text.slice(percentOf ?? i, end), kind, value), end };

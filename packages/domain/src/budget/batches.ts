@@ -97,7 +97,8 @@ export function planBatches(input: PlanBatchesInput): PlanBatchesResult {
     if (piece.text.length === 0) continue;
     const parts = toSegments(piece, maxSegmentTokens);
     if (parts === null) return { ok: false, reason: 'budget_too_small' };
-    segments.push(...parts);
+    // 逐一 push：展開極大陣列會超過參數上限（RangeError）
+    for (const part of parts) segments.push(part);
   }
 
   const batches: Batch[] = [];

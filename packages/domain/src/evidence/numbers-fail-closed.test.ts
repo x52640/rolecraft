@@ -192,3 +192,25 @@ describe('正常技術履歷句子不產生數字', () => {
     expect(extractNumbers(text)).toEqual([]);
   });
 });
+
+describe('P1-T035 回歸：百分比、成、混寫', () => {
+  it.each([
+    ['提升 1萬%', ['%10000']],
+    ['1k percent', ['%1000']],
+    ['提升百分之thirty', ['%30']],
+    ['提升百分之 thirty', ['%30']],
+  ])('量級或英文數字詞仍保留百分比：%s', (text, expected) => {
+    expect(keys(text)).toEqual(expected);
+  });
+
+  it.each(['三成多', '三成餘', '三成五多', '3成多'])('成之後的約數：%s → 無法辨識', (text) => {
+    expect(keys(text)).toEqual([null]);
+  });
+
+  it.each(['3成五', '三成5', '3成55', '三成五六'])(
+    '成的阿拉伯／中文混寫整段無法辨識：%s',
+    (text) => {
+      expect(keys(text)).toEqual([null]);
+    },
+  );
+});

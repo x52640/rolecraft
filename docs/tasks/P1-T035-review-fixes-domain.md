@@ -61,15 +61,22 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 各項修正與回歸測試
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 各項修正與回歸測試
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀分類結果與 PoC 後開工
+- 最後完成：6 項修正與回歸測試
+- 已通過驗證：`npm run verify`；分類員 PoC（budget／sc／num）改為正確結果
+- 下一步：協調者驗收後關閉
 - Blocker：無
 
 ## 完成結果
+
+- budget `batches.ts`：`segments.push(...parts)` 改逐一 push；15 萬段不再 RangeError。
+- source-change `isUsableForGeneration`：normal 也要求有來源片段或使用者確認，空依據回 false。
+- 數字 `numbers.ts`：量級（萬、k）之後再查百分比後綴，「1萬%」→ %10000、「1k percent」→ %1000；阿拉伯數字「成」後緊接數字（3成五、3成55）整段 null。
+- 數字 `number-words.ts`：中文數字結尾再查約數後綴（三成多／三成餘／三成五多 → null）；「成」後緊接數字（三成5、三成五六）整段 null；英文數字詞前有「百分之」算百分比（百分之thirty → %30）。
+- 混寫選 fail closed（null），不猜成 %35。副作用：「3成一致」這類成後緊接中文數字字的寫法也會變 null。
+- 回歸測試：`budget.test.ts`、`evaluate.test.ts`、`numbers-fail-closed.test.ts` 末尾 P1-T035 區塊。

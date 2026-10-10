@@ -35,6 +35,8 @@ const STARTS_WITH_UNIT = new RegExp(`^${CN_UNIT_CLASS}`, 'u');
 const ADJACENT_ARABIC = /\s*\d+(?:[.,]\d+)*/uy;
 /** 三成、三成五 → 百分之三十、三十五。 */
 const CHENG = new RegExp(`成(${CN_DIGIT_CLASS}(?!${CN}))?`, 'uy');
+/** 三成5、三成五六：成後面又接數字，混寫不猜。 */
+const DIGITS_AFTER_CHENG = new RegExp(`(?:\\d|${CN})+`, 'uy');
 
 export function chineseAt(text: string, i: number, spans: readonly Span[]): Hit | null {
   const m = stickyAt(CN_RUN, text, i);
@@ -64,10 +66,21 @@ export function chineseAt(text: string, i: number, spans: readonly Span[]): Hit 
     kind = '%';
     value = value * 10 + (cheng[1] === undefined ? 0 : (cnDigitValue(cheng[1]) ?? 0));
     end += cheng[0].length;
+    const mixed = stickyAt(DIGITS_AFTER_CHENG, text, end);
+    if (mixed) {
+      value = null;
+      end += mixed[0].length;
+    }
   } else if (suffix) {
     kind = suffix.kind;
     if (value !== null) value *= suffix.scale;
     end = suffix.end;
+  }
+  // 三成多、三成五餘：成之後的約數
+  const approxAfter = stickyAt(APPROX_SUFFIX, text, end);
+  if (approxAfter) {
+    value = null;
+    end += approxAfter[0].length;
   }
   return { token: makeToken(text.slice(percentOf ?? i, end), kind, value), end };
 }
@@ -98,14 +111,16 @@ export function englishAt(text: string, i: number, spans: readonly Span[]): Hit 
     .split(/[\s-]+/u)
     .filter((w) => w !== '' && w !== 'and');
   let value = isApproximateEnglish(words) ? null : parseEnglishNumber(words);
-  let kind: NumberKind = '#';
+  // 百分之thirty：前面有「百分之」標記
+  const percentOf = percentOfStart(text, i);
+  let kind: NumberKind = percentOf === null ? '#' : '%';
   const suffix = percentLikeSuffix(text, end);
   if (suffix) {
     kind = suffix.kind;
     if (value !== null) value *= suffix.scale;
     end = suffix.end;
   }
-  return { token: makeToken(text.slice(i, end), kind, value), end };
+  return { token: makeToken(text.slice(percentOf ?? i, end), kind, value), end };
 }
 
 /** 整串都是形似數字的字母（IOO、ЗО、XII）緊接百分比或量詞：無法辨識。 */

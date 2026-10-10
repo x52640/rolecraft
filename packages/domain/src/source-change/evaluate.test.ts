@@ -327,3 +327,13 @@ describe('防呆', () => {
     expect(() => applyConflictMarks(claims, [{ ...base, excerpts: [ex, ex] }])).toThrow();
   });
 });
+
+describe('P1-T035 回歸：沒有依據的事實項', () => {
+  it('reviewStatus 正常但沒有來源片段也沒有使用者確認 → 不可用於生成', () => {
+    expect(isUsableForGeneration(claimWith([]))).toBe(false);
+  });
+
+  it('只有使用者確認、沒有來源片段 → 可用', () => {
+    expect(isUsableForGeneration(claimWith([], true))).toBe(true);
+  });
+});

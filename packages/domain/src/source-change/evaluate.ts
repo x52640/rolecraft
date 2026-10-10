@@ -183,7 +183,8 @@ function statusFromChecks(checks: readonly ExcerptCheck[]): ReviewStatus {
 export function isUsableForGeneration(claim: Pick<Claim, 'reviewStatus' | 'basis'>): boolean {
   switch (claim.reviewStatus) {
     case 'normal':
-      return true;
+      // 沒有任何依據（無來源片段、無使用者確認）的事實項不能拿來生成
+      return claim.basis.sourceExcerpts.length > 0 || claim.basis.userConfirmation !== null;
     case 'source_removed':
       return claim.basis.userConfirmation !== null;
     case 'needs_review':

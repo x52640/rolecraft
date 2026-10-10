@@ -207,3 +207,14 @@ describe('splitByTokens', () => {
     expect(splitByTokens('中', 1)).toBeNull();
   });
 });
+
+describe('P1-T035 回歸：極大片段數', () => {
+  it('單一來源拆成十多萬段也不會爆堆疊（RangeError）', () => {
+    const result = planBatches({
+      budget: budgetOf(SEGMENT_OVERHEAD_TOKENS + 2),
+      fixed: [],
+      pieces: [{ sourceId: 's', text: '中'.repeat(150_000) }],
+    });
+    expect(batchesOf(result).length).toBe(150_000);
+  });
+});
