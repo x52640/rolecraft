@@ -73,9 +73,15 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：實作與測試（待協調者收官）
+- 已通過驗證：`npm run verify` 綠（Vitest 15 檔 93 測試，其中 resume-import 2 檔 16 測試；test:docs 11）
+- 下一步：協調者收官；擁有者 104 PDF 到位後跑 P1-T020 手動驗證
 - Blocker：無
 
 ## 完成結果
+
+- 公開入口 `extractResumePdf(bytes)` → 成功（各頁依閱讀順序的行，含頁碼、欄序號、座標；`pagesWithoutText`；欄位草稿）或明確失敗 `invalid_pdf`／`encrypted`／`no_text_layer`／`garbled_text`／`reading_order_unreliable`。
+- 模組：`pdf/read-text-layer.ts`（pdfjs-dist 6.4 legacy build，本機 cmaps／standard_fonts，不連網、不 OCR）、`pdf/quality.ts`（可見字 < 20 → 無文字層；U+FFFD／私用區／控制字元 > 20% → 亂碼；旋轉或同基線疊字 > 20% → 讀取順序異常）、`pdf/layout.ts`（基線分行；頁面中段找 ≥ 12pt 直向空白帶判定雙欄，跨欄行切段，每段先左後右）、`draft/`（中英文標籤、日期區間、公司字尾、職稱關鍵字、經歷／技能段落；全部 `unconfirmed` 並記來源頁碼與行號，找不到不填）。
+- 型別暫放套件內（contract_change: none）；草稿要進 contracts 時另開 Task。
+- 測試 PDF 由 pdf-lib（devDependency）在測試中產生：單欄、內容串流倒序、雙欄（先寫右欄）、無文字層、疊字、旋轉、非 PDF。中文規則只在文字層級測試（Helvetica 無 CJK、不打包系統字型）；中文 PDF 實測留給 P1-T020。
+- 未測：加密 PDF（pdf-lib 無法產生加密檔，只有分類邏輯）、真實亂碼 PDF（亂碼只做單元測試）。

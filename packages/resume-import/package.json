@@ -7,6 +7,10 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@rolecraft/contracts": "0.0.0"
+    "@rolecraft/contracts": "0.0.0",
+    "pdfjs-dist": "^6.4.299"
+  },
+  "devDependencies": {
+    "pdf-lib": "^1.17.1"
   }
 }
