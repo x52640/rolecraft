@@ -6,7 +6,7 @@
 ## 進行中
 
 - P1-T024 pipeline：職缺匹配與段落生成（`docs/tasks/P1-T024-pipeline-resume-gen.md`）
-- P1-T040 helper：匯出接線（`docs/tasks/P1-T040-helper-export-wiring.md`）
+- P1-T043 helper：macOS 原生選取器與服務組裝（`docs/tasks/P1-T043-helper-native-pickers.md`）
 
 ## ready
 

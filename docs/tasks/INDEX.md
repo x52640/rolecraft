@@ -46,10 +46,10 @@
 | [P1-T037](P1-T037-review-fixes-providers.md) | codex 補審修正：providers 取消終止與 Claude spike 腳本 | done | 1 | providers | — |
 | [P1-T038](P1-T038-review-fixes-output.md) | codex 補審修正：pdf-export、104 擷取提示、task:close | done | 1 | output | — |
 | [P1-T039](P1-T039-claude-auto-reverify.md) | Claude CLI 版本變更時自動重新驗證 | done | 1 | providers | P1-T012、P1-T037 |
-| [P1-T040](P1-T040-helper-export-wiring.md) | helper：匯出接線 | in_progress | 1 | helper | P1-T041、P1-T027、P1-T007 |
+| [P1-T040](P1-T040-helper-export-wiring.md) | helper：匯出接線 | done | 1 | helper | P1-T041、P1-T027、P1-T007 |
 | [P1-T041](P1-T041-bridge-editor-ops.md) | 橋接：編輯器頁面所需操作清單 | done | 1 | bridge | P1-T034 |
 | [P1-T042](P1-T042-readme.md) | README 與開源說明文件 | done | 1 | readme | — |
-| [P1-T043](P1-T043-helper-native-pickers.md) | helper：macOS 原生選取器與服務組裝 | blocked | 1 | helper | P1-T020、P1-T021、P1-T028、P1-T040 |
+| [P1-T043](P1-T043-helper-native-pickers.md) | helper：macOS 原生選取器與服務組裝 | in_progress | 1 | helper | P1-T020、P1-T021、P1-T028、P1-T040 |
 
 ## 依賴清單
 
