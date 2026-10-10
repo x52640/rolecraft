@@ -2,7 +2,7 @@
 // Chrome 自動實測（可重跑）：先 `npm run build -w @rolecraft/extension`，再
 //   node apps/extension/scripts/chrome-e2e.mjs [--browser-path <Chrome 執行檔>] [--headful]
 // 拋棄式暫存 profile（不碰使用者 profile 與家目錄的 host 註冊）；假 host manifest 寫進暫存 profile。
-// 檢查：載入 dist/unpacked、service worker 啟動、編輯器頁載入、經 service worker 轉送的橋接往返
+// 檢查：載入 dist/unpacked、service worker 啟動、編輯器頁（apps/editor）載入與路由、經 service worker 轉送的橋接往返
 // （合法請求、schema 不合法請求不送出、host 回不合法回應被擋）。
 // 工具列按鈕與快捷鍵注入無法用 CDP 觸發，見 Task 手動驗證步驟。
 import { spawn } from 'node:child_process';
@@ -103,6 +103,16 @@ async function writeFakeHost(tmp, profile) {
   return { log, wrapper, profileHosts: path.join(profile, 'NativeMessagingHosts') };
 }
 
+const EDITOR_PROBE = `({
+  marker: document.body.dataset.rolecraftEditor,
+  heading: document.querySelector('h1')?.textContent,
+  navCount: document.querySelectorAll('nav a').length,
+})`;
+const ROUTE_PROBE = `new Promise((resolve) => {
+  location.hash = '#/jobs';
+  setTimeout(() => resolve(document.querySelector('h1')?.textContent), 200);
+})`;
+
 const CASES = [
   { name: '合法 open_editor', request: { op: 'open_editor', payload: {} }, expect: { ok: true } },
   {
@@ -171,8 +181,18 @@ async function main() {
 
     const { targetId } = await send('Target.createTarget', { url: `${prefix}${EDITOR_PAGE}` });
     await sleep(500);
-    const marker = await evaluateIn(send, targetId, 'document.body.dataset.rolecraftEditor');
-    report.results.push({ name: '編輯器佔位頁載入', pass: marker === 'placeholder', got: marker });
+    const page = await evaluateIn(send, targetId, EDITOR_PROBE);
+    report.results.push({
+      name: '編輯器（React）載入並顯示匯入頁',
+      pass: page.marker === 'ready' && page.heading === '匯入' && page.navCount === 7,
+      got: page,
+    });
+    const routed = await evaluateIn(send, targetId, ROUTE_PROBE);
+    report.results.push({
+      name: '編輯器 hash 路由切到職缺頁',
+      pass: routed === '職缺',
+      got: routed,
+    });
 
     for (const c of CASES) {
       const message = JSON.stringify({ channel: RELAY_CHANNEL, request: c.request });
