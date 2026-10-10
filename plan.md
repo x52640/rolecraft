@@ -47,3 +47,5 @@
 
 - **E1 模組化（2026-10-10 擁有者裁定）**：程式不能集中在單一檔案，要模組化；由 lint 強制單檔行數上限與模組相依方向（見 `docs/adr/0001-monorepo-modules.md`）。
 - **E2 冷啟動治理（2026-10-10 擁有者裁定）**：採 know_how 方法（權威分層、Task 契約、CURRENT_TASK 入口、一 Task 一 commit）。
+- **E3 驗證分級（2026-10-10 擁有者裁定）**：高風險 Task（P1-T002、T003、T007、T008、T010、T011、T012、T014；碰 R1–R7 核心限制）收官前跑 Workflow 對抗驗證，上限 4 個 agent（2 review＋2 verify）。其餘 Task 用協調者收官閘門。
+- **E4 codex review 延後（2026-10-10 擁有者裁定）**：每個 Task 仍獨立 commit；codex review 因額度不足先延後，待補清單記在 `docs/CURRENT_TASK.md`，額度恢復後逐 commit 補跑。

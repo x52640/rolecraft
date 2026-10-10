@@ -24,6 +24,10 @@
 - P1-T031：在乾淨 macOS 使用者帳號跑安裝測試。
 - P1-T032：實際跑一次完整流程。
 
+## 待補 codex review（E4，額度恢復後逐 commit 跑）
+
+（尚無；每個 Task 收官後在此加一行：Task ID＋commit hash）
+
 ## 已知殘餘（記錄，不擋上線）
 
 - 全域 `~/.claude/skills/spec-discuss/codex-talk.mjs` 在非 git 目錄會失敗（缺 `--skip-git-repo-check`）；本 repo 已 git init，不再受影響。
