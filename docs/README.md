@@ -6,7 +6,7 @@
 2. `docs/specs/`：技術定義（索引 `docs/specs/README.md`）
 3. `docs/adr/`：決策理由，解釋 spec，不覆蓋 spec
 4. `docs/tasks/`：可執行任務；只引用 spec，不重抄欄位、狀態、規則
-5. `docs/CURRENT_TASK.md`：現在在飛什麼（100 行上限）
+5. `docs/CURRENT_TASK.md`：現在在飛什麼（100 行上限）；殘餘帳本 `docs/RESIDUALS.md`、待補 codex review `docs/REVIEW_QUEUE.md`
 
 `Spec.md` 與 `docs/spec-discussions/` 是歷史來源，不是現行需求。
 
