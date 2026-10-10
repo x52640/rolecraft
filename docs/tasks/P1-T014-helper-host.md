@@ -75,9 +75,16 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：傳輸層（框編解碼、來源驗證、依序處理的 host 迴圈）、分派表、4 個 handler（服務未接時回「尚未支援」）、固定欄位日誌、子行程端到端與 R7 靜態掃描測試
+- 已通過驗證：`npm run verify` 綠（Vitest 26 檔 246 測試；helper 7 檔 107 測試）
+- 下一步：對抗驗證（E3）後協調者收官
 - Blocker：無
 
 ## 完成結果
+
+- `apps/helper/src/bridge/`：`framing.ts`（native byte order 長度＋UTF-8 JSON；收 1 MiB、送 1 MB 上限；長度欄位先檢查再收內容；非法 UTF-8 算壞框；出錯後不重新同步）、`origin.ts`（`chrome-extension://<32 a–p>/` 逐字比對允許清單；清單來自環境變數 `ROLECRAFT_ALLOWED_ORIGINS`，未設＝全拒、格式錯＝不啟動；`NATIVE_HOST_NAME = com.rolecraft.helper` 與擴充功能端一致）、`dispatch.ts`（op 先比對 `BridgeOperation`，再用 contracts `BridgeRequest` strict 驗證；handler 例外與回應不合 schema 都回 `internal_error`；錯誤訊息固定文字不回填內容）、`host.ts`（主迴圈）、`logger.ts`（只寫 stderr、只收固定欄位，不記請求內容、例外訊息與堆疊）。
+- `apps/helper/src/handlers/`：每操作一檔；`services.ts` 定義 storage／pipeline 服務介面，目前 `createServices()` 全部未接，handler 回 `internal_error`＋`not_implemented` 字樣，不偽造成功。
+- `apps/helper/src/main.ts`：執行入口（`node apps/helper/src/main.ts <origin>`）；只從 argv 讀 origin、從環境變數讀允許清單。
+- 併發：contracts 信封沒有請求 ID，所以請求依抵達順序**逐一**處理、依序回覆；未回覆上限 32 則，超過斷線。
+- 結束碼：0 正常、1 設定錯、2 origin 被拒、3 框錯誤／未回覆過多、4 框被截斷。框錯誤時先回完已排隊的請求，再送一則 `invalid_request` 後斷線。
+- 待定：contracts 無「未實作」代碼與請求 ID（要平行處理或分塊時需改 contracts）；允許清單來源（環境變數由安裝程式寫入包裝檔）待 P1-T031 確認。
