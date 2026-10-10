@@ -1,0 +1,5 @@
+{
+  "verdict": "no_blockers",
+  "spec_sha256": "6f3d0b289b38e39e51f63788f0768fa449f330a84da7521a84071d8351bfe874",
+  "findings": []
+}

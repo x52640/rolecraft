@@ -1,0 +1,92 @@
+{
+  "slug": "rolecraft-v01",
+  "status": "converged",
+  "rounds": [
+    {
+      "label": "r1",
+      "sentAt": "2026-10-10T03:47:09.804Z",
+      "mode": "fresh",
+      "specSha256": "0afb837d77273358cb25b6fd39260acb091f648b67d27de699b64cb1d38617b9",
+      "sentFile": "docs/spec-discussions/rolecraft-v01/rounds/r1-sent.txt",
+      "codexFile": "docs/spec-discussions/rolecraft-v01/rounds/r1-codex.txt",
+      "durationMs": 83,
+      "exitCode": 1,
+      "outcome": "error"
+    },
+    {
+      "label": "r1",
+      "sentAt": "2026-10-10T04:01:23.797Z",
+      "mode": "fresh",
+      "specSha256": "0afb837d77273358cb25b6fd39260acb091f648b67d27de699b64cb1d38617b9",
+      "sentFile": "docs/spec-discussions/rolecraft-v01/rounds/r1-sent.txt",
+      "codexFile": "docs/spec-discussions/rolecraft-v01/rounds/r1-codex.txt",
+      "durationMs": 176349,
+      "exitCode": 0,
+      "outcome": "ok",
+      "usage": {
+        "input_tokens": 106119,
+        "cached_input_tokens": 81920,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 5930,
+        "reasoning_output_tokens": 2115
+      }
+    },
+    {
+      "label": "r2",
+      "sentAt": "2026-10-10T04:15:26.907Z",
+      "mode": "resume",
+      "specSha256": "55ff3a41e88b709852950be2e3091079e958e97a04e7c589283833d2e5654e01",
+      "sentFile": "docs/spec-discussions/rolecraft-v01/rounds/r2-sent.txt",
+      "codexFile": "docs/spec-discussions/rolecraft-v01/rounds/r2-codex.txt",
+      "durationMs": 192261,
+      "exitCode": 0,
+      "outcome": "ok",
+      "usage": {
+        "input_tokens": 396622,
+        "cached_input_tokens": 333824,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 12143,
+        "reasoning_output_tokens": 5252
+      }
+    },
+    {
+      "label": "final",
+      "sentAt": "2026-10-10T04:19:44.809Z",
+      "mode": "resume",
+      "specSha256": "1d2508ee55145438021488b8436b88c8bcbf579aa8c623df795f380900cc59b5",
+      "sentFile": "docs/spec-discussions/rolecraft-v01/rounds/final-sent.txt",
+      "codexFile": "docs/spec-discussions/rolecraft-v01/rounds/final-codex.txt",
+      "durationMs": 19715,
+      "exitCode": 0,
+      "outcome": "ok",
+      "usage": {
+        "input_tokens": 657441,
+        "cached_input_tokens": 499584,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 12496,
+        "reasoning_output_tokens": 5328
+      }
+    },
+    {
+      "label": "final2",
+      "sentAt": "2026-10-10T05:12:55.341Z",
+      "mode": "resume",
+      "specSha256": "6f3d0b289b38e39e51f63788f0768fa449f330a84da7521a84071d8351bfe874",
+      "sentFile": "docs/spec-discussions/rolecraft-v01/rounds/final2-sent.txt",
+      "codexFile": "docs/spec-discussions/rolecraft-v01/rounds/final2-codex.txt",
+      "durationMs": 18190,
+      "exitCode": 0,
+      "outcome": "ok",
+      "usage": {
+        "input_tokens": 955942,
+        "cached_input_tokens": 784896,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 12906,
+        "reasoning_output_tokens": 5441
+      }
+    }
+  ],
+  "createdAt": "2026-10-10T03:47:09.719Z",
+  "updatedAt": "2026-10-10T05:12:58.537Z",
+  "threadId": "01a123f6-50ac-7653-9fcb-81da5a43943a"
+}
