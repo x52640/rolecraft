@@ -6,7 +6,7 @@ depends_on: ["P1-T024", "P1-T023"]
 specs: ["resume-output.md", "evidence-model.md"]
 track: editor
 primary_repo: rolecraft
-write_paths: ["apps/editor/src/pages/resumes/", "apps/helper/src/handlers/resume/", "packages/contracts/src/bridge/editor/resume.ts", "apps/helper/src/main.ts", "apps/helper/src/handlers/export/export-create.ts", "apps/helper/src/handlers/export/export-create.test.ts", "docs/specs/bridge.md"]
+write_paths: ["apps/editor/src/pages/resumes/", "apps/helper/src/handlers/resume/", "packages/contracts/src/bridge/editor/resume.ts", "apps/helper/src/main.ts", "apps/helper/src/handlers/export/export-create.ts", "apps/helper/src/handlers/export/export-create.test.ts", "docs/specs/bridge.md", "apps/helper/src/handlers/export/__fixtures__/"]
 contract_change: none
 expected_commit: "feat(P1-T025): editor：逐段對照、接受與匯出前檢查"
 ---
