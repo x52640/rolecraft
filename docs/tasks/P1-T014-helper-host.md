@@ -88,3 +88,9 @@ npm run verify
 - 併發：contracts 信封沒有請求 ID，所以請求依抵達順序**逐一**處理、依序回覆；未回覆上限 32 則，超過斷線。
 - 結束碼：0 正常、1 設定錯、2 origin 被拒、3 框錯誤／未回覆過多、4 框被截斷。框錯誤時先回完已排隊的請求，再送一則 `invalid_request` 後斷線。
 - 待定：contracts 無「未實作」代碼與請求 ID（要平行處理或分塊時需改 contracts）；允許清單來源（環境變數由安裝程式寫入包裝檔）待 P1-T031 確認。
+
+### 對抗驗證修正
+
+- 壞框前的請求遺失：同一 stdin chunk 內「合法框＋壞框（壞 JSON 或長度超上限）」時，`FrameDecoder.push()` 丟錯連帶丟掉已解出的訊息，host 只送一則 `invalid_request`，擴充功能會把它當成第一個合法請求的回覆（無請求 ID、靠順序對應）；結果取決於 pipe 怎麼切 chunk。
+- 修法：`FrameDecoder` 新增 `decode(chunk) → { messages, error? }`，出錯時仍交出壞框之前的訊息；host 改用它，先照常排隊（仍檢查未回覆上限），回完後再送 `invalid_request` 並以 3 結束。`push()` 保留為會丟錯的簡便版（只給出錯就整個放棄的呼叫端，如測試讀回覆）。
+- 回歸測試：`framing.test.ts`（同 chunk 合法框＋壞 JSON／超長標頭：先交出訊息再回報錯誤）、`host.test.ts`（同 chunk 與分兩個 chunk 對照，回覆皆為 `[{ ok: true }, invalid_request]`、handler 呼叫 1 次）。

@@ -49,10 +49,18 @@ export function encodeFrame(value: unknown, maxBytes: number = MAX_OUTGOING_BYTE
   return Buffer.concat([writeLength(body.length), body]);
 }
 
+/** 一次餵入的結果：壞框之前已完整解出的訊息一律交出，不因後面的壞框而遺失。 */
+export interface DecodeResult {
+  messages: unknown[];
+  /** 這個 chunk 裡遇到的框錯誤；有錯時解碼器已停止，呼叫端應結束連線。 */
+  error?: FrameError;
+}
+
 /**
  * 串流解碼器：餵任意切法的 chunk，吐出完整訊息。
- * 長度欄位超過上限或 JSON 壞掉時丟 FrameError；呼叫端應直接結束連線，不嘗試重新同步。
+ * 長度欄位超過上限或 JSON 壞掉時回報 FrameError；呼叫端應直接結束連線，不嘗試重新同步。
  * 長度欄位在讀到內容前就檢查，所以不會為了惡意長度預先配置記憶體。
+ * 結果與 chunk 切法無關：同一 chunk 裡「合法框＋壞框」與分兩次送，交出的訊息相同。
  */
 export class FrameDecoder {
   private buffer: Buffer = Buffer.alloc(0);
@@ -63,24 +71,39 @@ export class FrameDecoder {
     this.maxBytes = maxBytes;
   }
 
-  push(chunk: Buffer): unknown[] {
-    if (this.failed) throw new FrameError('bad_json', '解碼器已因錯誤停止');
+  /** 不丟錯的版本：先交出壞框之前的訊息，再附上錯誤。host 用這個。 */
+  decode(chunk: Buffer): DecodeResult {
+    if (this.failed)
+      return { messages: [], error: new FrameError('bad_json', '解碼器已因錯誤停止') };
     this.buffer = this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk]);
     const messages: unknown[] = [];
     while (this.buffer.length >= HEADER_BYTES) {
       const length = readLength(this.buffer);
       if (length > this.maxBytes) {
         this.failed = true;
-        throw new FrameError(
+        const error = new FrameError(
           'incoming_too_large',
           `訊息 ${length} bytes 超過上限 ${this.maxBytes}`,
         );
+        return { messages, error };
       }
       if (this.buffer.length < HEADER_BYTES + length) break;
       const body = this.buffer.subarray(HEADER_BYTES, HEADER_BYTES + length);
       this.buffer = this.buffer.subarray(HEADER_BYTES + length);
-      messages.push(this.parse(body));
+      const parsed = this.parse(body);
+      if (parsed instanceof FrameError) return { messages, error: parsed };
+      messages.push(parsed.value);
     }
+    return { messages };
+  }
+
+  /**
+   * 會丟錯的簡便版：出錯時同一 chunk 已解出的訊息隨之捨棄。
+   * 只適合「出錯就整個放棄」的呼叫端（例如測試讀回覆）；需要依序回覆的 host 要用 decode()。
+   */
+  push(chunk: Buffer): unknown[] {
+    const { messages, error } = this.decode(chunk);
+    if (error) throw error;
     return messages;
   }
 
@@ -89,14 +112,14 @@ export class FrameDecoder {
     return this.buffer.length > 0;
   }
 
-  private parse(body: Buffer): unknown {
+  private parse(body: Buffer): { value: unknown } | FrameError {
     try {
       // fatal：非法 UTF-8 也算壞框，不默默換成替代字元。
       const text = new TextDecoder('utf-8', { fatal: true }).decode(body);
-      return JSON.parse(text) as unknown;
+      return { value: JSON.parse(text) as unknown };
     } catch {
       this.failed = true;
-      throw new FrameError('bad_json', '訊息不是合法 UTF-8 JSON');
+      return new FrameError('bad_json', '訊息不是合法 UTF-8 JSON');
     }
   }
 }

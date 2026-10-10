@@ -186,6 +186,45 @@ describe('startHost：框錯誤一律斷線', () => {
     expect(h.logger.text()).not.toContain('王小明');
   });
 
+  // 對抗驗證修正：壞框前已解出的請求不能遺失，結果與 pipe 怎麼切 chunk 無關。
+  describe.each([
+    ['壞 JSON', Buffer.concat([header(3), Buffer.from('{{{')])],
+    ['超長標頭', header(2048)],
+  ])('合法框＋%s', (_name, bad) => {
+    const run = async (chunks: Buffer[]) => {
+      let opened = 0;
+      const editor = {
+        open: () => {
+          opened += 1;
+          return Promise.resolve();
+        },
+      };
+      const h = host({ editor }, ALLOWED, { maxIncomingBytes: 1024 });
+      for (const chunk of chunks) {
+        h.input.write(chunk);
+        await delay(5);
+      }
+      expect(await h.exitCode).toBe(EXIT_CODES.protocol);
+      return { opened, replies: h.replies };
+    };
+    const expected = {
+      opened: 1,
+      replies: [
+        { ok: true },
+        { ok: false, error: { code: 'invalid_request', message: anyString } },
+      ],
+    };
+    const good = encodeFrame(requests.open_editor);
+
+    it('同一 chunk：先回合法請求，再送 invalid_request', async () => {
+      expect(await run([Buffer.concat([good, bad])])).toEqual(expected);
+    });
+
+    it('分兩個 chunk（對照）：結果一致', async () => {
+      expect(await run([good, bad])).toEqual(expected);
+    });
+  });
+
   it('截斷的框：stdin 結束時以 4 結束，不處理半截內容', async () => {
     const frame = encodeFrame(requests.open_editor);
     const h = host({ editor: { open: () => Promise.resolve() } });

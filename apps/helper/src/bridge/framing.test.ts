@@ -82,6 +82,20 @@ describe('FrameDecoder', () => {
     expect(codeOf(() => decoder.push(rawFrame('{}')))).toBe('bad_json');
   });
 
+  it.each([
+    ['bad_json', rawFrame('{"op":')],
+    ['incoming_too_large', header(17)],
+  ])('同一 chunk 合法框＋壞框（%s）：先交出已解出的訊息再回報錯誤', (code, bad) => {
+    const decoder = new FrameDecoder(16);
+    const { messages, error } = decoder.decode(Buffer.concat([rawFrame('{"a":1}'), bad]));
+    expect(messages).toEqual([{ a: 1 }]);
+    expect(error?.code).toBe(code);
+    expect(decoder.decode(rawFrame('{}'))).toMatchObject({
+      messages: [],
+      error: { code: 'bad_json' },
+    });
+  });
+
   it('截斷的框留下殘留位元組', () => {
     const decoder = new FrameDecoder();
     const frame = rawFrame('{"a":1}');

@@ -103,15 +103,8 @@ export function startHost(options: HostOptions): void {
 
   function onData(chunk: Buffer): void {
     if (closing) return;
-    let messages: unknown[];
-    try {
-      messages = decoder.push(chunk);
-    } catch (err) {
-      const code = err instanceof FrameError ? err.code : 'bad_json';
-      logger.log({ event: 'protocol_error', code });
-      shutdown(EXIT_CODES.protocol, failure('invalid_request', '框格式錯誤，結束連線'));
-      return;
-    }
+    // 壞框之前已解出的請求照常排隊（結果與 chunk 切法無關），再處理框錯誤。
+    const { messages, error } = decoder.decode(chunk);
     for (const message of messages) {
       if (pending >= maxPending) {
         logger.log({ event: 'protocol_error', code: 'too_many_pending' });
@@ -119,6 +112,10 @@ export function startHost(options: HostOptions): void {
         return;
       }
       enqueue(message);
+    }
+    if (error) {
+      logger.log({ event: 'protocol_error', code: error.code });
+      shutdown(EXIT_CODES.protocol, failure('invalid_request', '框格式錯誤，結束連線'));
     }
   }
 
