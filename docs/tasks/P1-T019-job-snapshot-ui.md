@@ -1,12 +1,12 @@
 ---
 id: P1-T019
 phase: 1
-status: blocked
+status: in_progress
 depends_on: ["P1-T016", "P1-T014", "P1-T041"]
 specs: ["jobs-and-messages.md"]
 track: editor
 primary_repo: rolecraft
-write_paths: ["apps/editor/src/pages/jobs/", "apps/helper/src/handlers/jobs/"]
+write_paths: ["apps/editor/src/pages/jobs/", "apps/helper/src/handlers/jobs/", "apps/helper/src/main.ts"]
 contract_change: none
 expected_commit: "feat(P1-T019): editor：職缺快照確認與手動貼上"
 ---
@@ -77,6 +77,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：讀必讀入口後開工
-- Blocker：等待相依：P1-T041
+- Blocker：無
 
 ## 完成結果

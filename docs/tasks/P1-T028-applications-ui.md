@@ -1,12 +1,12 @@
 ---
 id: P1-T028
 phase: 1
-status: blocked
+status: in_progress
 depends_on: ["P1-T027", "P1-T041"]
 specs: ["resume-output.md"]
 track: editor
 primary_repo: rolecraft
-write_paths: ["apps/editor/src/pages/applications/", "apps/helper/src/handlers/applications/"]
+write_paths: ["apps/editor/src/pages/applications/", "apps/helper/src/handlers/applications/", "apps/helper/src/main.ts"]
 contract_change: none
 expected_commit: "feat(P1-T028): editor：投遞紀錄"
 ---
@@ -75,6 +75,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：讀必讀入口後開工
-- Blocker：等待相依：P1-T027
+- Blocker：無
 
 ## 完成結果

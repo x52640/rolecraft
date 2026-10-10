@@ -1,7 +1,7 @@
 ---
 id: P1-T040
 phase: 1
-status: blocked
+status: in_progress
 depends_on: ["P1-T041", "P1-T027", "P1-T007"]
 specs: ["resume-output.md", "evidence-model.md"]
 track: helper

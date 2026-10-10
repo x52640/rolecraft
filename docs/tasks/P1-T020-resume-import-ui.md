@@ -1,12 +1,12 @@
 ---
 id: P1-T020
 phase: 1
-status: blocked
+status: in_progress
 depends_on: ["P1-T009", "P1-T016", "P1-T014", "P1-T041"]
 specs: ["resume-import.md"]
 track: editor
 primary_repo: rolecraft
-write_paths: ["apps/editor/src/pages/import/", "apps/helper/src/handlers/import/"]
+write_paths: ["apps/editor/src/pages/import/", "apps/helper/src/handlers/import/", "apps/helper/src/main.ts"]
 contract_change: none
 expected_commit: "feat(P1-T020): editor：履歷 PDF 匯入與校正"
 ---

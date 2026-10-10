@@ -1,7 +1,7 @@
 ---
 id: P1-T041
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T034"]
 specs: ["bridge.md", "architecture.md"]
 track: bridge
@@ -74,7 +74,7 @@ npm run verify
 ## 中斷／接手紀錄
 
 - 最後完成：contracts 47 個操作 schema、helper 分派表＋每操作一個 handler 檔、relay sender 規則、bridge.md 操作表與分塊協定、測試
-- 已通過驗證：worktree 內 `npm run verify` 綠（Vitest 1763 通過、9 略過；test:docs 15）
+- 已通過驗證：主樹 `npm run verify` 綠（Vitest 1850 通過）；對抗驗證（E3）屬實 3 項已修（巢狀 claimId、`messageDraftId`／`jobSnapshotId` 改 OpaqueId、職缺網址限 http(s)）；第二個審查角度（發送端與分派）回傳空結果
 - 下一步：協調者收官前跑對抗驗證（高風險 R7）
 - Blocker：無
 
@@ -98,3 +98,4 @@ npm run verify
   - P1-T025 → `resume/`：`generate.ts`、`list.ts`、`get.ts`、`accept-section.ts`、`reject-section.ts`、`edit-section.ts`、`delete-section.ts`、`confirm-section.ts`、`check-export.ts`
   - P1-T029 → `messages/`：`submit-message-capture.ts`、`request-draft.ts`、`list.ts`、`get.ts`、`update-draft.ts`
 - 測試：contracts（每操作合法請求、頂層／payload 多帶欄位、ID 欄位拒路徑／旗標／空白、各別規則、分塊邊界與 1 MB）；helper（分派表涵蓋全部操作、每操作恰有一個 handler 檔、未實作回 not_implemented、路徑類 ID 不進 handler 且不入日誌、最大塊可編碼成單框、contracts 鏡像列舉與 domain／resume-import 型別一致）；extension（content script 對每個非擷取操作被拒、擴充功能頁全部允許、合法的事實項確認從職缺頁送出不轉送）。
+- 協調者同步：ADR-0006 第 8 項已更新；第二波各頁 Task 的 write_paths 加入 `apps/helper/src/main.ts`（服務組裝）。

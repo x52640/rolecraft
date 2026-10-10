@@ -5,8 +5,13 @@
 <!-- index:start -->
 ## 進行中
 
+- P1-T019 editor：職缺快照確認與手動貼上（`docs/tasks/P1-T019-job-snapshot-ui.md`）
+- P1-T020 editor：履歷 PDF 匯入與校正（`docs/tasks/P1-T020-resume-import-ui.md`）
+- P1-T021 editor：專案資料夾匯入與預覽（`docs/tasks/P1-T021-project-import-ui.md`）
 - P1-T022 pipeline：文件分析成事實項（`docs/tasks/P1-T022-pipeline-analysis.md`）
-- P1-T041 橋接：編輯器頁面所需操作清單（`docs/tasks/P1-T041-bridge-editor-ops.md`）
+- P1-T028 editor：投遞紀錄（`docs/tasks/P1-T028-applications-ui.md`）
+- P1-T030 editor：供應商狀態與設定精靈（`docs/tasks/P1-T030-install-wizard-ui.md`）
+- P1-T040 helper：匯出接線（`docs/tasks/P1-T040-helper-export-wiring.md`）
 
 ## ready
 
