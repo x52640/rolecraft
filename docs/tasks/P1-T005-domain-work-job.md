@@ -1,13 +1,13 @@
 ---
 id: P1-T005
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T001"]
 specs: ["runtime-and-budget.md"]
 track: domain
 primary_repo: rolecraft
 write_paths: ["packages/domain/src/work-job/", "packages/domain/src/index.ts"]
-contract_change: none
+contract_change: additive
 expected_commit: "feat(P1-T005): domain：R9 工作單元狀態機"
 ---
 # domain：R9 工作單元狀態機
@@ -84,6 +84,6 @@ npm run verify
 - `packages/domain/src/work-job/`：`policy.ts`（重試上限 2、間隔 2s→4s 倍增）、`state.ts`（`WorkRun` ＝ 可持久化 WorkJob＋記憶體中的進行中嘗試、建立／還原）、`transitions.ts`（startUnit、completeUnit、failUnit、cancelJob、resumeJob）。全部純函式；重試時間由呼叫端注入 `now`。
 - 取消後晚到結果：每次送出帶呼叫端產生的 `attemptId`，不符目前嘗試的結果／錯誤一律丟棄（含續跑後舊嘗試回來）。
 - 暫時性錯誤重試用盡 → 暫停 `retries_exhausted`；輔助程式重開時執行中的工作 → 暫停 `interrupted`；都只能使用者續跑（D21），續跑需 R6 通過旗標。
-- 服務／模型記在單元；同一單元重試中不得切換；續跑時清掉第一個未完成單元的紀錄與重試次數，可改用別的服務。
+- 服務／模型記在單元；同一單元重試中不得切換；續跑時清掉第一個待處理單元的紀錄與重試次數，可改用別的服務。
 - contracts：`PauseReason` 加 `retries_exhausted`、`interrupted`（additive）；ADR-0006 第 7 列定案。
 - 未涵蓋（不屬 domain）：S9-11「無自動加購、付費回退」由 providers（P1-T010）負責；「通過檢查」由呼叫端在 completeUnit 前完成。

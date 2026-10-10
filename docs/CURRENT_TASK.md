@@ -7,7 +7,6 @@
 
 - P1-T002 domain：事實項狀態與 R1 匯出前檢查（`docs/tasks/P1-T002-domain-evidence.md`）
 - P1-T003 domain：R2 來源變更判定（`docs/tasks/P1-T003-domain-source-change.md`）
-- P1-T005 domain：R9 工作單元狀態機（`docs/tasks/P1-T005-domain-work-job.md`）
 - P1-T006 storage：SQLite schema 與 repository（`docs/tasks/P1-T006-storage-core.md`）
 - P1-T008 sources：資料夾列舉、授權集合與安全讀檔（`docs/tasks/P1-T008-sources-authorization.md`）
 - P1-T009 resume-import：PDF 文字層擷取（`docs/tasks/P1-T009-resume-import-pdf.md`）
@@ -39,6 +38,7 @@
 - P1-T001 `7b4da39`
 - P1-T013 `3265187`
 - P1-T004 `f569c68`
+- P1-T005 `fb412f7`
 
 ## 已知殘餘（記錄，不擋上線）
 
