@@ -76,9 +76,17 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：spike（`scripts/spikes/claude/`）實測 16 次 CLI 呼叫（模型 10 次），ADR-0002 寫完，open-verifications 已註記
+- 已通過驗證：isolated-injection 全項 PASS（3 次）；對照組證明誘餌有效；`npm run verify` 綠
+- 下一步：協調者收官（E3 對抗驗證）；P1-T012 依 ADR-0002 §6 實作
 - Blocker：無
 
 ## 完成結果
+
+- 結論：Claude 過得了 R5／R6，D13 不需改走 Codex。詳見 `docs/adr/0002-claude-cli-isolation.md`。
+- 正式命令列：`-p --model <MODEL_SLOT> --output-format stream-json --verbose --tools "" --strict-mcp-config --setting-sources "" --safe-mode --disable-slash-commands --no-chrome --no-session-persistence --permission-mode dontAsk`，提示走 stdin。
+- 關鍵發現：HOME 必須是真實 HOME（假 HOME／`CLAUDE_CONFIG_DIR` 會登出）；`--safe-mode` 擋 CLAUDE.md／外掛／hooks／claude.ai 連接器但不擋 settings 的 apiKeyHelper／env，`--setting-sources ""` 兩者缺一不可；`--settings` 即使在隔離旗標下仍會改走 API key，必須禁用；`--strict-mcp-config` 擋不住 claude.ai 連接器（靠 safe-mode）。
+- R6-1：`claude auth status --json` 的 `authMethod`（claude.ai／api_key_helper）＋ init 事件 `apiKeySource`（none 才是訂閱）。
+- R8：只能從 result 的 `modelUsage.<模型>.contextWindow` 取得。R9：串流有 `rate_limit_event`（status、utilization、resetsAt）。
+- spike：`scripts/spikes/claude/`（run／cases／fixtures／lib），預設只印計畫，`--live` 才呼叫。
+- 殘餘：本機訊息 socket `/tmp/cc-socks/<pid>.sock` 關不掉；CLI 每次改寫 `~/.claude.json`；受管設定不受隔離旗標影響；使用者層 apiKeyHelper 被忽略是推論（靠執行前 auth status 擋）。

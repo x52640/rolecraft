@@ -15,8 +15,8 @@
 - macOS／Windows 支援順序、安裝包、簽章與發布方式。
 - 履歷模板、頁數、中文／英文需求。
 - 第二階段官方 App 語音的資料交接與附件處理方式。
-- 〔補〕各家官方 CLI 能否照 R5 執行：關閉全部工具、不載入使用者的設定／指令檔／hooks／MCP／外掛，同時仍走訂閱登入。本機 help 有相關旗標（claude 2.1.296：`--tools ""`、`--safe-mode`、`--strict-mcp-config`；codex 0.159.3：`--ignore-user-config`、`shell_tool` 功能開關；agy 1.3.2 的 help 未見對應旗標），都還沒實測。
-- 〔補〕各家能否由工具自己回報「目前的登入／計費方式」（R6）。〔D12 後，額外用量是否啟用不再需要驗證〕
-- 〔補〕各模型在訂閱路線下的上下文上限（R8）。
+- 〔補〕各家官方 CLI 能否照 R5 執行：關閉全部工具、不載入使用者的設定／指令檔／hooks／MCP／外掛，同時仍走訂閱登入。本機 help 有相關旗標（claude 2.1.296：`--tools ""`、`--safe-mode`、`--strict-mcp-config`；codex 0.159.3：`--ignore-user-config`、`shell_tool` 功能開關；agy 1.3.2 的 help 未見對應旗標），都還沒實測。→ ADR-0002：claude 已實測通過（`--tools ""`＋`--strict-mcp-config`＋`--setting-sources ""`＋`--safe-mode` 等，HOME 須為真實 HOME，`--settings` 須禁用）；codex、agy 未驗證。
+- 〔補〕各家能否由工具自己回報「目前的登入／計費方式」（R6）。〔D12 後，額外用量是否啟用不再需要驗證〕→ ADR-0002：claude 可由 `auth status --json`（authMethod、subscriptionType）與 stream-json init 的 `apiKeySource` 回報；codex、agy 未驗證。
+- 〔補〕各模型在訂閱路線下的上下文上限（R8）。→ ADR-0002：claude 只能從執行結果 `modelUsage.<模型>.contextWindow` 取得（haiku 實測 1000000）；codex、agy 未驗證。
 - 〔補〕各平台的投遞流程能否附上自訂 PDF，以「具體投遞流程」為單位驗證（同一站可能有多種）。不能附的流程，F07 產出的 PDF 只能用於站外投遞，實際投出版本的記法依 D20。
 - 〔補〕擴充功能與安裝包在自用（D17）下的安裝路線（開發人員模式載入或上架商店、簽章）與費用。
