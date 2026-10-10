@@ -12,7 +12,6 @@
 - P1-T010 providers：適配介面、環境清理與 R6 紀錄（`docs/tasks/P1-T010-providers-core.md`）
 - P1-T014 helper：橋接端點與操作清單分派（`docs/tasks/P1-T014-helper-host.md`）
 - P1-T016 editor：React 骨架與路由（`docs/tasks/P1-T016-editor-skeleton.md`）
-- P1-T026 驗證：中文 PDF 匯出方式（`docs/tasks/P1-T026-spike-pdf-export.md`）
 
 ## ready
 
@@ -42,6 +41,7 @@
 - P1-T009 `3c5e934`
 - P1-T006 `3eed0e7`
 - P1-T015 `859b505`
+- P1-T026 `9ea7487`
 
 ## 已知殘餘（記錄，不擋上線）
 

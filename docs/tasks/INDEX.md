@@ -32,7 +32,7 @@
 | [P1-T023](P1-T023-claims-review-ui.md) | editor：事實項檢視與確認 | blocked | 1 | editor | P1-T022、P1-T016 |
 | [P1-T024](P1-T024-pipeline-resume-gen.md) | pipeline：職缺匹配與段落生成 | blocked | 1 | pipeline | P1-T022、P1-T019 |
 | [P1-T025](P1-T025-resume-editor-ui.md) | editor：逐段對照、接受與匯出前檢查 | blocked | 1 | editor | P1-T024、P1-T023 |
-| [P1-T026](P1-T026-spike-pdf-export.md) | 驗證：中文 PDF 匯出方式 | in_progress | 1 | pdf | P0-T001 |
+| [P1-T026](P1-T026-spike-pdf-export.md) | 驗證：中文 PDF 匯出方式 | done | 1 | pdf | P0-T001 |
 | [P1-T027](P1-T027-pdf-export.md) | pdf-export：中文模板與匯出檢查 | blocked | 1 | pdf | P1-T026、P1-T007 |
 | [P1-T028](P1-T028-applications-ui.md) | editor：投遞紀錄 | blocked | 1 | editor | P1-T027 |
 | [P1-T029](P1-T029-message-drafts.md) | 招募訊息回覆草稿（手動貼上） | blocked | 1 | pipeline | P1-T024、P1-T016 |
