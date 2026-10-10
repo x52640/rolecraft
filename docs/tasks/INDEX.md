@@ -35,7 +35,7 @@
 | [P1-T026](P1-T026-spike-pdf-export.md) | 驗證：中文 PDF 匯出方式 | done | 1 | pdf | P0-T001 |
 | [P1-T027](P1-T027-pdf-export.md) | pdf-export：中文模板與匯出檢查 | done | 1 | pdf | P1-T026、P1-T007 |
 | [P1-T028](P1-T028-applications-ui.md) | editor：投遞紀錄 | done | 1 | editor | P1-T027、P1-T041 |
-| [P1-T029](P1-T029-message-drafts.md) | 招募訊息回覆草稿（手動貼上） | in_progress | 1 | pipeline | P1-T024、P1-T016 |
+| [P1-T029](P1-T029-message-drafts.md) | 招募訊息回覆草稿（手動貼上） | done | 1 | pipeline | P1-T024、P1-T016 |
 | [P1-T030](P1-T030-install-wizard-ui.md) | editor：供應商狀態與設定精靈 | done | 1 | editor | P1-T012、P1-T016、P1-T014、P1-T041 |
 | [P1-T031](P1-T031-macos-installer.md) | macOS 安裝包與乾淨環境測試 | blocked | 1 | infra | P1-T030、P1-T018 |
 | [P1-T032](P1-T032-phase1-gate.md) | 第一階段驗收閘門 | blocked | 1 | infra | P1-T020、P1-T021、P1-T023、P1-T025、P1-T028、P1-T029、P1-T031 |

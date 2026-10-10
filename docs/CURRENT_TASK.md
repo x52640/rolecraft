@@ -5,7 +5,7 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T029 招募訊息回覆草稿（手動貼上）（`docs/tasks/P1-T029-message-drafts.md`）
+- 無
 
 ## ready
 
