@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { rmSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 
 import {
   BRIDGE_CHUNK_BYTES,
@@ -10,6 +12,7 @@ import type { PdfExportOutcome } from '@rolecraft/pdf-export';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createServices } from '../../main.ts';
+import { FILES_DIR } from '../../services/runtime.ts';
 import { HANDLERS } from '../registry.ts';
 import type { HelperServices } from '../services.ts';
 import { exportTestbed, fakePdf, VERSION_ID } from './__fixtures__/testbed.ts';
@@ -71,6 +74,55 @@ describe('export.list_versions／get_version', () => {
       const response = await call(op, { exportVersionId: 'nope', chunkIndex: 0 }, services);
       expect(response).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
     }
+  });
+});
+
+describe('export.list_versions：單筆 PDF 遺失或被改動', () => {
+  it('只略過該筆，其他版本照常列出；該版本內容仍可讀', async () => {
+    const bed = exportTestbed();
+    cleanups.push(bed.cleanup);
+    let n = 0;
+    const report = { issues: [], pageCount: 1, browserVersion: 'fake', extractedText: '' };
+    const exportPdf = (): Promise<PdfExportOutcome> =>
+      Promise.resolve({ ok: true, pdf: fakePdf(`v${++n}`), report });
+    const services: HelperServices = {
+      pdfExport: createExportService({ ...bed.runtime, exportPdf }),
+    };
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const created = await call('export.create', { resumeVersionId: VERSION_ID }, services);
+      ids.push((created.outcome as { exportVersionId: string }).exportVersionId);
+    }
+    const [missing, tampered, intact] = ids.map((id) => bed.runtime.exports.get(id));
+    if (!missing || !tampered || !intact) throw new Error('應有版本');
+    const fileOf = (hash: string) =>
+      path.join(bed.dir, FILES_DIR, 'sha256', hash.slice(0, 2), hash);
+    rmSync(fileOf(missing.pdfHash));
+    writeFileSync(fileOf(tampered.pdfHash), 'tampered');
+
+    const list = await call('export.list_versions', {}, services);
+    expect(list).toMatchObject({ ok: true });
+    expect((list.versions as { exportVersionId: string }[]).map((v) => v.exportVersionId)).toEqual([
+      intact.id,
+    ]);
+    const got = await call('export.get_version', { exportVersionId: missing.id }, services);
+    expect(got).toMatchObject({ ok: true, version: { id: missing.id } });
+  });
+
+  it('非儲存區錯誤照拋（不吞掉程式錯誤）', () => {
+    const bed = exportTestbed();
+    cleanups.push(bed.cleanup);
+    const broken = createExportService({
+      ...bed.runtime,
+      exports: {
+        ...bed.runtime.exports,
+        list: () => [{ id: 'x' } as unknown as ReturnType<typeof bed.runtime.exports.list>[number]],
+        readPdf: () => {
+          throw new TypeError('bug');
+        },
+      },
+    });
+    expect(() => broken.listVersions()).toThrow('bug');
   });
 });
 
