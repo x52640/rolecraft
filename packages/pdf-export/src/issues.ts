@@ -22,6 +22,11 @@ export type PdfIssue =
       readonly expected: string;
       readonly actual: string;
     }
+  /**
+   * 字形（一部分）畫在頁面外：pdfjs 只丟掉整個落在頁外的字，跨過頁緣的字仍會擷取到，
+   * 碼位比對抓不到，但印出來被裁掉。text 是該段文字。
+   */
+  | { readonly code: 'text_out_of_page'; readonly page: number; readonly text: string }
   /** 超過 D15 的 2 頁上限 */
   | { readonly code: 'page_limit'; readonly pages: number; readonly max: number }
   /** 整頁沒有文字 */

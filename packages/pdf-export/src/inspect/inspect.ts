@@ -30,12 +30,31 @@ export interface PdfInspection {
   readonly issues: readonly PdfIssue[];
 }
 
-/**
- * 截斷不另做座標檢查：pdfjs 擷取時會丟掉畫在頁面外的字（實測），
- * 所以被裁掉的字一定反映在碼位比對（text_mismatch）。
- */
 function pageText(page: PdfPageContent): string {
   return page.items.map((i) => i.str).join('');
+}
+
+/** 座標容差（PDF point），吸收浮點誤差。 */
+const EDGE_TOLERANCE = 0.5;
+
+/**
+ * 截斷有兩種：整個字落在頁外 → pdfjs 擷取時丟掉，反映在碼位比對；
+ * 字的起點在頁內、字形跨過頁緣 → 仍會擷取到，要靠這裡的座標檢查（P1-T038 實測）。
+ */
+function outOfPageIssues(pages: readonly PdfPageContent[]): PdfIssue[] {
+  return pages.flatMap((page) => {
+    const [x0, y0, x1, y1] = page.view;
+    return page.items
+      .filter((i) => i.str.trim() !== '')
+      .filter(
+        (i) =>
+          i.x < x0 - EDGE_TOLERANCE ||
+          i.y < y0 - EDGE_TOLERANCE ||
+          i.x + i.width > x1 + EDGE_TOLERANCE ||
+          i.y + i.height > y1 + EDGE_TOLERANCE,
+      )
+      .map((i): PdfIssue => ({ code: 'text_out_of_page', page: page.pageNumber, text: i.str }));
+  });
 }
 
 function normalizeHref(href: string): string {
@@ -113,6 +132,7 @@ export async function inspectPdf(
   issues.push(...paginationIssues(pages, expect.keepWithNext));
   const mismatch = compareText(stripWhitespace(expect.text), stripWhitespace(extractedText));
   if (mismatch !== null) issues.push(mismatch);
+  issues.push(...outOfPageIssues(pages));
   issues.push(...linkIssues(pages, expect.hrefs));
   issues.push(...fontIssues(fonts, expect.allowedFonts));
   return { pageCount: pages.length, fonts, extractedText, issues };

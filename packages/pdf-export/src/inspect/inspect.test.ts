@@ -86,6 +86,28 @@ describe('inspectPdf（匯出後檢查，以 pdf-lib 造 PDF）', () => {
     expect(codes(result.issues)).toContain('text_mismatch');
   });
 
+  it('字形一部分超出頁面右緣（pdfjs 仍會擷取）要擋', async () => {
+    const pdf = await makePdf([{ texts: [{ text: 'W', x: A4[0] - 5 }] }]);
+    const result = await inspectPdf(pdf, { ...ALLOW_HELVETICA, text: 'W' });
+    expect(codes(result.issues)).not.toContain('text_mismatch');
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ code: 'text_out_of_page', page: 1, text: 'W' }),
+    );
+  });
+
+  it('字形超出頁面上緣要擋', async () => {
+    const pdf = await makePdf([{ texts: [{ text: 'Top', y: A4[1] - 3 }] }]);
+    const result = await inspectPdf(pdf, { ...ALLOW_HELVETICA, text: 'Top' });
+    expect(codes(result.issues)).toContain('text_out_of_page');
+  });
+
+  it('µ（U+00B5）不會被 pdfjs 正規化成 μ（U+03BC）而誤擋', async () => {
+    const pdf = await makePdf([{ texts: [{ text: '10 µm' }] }]);
+    const result = await inspectPdf(pdf, { ...ALLOW_HELVETICA, text: '10 µm' });
+    expect(codes(result.issues)).toEqual(['font_not_embedded']);
+    expect(result.extractedText).toContain('\u00b5');
+  });
+
   it('缺少連結與多出連結', async () => {
     const pdf = await makePdf([{ texts: [{ text: 'X' }], links: ['https://evil.example/'] }]);
     const result = await inspectPdf(pdf, {

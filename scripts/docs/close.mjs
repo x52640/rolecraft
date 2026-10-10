@@ -16,11 +16,12 @@ export function closeBlockers(task) {
   if (task.data.status !== 'in_progress') {
     errors.push(`${task.rel}：status 是 ${task.data.status}，只有 in_progress 能收官`);
   }
+  // 缺「## 完成結果」段時 sectionOf 回 null，和空段落一樣擋下（P1-T038）。
   const result = sectionOf(task.body, '完成結果');
-  // 行內程式碼（反引號）裡的字是名稱，不是待辦（例如檔名 `TODO`）。
-  const prose = result.replace(/`[^`\n]*`/g, '');
   if (!result) errors.push(`${task.rel}：「完成結果」是空的`);
   else {
+    // 行內程式碼（反引號）裡的字是名稱，不是待辦（例如檔名 `TODO`）。
+    const prose = result.replace(/`[^`\n]*`/g, '');
     for (const word of FORBIDDEN_IN_RESULT) {
       if (prose.includes(word)) errors.push(`${task.rel}：「完成結果」含有「${word}」`);
     }

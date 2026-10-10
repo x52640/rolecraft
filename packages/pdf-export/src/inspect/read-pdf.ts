@@ -67,7 +67,9 @@ export async function readPdf(bytes: Uint8Array): Promise<PdfPageContent[]> {
     for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
       const page = await doc.getPage(pageNumber);
       const [x0 = 0, y0 = 0, x1 = 0, y1 = 0] = page.view;
-      const content = await page.getTextContent();
+      // 關掉 pdfjs 的 Unicode 正規化（預設會把 µ U+00B5 轉成 μ U+03BC、ﬁ 拆成 fi），
+      // 讀回的就是 PDF 實際寫的碼位；康熙部首不在 pdfjs 正規化範圍內，原本就照實讀回。
+      const content = await page.getTextContent({ disableNormalization: true });
       const rawItems: readonly unknown[] = content.items;
       const items: PdfTextItem[] = rawItems.filter(isTextItem).map((it) => {
         const [, , c = 0, d = 1, e = 0, f = 0] = it.transform;

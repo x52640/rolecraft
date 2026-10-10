@@ -131,4 +131,32 @@ describe.runIf(process.env.RUN_CHROME === '1')('Chrome 列印（RUN_CHROME=1）'
     },
     TIMEOUT,
   );
+
+  it(
+    '文字超出頁寬（不換行長字串）：Chrome 整字丟掉超出的字形，由碼位比對擋下',
+    async () => {
+      const browser = await findChrome();
+      if (browser === null) throw new Error('找不到 Chrome');
+      const text = 'W'.repeat(120);
+      const html = `<!doctype html><meta charset="utf-8"><style>
+        @font-face { font-family: F; src: url(${dataUrl(fonts.regular)}); }
+        @page { size: A4; margin: 12mm; }
+        body { margin: 0; font: 12pt F; white-space: nowrap; }
+      </style><p>${text}</p>`;
+      const { pdf } = await printHtmlToPdf(html, { executablePath: browser });
+      const result = await inspectPdf(pdf, {
+        text,
+        keepWithNext: [],
+        hrefs: [],
+        allowedFonts: [describeFont(fonts.regular).postscriptName],
+        maxPages: 2,
+      });
+      // P1-T038 實測：Chrome 把超出的字形整個不輸出，沒有留下跨頁緣的半個字；
+      // 若哪天 Chrome 改成輸出跨頁緣字形，改由 text_out_of_page 擋。兩者任一即可。
+      const codes = result.issues.map((i) => i.code);
+      expect(codes.some((c) => c === 'text_mismatch' || c === 'text_out_of_page')).toBe(true);
+      expect(result.extractedText.length).toBeLessThan(text.length);
+    },
+    TIMEOUT,
+  );
 });

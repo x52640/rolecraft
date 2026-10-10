@@ -142,6 +142,16 @@ test('task:close：完成結果空白或含 TODO 拒絕且不改檔', () => {
   assert.match(read(file), /status: in_progress/);
 });
 
+test('task:close：缺「## 完成結果」段時回報錯誤而不是崩潰，且不改檔', () => {
+  const file = 'docs/tasks/P0-T002-next.md';
+  write(file, read(file).replace('## 完成結果\n', '## 其他\n'));
+  const before = read(file);
+  const result = closeTask(root, 'P0-T002');
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(), /「完成結果」是空的/);
+  assert.equal(read(file), before);
+});
+
 test('task:close：成功時改 done、更新 index、verify 通過', () => {
   const file = 'docs/tasks/P0-T002-next.md';
   write(file, read(file).replace('## 完成結果\n', '## 完成結果\n\n- 全部完成\n'));

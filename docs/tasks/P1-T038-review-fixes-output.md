@@ -61,15 +61,21 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 各項修正與回歸測試
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 各項修正與回歸測試
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀分類結果與 PoC 後開工
+- 最後完成：triage-D 5 項全部修正並附回歸測試
+- 已通過驗證：`npm run verify`、`npm run build`、`RUN_CHROME=1` 的 Chrome 整合測試、`npm run sample`（1 頁與 2 頁皆通過）
+- 下一步：協調者審查後收官
 - Blocker：無
 
 ## 完成結果
+
+- **pdfjs 正規化誤擋**：`read-pdf.ts` 的 `getTextContent` 改用 `disableNormalization: true`，讀回 PDF 實際碼位；µ（U+00B5）不再被轉成 μ 而誤報 `text_mismatch`。康熙部首不在 pdfjs 正規化範圍，Chrome 康熙部首回測照樣擋下。
+- **文字超出頁緣（valid?）判定：PDF 層面成立，已加檢查**。實測 pdfjs 只丟掉「整個」落在頁外的字形；起點在頁內、字形跨過頁緣的字仍會擷取到，碼位比對抓不到（pdf-lib PoC 於右緣與上緣皆重現）。新增 `text_out_of_page` 座標檢查（block）。另以 Chrome 實測不換行長字串：Chrome 把超出的字形整個不輸出、沒有留下半個字，由 `text_mismatch` 擋下；新檢查是 Chrome 行為改變時的防線。Chrome 測試只在 `RUN_CHROME=1` 跑。
+- **sample 指令**：`package.json` 改指 `scripts/render-sample.mjs`，新增測試確認各 script 指向的檔案存在；實跑 `npm run sample` 通過。
+- **104 擷取提示**：新增 `sites/104/notice.ts`，擷取不到、轉送失敗或回應 `ok:false` 時在頁面右上角顯示提示（shadow DOM、純文字、可關閉），請使用者改用編輯器手動貼上；不加權限、不改 background。
+- **task:close 崩潰**：缺「## 完成結果」段時 `closeBlockers` 不再對 null 呼叫 `replace`，改回報「完成結果是空的」且不改檔。
