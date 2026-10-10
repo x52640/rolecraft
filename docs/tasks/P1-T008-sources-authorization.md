@@ -74,9 +74,18 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：實作與測試完成，單一 commit（未 push）
+- 已通過驗證：`npm run verify` 綠；sources 5 檔 98 測試
+- 下一步：協調者收官前跑 E3 對抗驗證
 - Blocker：無
 
 ## 完成結果
+
+- 結構（`packages/sources/src/`）：`types.ts`（FolderAccess 埠與對外型別）、`path-rules.ts`（乾淨相對路徑）、`filter.ts`（白名單篩選、優先序、二進位偵測）、`registry.ts`（SourceRegistry：列舉、授權集合、增量更新、只收項目 ID 的 read、讀檔紀錄與拒絕提示）、`node-folder-access.ts`（本機 fs 實作）。
+- 機制分離：registry 不碰檔案系統，列舉與讀取由注入的 `FolderAccess` 完成；P1-T013 若改成「瀏覽器讀內容送 helper」，只需另寫一個 FolderAccess（registry 測試已用記憶體假資料夾跑過同一流程）。
+- 篩選：副檔名白名單（md、markdown、txt、text、rst、adoc、asciidoc、org；無副檔名只限 README、CHANGELOG、TODO、PLAN、AGENTS、CLAUDE）；檔名任一段是原始碼副檔名就排除（擋 `main.py.txt`）；隱藏檔／隱藏資料夾、憑證類（副檔名與檔名片段）、相依與建置資料夾、超過 1 MiB 排除。自訂檔名只提高優先序。
+- 安全讀檔（本機版）：lstat → `O_NOFOLLOW|O_NONBLOCK` 開檔 → fstat 一般檔 → realpath 必須完全等於「資料夾實際路徑＋相對路徑」→ realpath 的 inode 與 fd 相同 → 讀至上限＋1 位元組。registry 另做：狀態複查（讀取前後各一次，期間被取消勾選或移除資料夾就不交出內容）、類型複查、二進位／非 UTF-8 拒絕、sha256。
+- 讀檔紀錄只記成功讀取（項目 ID、資料夾、路徑、時間、sha256）；被拒嘗試另存 `rejections()` 供提示，避免紀錄混入未授權路徑。
+- 測試：S9-14 五子句各一（最後一句拆三個：換 symlink、換目錄、換二進位）＋ symlink 迴圈、中間資料夾換 symlink（外部／內部）、根資料夾被換、FIFO、`..`／絕對路徑、大小寫同名、隱藏檔、憑證檔名、原始碼偽裝。
+- 待裁定／殘餘：(1) 讀檔紀錄目前只在記憶體＋`onRead` 回呼，持久化待 storage 接；(2) 篩選偏保守，`node.js.md`、`design-tokens.md` 這類檔名會被誤擋，使用者無法覆寫；(3) 「.md 裡其實是原始碼」無法靠檔名判斷，只擋二進位；(4) 開檔與 realpath 檢查之間仍有理論競態，但 inode 比對保證交出的內容來自檢查當下位於預期路徑的檔案；(5) SourceDocument 的 contentVersion 與 R2 變更判定未接（不在本 Task）。
+

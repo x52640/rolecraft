@@ -1,2 +1,12 @@
-/** 佔位：sources 的公開入口，實作由後續 Task 補上。 */
+/** sources 的公開入口：資料夾列舉、文件篩選、授權集合、安全讀檔與讀檔紀錄（R4）。 */
 export const PACKAGE_NAME = '@rolecraft/sources';
+
+export type * from './types.ts';
+export {
+  classifyEntry,
+  classifyName,
+  DEFAULT_MAX_FILE_BYTES,
+  type FilterOptions,
+} from './filter.ts';
+export { SourceRegistry, type RegistryOptions } from './registry.ts';
+export { createNodeFolderAccess, type NodeFolderAccessOptions } from './node-folder-access.ts';
