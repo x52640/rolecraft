@@ -48,7 +48,7 @@
 | [P1-T039](P1-T039-claude-auto-reverify.md) | Claude CLI 版本變更時自動重新驗證 | ready | 1 | providers | P1-T012、P1-T037 |
 | [P1-T040](P1-T040-helper-export-wiring.md) | helper：匯出接線 | blocked | 1 | helper | P1-T041、P1-T027、P1-T007 |
 | [P1-T041](P1-T041-bridge-editor-ops.md) | 橋接：編輯器頁面所需操作清單 | ready | 1 | bridge | P1-T034 |
-| [P1-T042](P1-T042-readme.md) | README 與開源說明文件 | in_progress | 1 | readme | — |
+| [P1-T042](P1-T042-readme.md) | README 與開源說明文件 | done | 1 | readme | — |
 
 ## 依賴清單
 

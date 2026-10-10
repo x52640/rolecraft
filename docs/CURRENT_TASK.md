@@ -5,7 +5,7 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T042 README 與開源說明文件（`docs/tasks/P1-T042-readme.md`）
+- 無
 
 ## ready
 
