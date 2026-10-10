@@ -5,10 +5,12 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { nodeAsCli } from '../fake/node-cli.ts';
 import { CommandPolicyError, defineCommand, MODEL_SLOT } from './command.ts';
 import { createLauncher, type SpawnFn } from './process.ts';
 
-const NODE = process.execPath;
+/** node 的符號連結（執行檔不得名為 node，見 assertExecutablePath） */
+const NODE = nodeAsCli();
 const ENV = { PATH: process.env['PATH'] ?? '/usr/bin' };
 
 let cwd: string;
@@ -27,6 +29,7 @@ describe('createLauncher：不經 shell', () => {
     const cmd = defineCommand([
       '-e',
       'process.stdout.write(JSON.stringify(process.argv.slice(1)))',
+      // eslint-disable-next-line no-restricted-syntax -- 故意塞入 shell 特殊字元，驗證不經 shell
       evil as '$(touch)',
     ]);
     const out = await launch({ executablePath: NODE, command: cmd });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createFakeAdapter } from '../fake/fake-adapter.ts';
+import { nodeAsCli } from '../fake/node-cli.ts';
 import type { ProviderAdapter } from './adapter.ts';
 import { defineCommand, MODEL_SLOT } from './command.ts';
 import { checkConnection, type ConnectionDeps } from './connection.ts';
@@ -66,7 +67,7 @@ describe('真實子程序路徑（以 node 代替 CLI，不呼叫任何 AI CLI�
       Promise.resolve({ subscriptionLogin: passed, cliConfig: passed, executionMode: passed }),
     execute: async ({ launch, model, prompt, signal }) => {
       const out = await launch({
-        executablePath: process.execPath,
+        executablePath: nodeAsCli(),
         command: echo,
         model,
         stdin: prompt,

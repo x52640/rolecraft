@@ -85,7 +85,7 @@ npm run verify
   - `adapter.ts`：ProviderAdapter 介面（偵測安裝、登入／資格、模型、`verifySubscriptionRoute`、執行、取消用 AbortSignal、錯誤分類 quota_exhausted／transient／other／cancelled）；`SupportStatus`（supported／not_supported「尚未支援」／cannot_confirm「無法確認」）。
   - `billing-env.ts`：計費環境變數**唯一清單**（Anthropic、OpenAI／Codex、Google／Vertex、AWS／Bedrock、Azure，附來源）＋關鍵字（API_KEY 等）與前綴兜底；不分大小寫、`-` 視同 `_`。
   - `environment.ts`：白名單帶出＋黑名單優先；適配器政策放行或設定計費變數直接丟錯；只回報被移除的名稱，不記值。
-  - `command.ts`：`defineCommand` 只收字面值（型別層拒絕寬型別 string、執行時登記表＋凍結）；唯一變數是 `MODEL_SLOT`（模型 ID 嚴格格式，不得 `-` 開頭）；`API_KEY_MODE_FLAGS`（claude `--bare`）。
+  - `command.ts`：`defineCommand` 只收字面值（型別層拒絕寬型別 string 與含插值的樣板型別、ESLint 禁止非字面量引數、執行時登記表＋凍結；原宣稱「型別層拒絕寬型別」不足以擋模板字串，見下方對抗驗證修正）；唯一變數是 `MODEL_SLOT`（模型 ID 嚴格格式，不得 `-` 開頭）；`API_KEY_MODE_FLAGS`（claude `--bare`）。
   - `process.ts`：`createLauncher` 綁定清理後環境與空暫存工作目錄，`shell: false`，提示只走 stdin，輸出上限、取消。適配器拿不到原始環境。
   - `run-check.ts`：`runWithSubscriptionCheck` 每次重查 R6，任一項非 passed（含 unknown、丟錯、尚未支援、模型 ID 不合法、命令含禁用旗標）就不執行；回傳經 contracts 驗證的 RunCheckRecord。
   - `connection.ts`：安裝精靈用 `checkConnection` → ProviderConnection（不能免除執行前確認）。
@@ -94,3 +94,10 @@ npm run verify
 - contracts（ADR-0006 第 6 項定案）：RunCheckRecord 加 trigger、items（四項各結果＋依據）、removedEnvVarNames、executed；schema 強制不變式。
 - 偏離：為配合 RunCheckRecord 新欄位，改了 `packages/contracts/src/entities/entities.test.ts` 的合法樣本（write_paths 外，否則既有測試會紅）。
 - 留給 P1-T011：codex、antigravity 的 API key 模式旗標與專屬環境變數未查證；各家 CLI 設定檔（apiKeyHelper、config.toml 等）偵測由各家適配器實作 `cliConfig`。
+
+### 對抗驗證修正
+
+- R6 缺項先擋：適配器 `verifySubscriptionRoute` 回 undefined、`{}`、缺項、空依據或多餘欄位時，原本 `summarizeChecks` 用 `Object.values(...).every` 判 passed、先呼叫 `execute` 才在 `RunCheckRecord.parse` 丟錯。改為執行前以 contracts `RunCheckItems` schema `safeParse`，不合法就四項都記 unknown（依據「適配器回報格式不合法」）、blocked、executed:false；`summarizeChecks` 改成逐一檢查四個固定 key。`routeChecks` 回傳改為 `{ checks, reportValid }`（`connection.ts` 同步）。
+- `defineCommand` 拒絕插值：原「型別層拒絕寬型別」宣稱不完整——`` `--x=${ext}` `` 型別與執行期都放行。改為：(a) 型別層 `IsPureLiteral` 拒絕寬型別與含 `${string}`／`${number}` 等插值的樣板型別（含與字面值的聯集）；(b) `eslint.config.js` 對 `packages/providers/src/**` 加 `no-restricted-syntax`：引數須為陣列常值，元素只能是字串常值、無插值樣板字串或 `MODEL_SLOT`；(c) `assertExecutablePath` 拒絕 sh、bash、zsh、dash、fish、ksh、csh、tcsh、env、node（basename 不分大小寫、忽略版本尾碼）。型別與 lint 仍可被 `as` 轉型＋eslint-disable 繞過，最終保證靠審查。測試改用指向 node 的符號連結 `fake/node-cli.ts` 代替 CLI。
+- 回歸測試：`run-check.test.ts`（五種不合法回報 execute 0 次、紀錄合法）、`command.test.ts`（`@ts-expect-error` 型別測試、直譯器路徑）、`command-lint.test.ts`（lintText）。
+- 移交：HOME 白名單、TMPDIR 工作目錄、codex `-c`／claude `--settings` 旗標經判定不屬本 Task，留 P1-T011／P1-T012。

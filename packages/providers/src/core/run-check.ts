@@ -2,7 +2,7 @@ import {
   type CheckOutcome,
   RunCheckRecord,
   type RunCheckItem,
-  type RunCheckItems,
+  RunCheckItems,
   type RunCheckTrigger,
 } from '@rolecraft/contracts';
 
@@ -51,9 +51,24 @@ function allUnknown(basis: string): SubscriptionRouteChecks {
   };
 }
 
-/** 總結：全部 passed 才 passed；有 failed 則 failed；其餘 unknown。 */
+/** R6 四項固定 key；總結逐一檢查，缺項視為 unknown（不靠 Object.values）。 */
+const CHECK_KEYS = [
+  'subscriptionLogin',
+  'environmentSanitized',
+  'cliConfig',
+  'executionMode',
+] as const satisfies readonly (keyof RunCheckItems)[];
+
+/** 適配器自己回報的三項（與 contracts 同一份 schema，只去掉 core 判定的環境清理）。 */
+const AdapterRouteChecks = RunCheckItems.omit({ environmentSanitized: true });
+
+const INVALID_REPORT = '適配器回報格式不合法';
+
+/** 總結：四項全部 passed 才 passed；有 failed 則 failed；其餘（含缺項）unknown。 */
 export function summarizeChecks(items: RunCheckItems): CheckOutcome {
-  const outcomes = Object.values(items).map((i) => i.outcome);
+  const outcomes = CHECK_KEYS.map(
+    (key) => (items as Partial<RunCheckItems> | undefined)?.[key]?.outcome ?? 'unknown',
+  );
   if (outcomes.every((o) => o === 'passed')) return 'passed';
   return outcomes.includes('failed') ? 'failed' : 'unknown';
 }
@@ -62,18 +77,28 @@ function describeError(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : '未知錯誤';
 }
 
-/** 適配器回報的 R6 項目＋core 自己的禁用旗標檢查；丟錯一律 unknown。 */
+/** routeChecks 的結果；reportValid=false 表示適配器回報不符 schema（缺項、空依據、多餘欄位）。 */
+export interface RouteCheckResult {
+  readonly checks: SubscriptionRouteChecks;
+  readonly reportValid: boolean;
+}
+
+/** 適配器回報的 R6 項目＋core 自己的禁用旗標檢查；丟錯或格式不合法一律 unknown。 */
 export async function routeChecks(
   adapter: ProviderAdapter,
   launch: Launch,
   signal: AbortSignal | undefined,
-): Promise<SubscriptionRouteChecks> {
-  let checks: SubscriptionRouteChecks;
+): Promise<RouteCheckResult> {
+  let raw: unknown;
   try {
-    checks = await adapter.verifySubscriptionRoute(signal ? { launch, signal } : { launch });
+    raw = await adapter.verifySubscriptionRoute(signal ? { launch, signal } : { launch });
   } catch (error) {
-    return allUnknown(`確認時發生錯誤：${describeError(error)}`);
+    return { checks: allUnknown(`確認時發生錯誤：${describeError(error)}`), reportValid: true };
   }
+  // 執行前就用 contracts schema 驗證，不靠事後 parse 紀錄才發現缺項。
+  const parsed = AdapterRouteChecks.safeParse(raw);
+  if (!parsed.success) return { checks: allUnknown(INVALID_REPORT), reportValid: false };
+  let checks: SubscriptionRouteChecks = parsed.data;
   // core 自己再檢查一次禁用旗標，不只相信適配器的回報。
   const flags = adapter.commands.flatMap((c) => findApiKeyModeFlags(adapter.provider, c));
   if (flags.length > 0) {
@@ -82,7 +107,7 @@ export async function routeChecks(
       executionMode: item('failed', `命令含會改走 API key 的旗標：${flags.join(', ')}`),
     };
   }
-  return checks;
+  return { checks, reportValid: true };
 }
 
 export async function runWithSubscriptionCheck(
@@ -145,7 +170,17 @@ export async function runWithSubscriptionCheck(
       ...(deps.spawn ? { spawn: deps.spawn } : {}),
     });
     const route = await routeChecks(adapter, launch, request.signal);
-    const items: RunCheckItems = { ...route, environmentSanitized };
+    // 再用完整 schema 驗一次四項；任何不合法 → 四項都記 unknown 並擋下。
+    const parsedItems = route.reportValid
+      ? RunCheckItems.safeParse({ ...route.checks, environmentSanitized })
+      : null;
+    if (!parsedItems?.success) {
+      return blocked(
+        { ...allUnknown(INVALID_REPORT), environmentSanitized: item('unknown', INVALID_REPORT) },
+        removed,
+      );
+    }
+    const items = parsedItems.data;
     if (summarizeChecks(items) !== 'passed') return blocked(items, removed);
 
     let result: ExecutionResult;

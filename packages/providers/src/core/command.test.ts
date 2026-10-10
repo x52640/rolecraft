@@ -57,10 +57,30 @@ describe('defineCommand／buildArgv', () => {
 
   it('型別層拒絕非字面值字串；執行時拒絕非字串', () => {
     const external: string = '外部內容';
+    /* eslint-disable no-restricted-syntax -- 故意違規，驗證型別層與執行時會擋 */
     // @ts-expect-error 寬型別 string（外部內容）不能當參數
     defineCommand(['-p', external]);
     expect(() => defineCommand([42 as never])).toThrow(CommandPolicyError);
+    /* eslint-enable no-restricted-syntax */
     expect(() => defineCommand(['a\0b'])).toThrow(CommandPolicyError);
+  });
+
+  it('型別層拒絕含插值的樣板型別（對抗驗證：模板字串繞過）', () => {
+    const ext: string = '外部內容';
+    const n: number = 1;
+    /* eslint-disable no-restricted-syntax -- 故意違規，驗證型別層會擋 */
+    // @ts-expect-error `${string}` 插值
+    defineCommand([`--append-system-prompt=${ext}`]);
+    // @ts-expect-error `${number}` 插值
+    defineCommand([`--max-turns=${n}`]);
+    // @ts-expect-error 純插值
+    defineCommand([`${ext}`]);
+    // @ts-expect-error 字面值與插值的聯集
+    defineCommand([Math.random() > 0.5 ? '-p' : `--x=${n}`]);
+    /* eslint-enable no-restricted-syntax */
+    // 無插值的樣板字串與字面值聯集照常接受
+    defineCommand([`--output-format`, MODEL_SLOT]);
+    expect(true).toBe(true);
   });
 });
 
@@ -77,7 +97,26 @@ describe('assertExecutablePath', () => {
     expect(() => assertExecutablePath(p)).toThrow(CommandPolicyError);
   });
 
+  it.each([
+    '/bin/sh',
+    '/bin/bash',
+    '/bin/zsh',
+    '/bin/dash',
+    '/opt/homebrew/bin/fish',
+    '/bin/ksh',
+    '/bin/csh',
+    '/bin/tcsh',
+    '/usr/bin/env',
+    '/usr/local/bin/node',
+    '/opt/homebrew/bin/bash5',
+    '/usr/local/bin/node24',
+    '/BIN/SH',
+  ])('通用直譯器 %j 被拒', (p) => {
+    expect(() => assertExecutablePath(p)).toThrow(CommandPolicyError);
+  });
+
   it('絕對路徑通過', () => {
     expect(() => assertExecutablePath('/opt/homebrew/bin/claude')).not.toThrow();
+    expect(() => assertExecutablePath('/usr/local/bin/codex')).not.toThrow();
   });
 });

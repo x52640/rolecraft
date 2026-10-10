@@ -1,4 +1,4 @@
-import { isAbsolute } from 'node:path';
+import { basename, isAbsolute } from 'node:path';
 
 import type { Provider } from '@rolecraft/contracts';
 
@@ -7,7 +7,9 @@ import type { Provider } from '@rolecraft/contracts';
  *
  * - 參數陣列只由程式常數組成；唯一的變數是模型 ID，用 MODEL_SLOT 佔位並嚴格驗證格式。
  * - 提示內容只走 stdin，永遠不進參數陣列。
- * - 只能用 defineCommand 建立（型別上拒絕非字面值字串；執行時用登記表確認來源）。
+ * - 只能用 defineCommand 建立：型別上拒絕寬型別與含 `${string}`／`${number}` 插值的樣板型別；
+ *   ESLint（eslint.config.js）禁止引數含運算式的樣板字串或非字面量元素；執行時用登記表確認來源。
+ *   型別與 lint 都只是第一道防線（`as` 轉型可繞過），真正的保證是「參數只來自程式常數」的審查。
  */
 
 /** 模型 ID 佔位。 */
@@ -20,9 +22,28 @@ export interface CommandSpec {
   readonly args: readonly CommandArg[];
 }
 
-/** 型別層拒絕寬型別 `string`（例如變數、外部內容），只接受字面值與 MODEL_SLOT。 */
+/**
+ * S 是否為純字面值（聯集時每個成員都要是）。
+ * 用「`{}` 能否指派給 Record<S, 1>」判斷：寬型別 string 與 `${string}`／`${number}`／`${bigint}`／
+ * Uppercase<string> 等樣板型別會變成索引簽章（`{}` 可指派），純字面值則是必填屬性（不可指派）。
+ */
+type IsUnitLiteral<S extends string> = S extends unknown
+  ? // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+    {} extends Record<S, 1>
+    ? false
+    : true
+  : never;
+type IsPureLiteral<S extends string> = false extends IsUnitLiteral<S> ? false : true;
+
+/** 型別層只接受純字面值與 MODEL_SLOT；拒絕寬型別 string（變數、外部內容）與含插值的樣板型別。 */
 type LiteralArgs<T extends readonly CommandArg[]> = {
-  readonly [K in keyof T]: T[K] extends ModelSlot ? T[K] : string extends T[K] ? never : T[K];
+  readonly [K in keyof T]: T[K] extends ModelSlot
+    ? T[K]
+    : T[K] extends string
+      ? IsPureLiteral<T[K]> extends true
+        ? T[K]
+        : never
+      : never;
 };
 
 const registered = new WeakSet<CommandSpec>();
@@ -94,10 +115,33 @@ export function buildArgv(spec: CommandSpec, model: string | undefined): string[
   });
 }
 
-/** 執行檔路徑：必須是絕對路徑、不含控制字元。 */
+/**
+ * 不得當成執行檔的通用直譯器／轉手程式（basename，不分大小寫，忽略版本尾碼如 bash5、node24）。
+ * 這些會把參數當程式碼或另一個命令執行，等於繞過「參數只由常數組成」。
+ */
+export const FORBIDDEN_INTERPRETERS: readonly string[] = [
+  'sh',
+  'bash',
+  'zsh',
+  'dash',
+  'fish',
+  'ksh',
+  'csh',
+  'tcsh',
+  'env',
+  'node',
+];
+
+/** 執行檔路徑：必須是絕對路徑、不含控制字元，且不是通用直譯器。 */
 export function assertExecutablePath(path: string): void {
   // eslint-disable-next-line no-control-regex
   if (!isAbsolute(path) || /[\u0000-\u001f]/.test(path)) {
     throw new CommandPolicyError('執行檔必須是絕對路徑且不含控制字元');
+  }
+  const name = basename(path)
+    .toLowerCase()
+    .replace(/[\d.-]+$/, '');
+  if (FORBIDDEN_INTERPRETERS.includes(name)) {
+    throw new CommandPolicyError('執行檔不得是 shell 或通用直譯器');
   }
 }

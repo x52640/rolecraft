@@ -1,10 +1,15 @@
-import { RunCheckRecord } from '@rolecraft/contracts';
+import { RunCheckRecord, type RunCheckItems } from '@rolecraft/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { createFakeAdapter } from '../fake/fake-adapter.ts';
 import type { ProviderAdapter, SubscriptionRouteChecks } from './adapter.ts';
 import { defineCommand } from './command.ts';
-import { runWithSubscriptionCheck, type RunDeps, type RunRequest } from './run-check.ts';
+import {
+  runWithSubscriptionCheck,
+  type RunDeps,
+  type RunRequest,
+  summarizeChecks,
+} from './run-check.ts';
 import { createUnsupportedAdapter } from './unsupported.ts';
 
 const deps: RunDeps = {
@@ -111,6 +116,53 @@ describe('R6：任一項不成立就不執行', () => {
     const out = await runWithSubscriptionCheck(fake, { ...req, model: '--bare' }, deps);
     expect(out.status).toBe('blocked');
     expect(fake.calls.prompts).toEqual([]);
+  });
+});
+
+describe('R6：適配器回報格式不合法 → 執行前就擋（對抗驗證）', () => {
+  const ok = { outcome: 'passed', basis: 'b' } as const;
+  it.each([
+    ['undefined', undefined],
+    ['空物件', {}],
+    ['缺項', { subscriptionLogin: ok }],
+    [
+      '空依據',
+      { subscriptionLogin: ok, cliConfig: ok, executionMode: { outcome: 'passed', basis: '' } },
+    ],
+    ['多餘欄位', { subscriptionLogin: ok, cliConfig: ok, executionMode: ok, extra: ok }],
+  ])('%s → execute 0 次、四項 unknown、紀錄合法', async (_name, route) => {
+    const fake = createFakeAdapter({ script: [{ text: 'should not run' }] });
+    let executed = 0;
+    const bad: ProviderAdapter = {
+      ...fake,
+      verifySubscriptionRoute: () => Promise.resolve(route as unknown as SubscriptionRouteChecks),
+      execute: () => {
+        executed += 1;
+        return Promise.resolve({ ok: true, text: 'x' });
+      },
+    };
+    const out = await runWithSubscriptionCheck(bad, req, deps);
+    expect(executed).toBe(0);
+    expect(out.status).toBe('blocked');
+    expect(out.record.executed).toBe(false);
+    expect(out.record.subscriptionOnly).toBe('unknown');
+    expect(Object.values(out.record.items)).toEqual(
+      Array(4).fill({ outcome: 'unknown', basis: '適配器回報格式不合法' }),
+    );
+    expect(RunCheckRecord.safeParse(out.record).success).toBe(true);
+  });
+
+  it('summarizeChecks 逐一檢查四個固定 key，缺項不算通過', () => {
+    const partial = { subscriptionLogin: ok } as unknown as RunCheckItems;
+    expect(summarizeChecks(partial)).toBe('unknown');
+    expect(
+      summarizeChecks({
+        subscriptionLogin: ok,
+        environmentSanitized: ok,
+        cliConfig: ok,
+        executionMode: ok,
+      }),
+    ).toBe('passed');
   });
 });
 

@@ -176,6 +176,31 @@ export default tseslint.config(
     },
     rules: { 'rolecraft/no-relative-cross-package': 'error' },
   },
+  {
+    // P1-T010 對抗驗證：defineCommand 的參數只能是字串常值或 MODEL_SLOT（型別層之外的第二道防線）。
+    files: [`packages/providers/${SOURCE_GLOB}`],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.name='defineCommand'] > ArrayExpression > TemplateLiteral[expressions.length>0]",
+          message: 'defineCommand 參數不得是含插值的樣板字串；只能用字串常值或 MODEL_SLOT。',
+        },
+        {
+          selector:
+            "CallExpression[callee.name='defineCommand'] > ArrayExpression > :not(Literal, TemplateLiteral, Identifier[name='MODEL_SLOT'])",
+          message:
+            'defineCommand 參數只能是字串常值或 MODEL_SLOT（不得用變數、運算式、展開或轉型）。',
+        },
+        {
+          selector:
+            "CallExpression[callee.name='defineCommand'][arguments.0.type!='ArrayExpression']",
+          message: 'defineCommand 必須直接傳入陣列常值。',
+        },
+      ],
+    },
+  },
   ...Object.keys(ALLOWED_DEPS).map((pkgDir) => ({
     files: [`${pkgDir}/${SOURCE_GLOB}`],
     rules: {

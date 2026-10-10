@@ -86,7 +86,7 @@ export async function checkConnection(
     const models = await safe(() => adapter.listModels(ctx), UNKNOWN_MODELS);
     const route = await routeChecks(adapter, launch, deps.signal);
     const subscriptionOnly = summarizeChecks({
-      ...route,
+      ...route.checks,
       environmentSanitized: { outcome: 'passed', basis: '子程序環境已清理' },
     });
     return report(installation, login, models, subscriptionOnly);
