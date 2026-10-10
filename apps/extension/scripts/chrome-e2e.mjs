@@ -3,7 +3,7 @@
 //   node apps/extension/scripts/chrome-e2e.mjs [--browser-path <Chrome 執行檔>] [--headful]
 // 拋棄式暫存 profile（不碰使用者 profile 與家目錄的 host 註冊）；假 host manifest 寫進暫存 profile。
 // 檢查：載入 dist/unpacked、service worker 啟動、編輯器頁（apps/editor）載入與路由、經 service worker 轉送的橋接往返
-// （合法請求、schema 不合法請求不送出、host 回不合法回應被擋）。
+// （合法請求、schema 不合法請求不送出、host 回不合法回應被擋、同時多則依 id 對應、host 結束回 helper_unavailable）。
 // 工具列按鈕與快捷鍵注入無法用 CDP 觸發，見 Task 手動驗證步驟。
 import { spawn } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -17,12 +17,20 @@ const APP = path.resolve(import.meta.dirname, '..');
 const UNPACKED = path.join(APP, 'dist', 'unpacked');
 const DEFAULT_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
-// 假 host：Native Messaging 框（4 bytes 小端長度＋JSON）。收到的訊息逐行記到 log。
-// open_editor 回合法回應；request_draft 故意回型別錯誤的回應。
+// 假 host：Native Messaging 框（4 bytes 小端長度＋JSON），信封 { id, request } → { id, response }。
+// 收到的訊息逐行記到 log。submit_message_capture 回 m-<訊息文字>；request_draft 故意回型別錯誤的回應；
+// 訊息文字 HOLD 先扣住，等下一則回完才回（驗證亂序回覆依 id 對應）；replyIntent EXIT 直接結束行程。
 const FAKE_HOST = `
 import { appendFileSync } from 'node:fs';
 const LOG = process.argv[2];
 let buf = Buffer.alloc(0);
+let held = null;
+const send = (value) => {
+  const out = Buffer.from(JSON.stringify(value), 'utf8');
+  const head = Buffer.alloc(4);
+  head.writeUInt32LE(out.length, 0);
+  process.stdout.write(Buffer.concat([head, out]));
+};
 process.stdin.on('data', (chunk) => {
   buf = Buffer.concat([buf, chunk]);
   while (buf.length >= 4) {
@@ -31,11 +39,21 @@ process.stdin.on('data', (chunk) => {
     const msg = JSON.parse(buf.subarray(4, 4 + len).toString('utf8'));
     buf = buf.subarray(4 + len);
     appendFileSync(LOG, JSON.stringify(msg) + '\\n');
-    const reply = msg.op === 'request_draft' ? { ok: true, workJobId: 123 } : { ok: true };
-    const out = Buffer.from(JSON.stringify(reply), 'utf8');
-    const head = Buffer.alloc(4);
-    head.writeUInt32LE(out.length, 0);
-    process.stdout.write(Buffer.concat([head, out]));
+    const req = msg.request ?? {};
+    if (req.op === 'request_draft' && req.payload?.replyIntent === 'EXIT') process.exit(0);
+    const response =
+      req.op === 'request_draft'
+        ? { ok: true, workJobId: 123 }
+        : { ok: true, messageDraftId: 'm-' + req.payload?.selectedMessageText };
+    if (req.payload?.selectedMessageText === 'HOLD') {
+      held = { id: msg.id, response };
+      continue;
+    }
+    send({ id: msg.id, response });
+    if (held) {
+      send(held);
+      held = null;
+    }
   }
 });
 `;
@@ -113,24 +131,43 @@ const ROUTE_PROBE = `new Promise((resolve) => {
   setTimeout(() => resolve(document.querySelector('h1')?.textContent), 200);
 })`;
 
+const message = (text) => ({
+  op: 'submit_message_capture',
+  payload: {
+    platform: 'cake',
+    captureMethod: 'auto',
+    selectedMessageText: text,
+    jobSnapshotId: null,
+  },
+});
+const draft = (replyIntent) => ({
+  op: 'request_draft',
+  payload: { messageDraftId: 'm-1', replyIntent },
+});
+
+const MSG_OK = (text) => ({ ok: true, messageDraftId: `m-${text}` });
+const bad = (name, request, expectCode) => ({ name, request, expectCode });
+
+// 依序執行。EXIT 讓假 host 結束，下一則應自動重連。
 const CASES = [
-  { name: '合法 open_editor', request: { op: 'open_editor', payload: {} }, expect: { ok: true } },
-  {
-    name: '多帶 path 欄位：不送出',
-    request: { op: 'open_editor', payload: { path: '/etc/passwd' } },
-    expectCode: 'invalid_request',
-  },
-  {
-    name: '未知操作：不送出',
-    request: { op: 'run_command', payload: { cmd: 'ls' } },
-    expectCode: 'invalid_request',
-  },
-  {
-    name: 'host 回應不符 schema：擋下',
-    request: { op: 'request_draft', payload: { messageDraftId: 'm-1', replyIntent: '婉拒' } },
-    expectCode: 'internal_error',
-  },
+  { name: '合法 submit_message_capture', request: message('A'), expect: MSG_OK('A') },
+  bad(
+    '多帶 path 欄位：不送出',
+    { ...message('A'), payload: { ...message('A').payload, path: '/etc/passwd' } },
+    'invalid_request',
+  ),
+  bad('未知操作：不送出', { op: 'run_command', payload: { cmd: 'ls' } }, 'invalid_request'),
+  bad('open_editor 已移除：不送出', { op: 'open_editor', payload: {} }, 'invalid_request'),
+  bad('host 回應不符 schema：擋下', draft('婉拒'), 'internal_error'),
+  bad('host 行程結束：回 helper_unavailable', draft('EXIT'), 'helper_unavailable'),
+  { name: 'host 結束後下一則自動重連', request: message('C'), expect: MSG_OK('C') },
 ];
+
+/** 同時送兩則；假 host 先回第二則再回第一則。 */
+const CONCURRENT = [message('HOLD'), message('B')];
+
+const sendExpr = (channel, request) =>
+  `chrome.runtime.sendMessage(${JSON.stringify({ channel, request })})`;
 
 async function main() {
   const { values } = parseArgs({
@@ -194,20 +231,38 @@ async function main() {
       got: routed,
     });
 
+    const both = `Promise.all([${CONCURRENT.map((r) => sendExpr(RELAY_CHANNEL, r)).join(',')}])`;
+    const concurrent = await evaluateIn(send, targetId, both);
+    report.results.push({
+      name: '同時兩則、host 亂序回覆：依 id 對回各自請求',
+      pass: JSON.stringify(concurrent) === JSON.stringify([MSG_OK('HOLD'), MSG_OK('B')]),
+      got: concurrent,
+    });
+
     for (const c of CASES) {
-      const message = JSON.stringify({ channel: RELAY_CHANNEL, request: c.request });
-      const got = await evaluateIn(send, targetId, `chrome.runtime.sendMessage(${message})`);
+      const got = await evaluateIn(send, targetId, sendExpr(RELAY_CHANNEL, c.request));
       const pass = c.expect
         ? JSON.stringify(got) === JSON.stringify(c.expect)
         : got?.ok === false && got.error?.code === c.expectCode;
       report.results.push({ name: c.name, pass, got });
     }
+
     const received = (await readFile(host.log, 'utf8')).trim().split('\n').filter(Boolean);
-    const ops = received.map((line) => JSON.parse(line).op);
+    const frames = received.map((line) => JSON.parse(line));
+    const ops = frames.map((f) => f.request?.op);
+    const ids = frames.map((f) => f.id);
+    const [M, D] = ['submit_message_capture', 'request_draft'];
     report.results.push({
-      name: 'host 只收到合法請求',
-      pass: JSON.stringify(ops) === JSON.stringify(['open_editor', 'request_draft']),
+      name: 'host 只收到合法請求，每則都包在 { id, request } 信封內',
+      pass:
+        JSON.stringify(ops) === JSON.stringify([M, M, M, D, D, M]) &&
+        frames.every((f) => Object.keys(f).sort().join() === 'id,request'),
       got: ops,
+    });
+    report.results.push({
+      name: '請求 id 都是不重複的字串（跨重連）',
+      pass: ids.every((id) => typeof id === 'string') && new Set(ids).size === ids.length,
+      got: ids,
     });
   } catch (err) {
     report.error = String(err.message ?? err);

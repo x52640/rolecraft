@@ -1,3 +1,4 @@
+import { RELAY_CHANNEL } from '@rolecraft/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { BridgeClient } from '../bridge/client.ts';
@@ -27,10 +28,10 @@ const JOB = {
     },
   },
 };
-const OPEN = { op: 'open_editor', payload: {} };
+const DRAFT = { op: 'request_draft', payload: { messageDraftId: 'm', replyIntent: 'x' } };
 
 function fakeClient() {
-  const send = vi.fn<BridgeClient['send']>(() => Promise.resolve({ ok: true }));
+  const send = vi.fn<BridgeClient['send']>(() => Promise.resolve({ ok: true, workJobId: 'w-1' }));
   return { client: { send, close: vi.fn() } satisfies BridgeClient, send };
 }
 
@@ -42,9 +43,9 @@ async function relay(request: unknown, sender: SenderInfo) {
 
 describe('relay message shape', () => {
   it('只認 { channel, request }', () => {
-    expect(isRelayMessage(relayMessage(OPEN))).toBe(true);
-    expect(isRelayMessage({ channel: 'rolecraft.bridge', request: OPEN, path: '/x' })).toBe(false);
-    expect(isRelayMessage({ channel: 'other', request: OPEN })).toBe(false);
+    expect(isRelayMessage(relayMessage(DRAFT))).toBe(true);
+    expect(isRelayMessage({ channel: 'rolecraft.bridge', request: DRAFT, path: '/x' })).toBe(false);
+    expect(isRelayMessage({ channel: 'other', request: DRAFT })).toBe(false);
     expect(isRelayMessage(null)).toBe(false);
     expect(isRelayMessage([1, 2])).toBe(false);
   });
@@ -52,7 +53,7 @@ describe('relay message shape', () => {
 
 describe('handleRelay 驗發送者', () => {
   it('編輯器頁可用全部操作', async () => {
-    expect(await relay(OPEN, EDITOR)).toMatchObject({ forwarded: true, res: { ok: true } });
+    expect(await relay(DRAFT, EDITOR)).toMatchObject({ forwarded: true, res: { ok: true } });
     expect((await relay(JOB, EDITOR)).forwarded).toBe(true);
   });
 
@@ -61,15 +62,10 @@ describe('handleRelay 驗發送者', () => {
   });
 
   it.each<[string, unknown, SenderInfo]>([
-    ['其他擴充功能', OPEN, { ...EDITOR, id: 'zzzz' }],
-    ['其他擴充功能的頁面網址', OPEN, { id: EXT, url: 'chrome-extension://zzzz/x.html' }],
-    ['缺網址', OPEN, { id: EXT }],
-    ['content script 開編輯器', OPEN, JOB_PAGE],
-    [
-      'content script 要求草稿',
-      { op: 'request_draft', payload: { messageDraftId: 'm', replyIntent: 'x' } },
-      JOB_PAGE,
-    ],
+    ['其他擴充功能', DRAFT, { ...EDITOR, id: 'zzzz' }],
+    ['其他擴充功能的頁面網址', DRAFT, { id: EXT, url: 'chrome-extension://zzzz/x.html' }],
+    ['缺網址', DRAFT, { id: EXT }],
+    ['content script 要求草稿', DRAFT, JOB_PAGE],
     ['子框架', JOB, { ...JOB_PAGE, frameId: 3 }],
     ['未註冊網站', JOB, { ...JOB_PAGE, url: 'https://evil.example.com/job/abc' }],
     ['平台不符', { ...JOB, payload: { ...JOB.payload, platform: 'cake' } }, JOB_PAGE],
@@ -80,6 +76,21 @@ describe('handleRelay 驗發送者', () => {
     ],
   ])('%s：拒絕且不轉送', async (_name, request, sender) => {
     const { res, forwarded } = await relay(request, sender);
+    expect(res).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
+    expect(forwarded).toBe(false);
+  });
+
+  it('通道名稱來自 contracts', () => {
+    expect(relayMessage(DRAFT).channel).toBe(RELAY_CHANNEL);
+    expect(RELAY_CHANNEL).toBe('rolecraft.bridge');
+  });
+
+  it.each<[string, unknown]>([
+    ['未知操作', { op: 'exec', payload: { cmd: 'ls' } }],
+    ['open_editor 已移除', { op: 'open_editor', payload: {} }],
+    ['頁面自帶信封 id', { id: 'r1', request: DRAFT }],
+  ])('%s：拒絕且不轉送', async (_name, request) => {
+    const { res, forwarded } = await relay(request, EDITOR);
     expect(res).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
     expect(forwarded).toBe(false);
   });

@@ -10,8 +10,9 @@ import { describe, expect, it } from 'vitest';
 import {
   ALLOWED,
   anyString,
-  containing,
+  env as envelope,
   OTHER,
+  reply,
   SECRET,
   requests,
 } from './__fixtures__/requests.ts';
@@ -43,33 +44,37 @@ function runHost(args: string[], env: Record<string, string>, stdin: Buffer): Pr
 const env = { [ALLOWED_ORIGINS_ENV]: ALLOWED };
 
 describe('main（真實 stdio 子行程）', () => {
-  it('合法 origin：依序回覆、未接服務回尚未支援、stderr 不含內容', async () => {
+  it('合法 origin：依 id 回覆、未接服務回 not_implemented、stderr 不含內容', async () => {
     const stdin = Buffer.concat([
-      encodeFrame(requests.submit_message_capture),
-      encodeFrame({ op: 'run_command', payload: { cmd: SECRET } }),
+      encodeFrame(envelope('m1', requests.submit_message_capture)),
+      encodeFrame(envelope('x1', { op: 'run_command', payload: { cmd: SECRET } })),
     ]);
     const result = await runHost([ALLOWED], env, stdin);
     expect(result.code).toBe(0);
-    expect(result.replies).toEqual([
-      {
-        ok: false,
-        error: { code: 'internal_error', message: containing('not_implemented') },
-      },
-      { ok: false, error: { code: 'invalid_request', message: anyString } },
-    ]);
+    expect(result.replies).toEqual(
+      expect.arrayContaining([
+        reply('m1', { ok: false, error: { code: 'not_implemented', message: anyString } }),
+        reply('x1', { ok: false, error: { code: 'invalid_request', message: anyString } }),
+      ]),
+    );
+    expect(result.replies).toHaveLength(2);
     expect(result.stderr).toContain('host_started');
     expect(result.stderr).not.toContain('王小明');
     expect(result.stderr).not.toContain('rm -rf');
   });
 
   it('origin 不在允許清單：結束碼 2、沒有任何回覆', async () => {
-    const result = await runHost([OTHER], env, encodeFrame(requests.open_editor));
+    const result = await runHost([OTHER], env, encodeFrame(envelope('r1', requests.request_draft)));
     expect(result.code).toBe(2);
     expect(result.replies).toEqual([]);
   });
 
   it('沒設定允許清單：全部拒絕', async () => {
-    const result = await runHost([ALLOWED], {}, encodeFrame(requests.open_editor));
+    const result = await runHost(
+      [ALLOWED],
+      {},
+      encodeFrame(envelope('r1', requests.request_draft)),
+    );
     expect(result.code).toBe(2);
   });
 
@@ -77,6 +82,14 @@ describe('main（真實 stdio 子行程）', () => {
     const result = await runHost([ALLOWED], { [ALLOWED_ORIGINS_ENV]: '*' }, Buffer.alloc(0));
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('config_invalid');
+  });
+
+  it('沒有請求 id：回 id 為 null 的失敗，結束碼 3', async () => {
+    const result = await runHost([ALLOWED], env, encodeFrame(requests.request_draft));
+    expect(result.code).toBe(3);
+    expect(result.replies).toEqual([
+      reply(null, { ok: false, error: { code: 'invalid_request', message: anyString } }),
+    ]);
   });
 
   it('壞 JSON：結束碼 3', async () => {

@@ -74,9 +74,19 @@ npm run verify && npm run build && node apps/extension/scripts/chrome-e2e.mjs
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：實作與文件全部完成（工作者 commit，待協調者收官與對抗驗證）
+- 已通過驗證：`npm run verify`、`npm run build`、`node apps/extension/scripts/chrome-e2e.mjs`（13 項全過）；Vitest 961 通過、1 略過；test:docs 14
+- 下一步：協調者範圍稽核（見下方「超出 write_paths」）、R7 對抗驗證
 - Blocker：無
 
 ## 完成結果
+
+- contracts：新增 `bridge/protocol.ts`（`NATIVE_HOST_NAME`、`RELAY_CHANNEL`、`BRIDGE_MAX_IN_FLIGHT = 32`、`BridgeRequestId`＝1–64 個 `[A-Za-z0-9_-]`、`BridgeRequestEnvelope { id, request }`、`BridgeResponseEnvelope { id | null, response }`）；錯誤碼加 `not_implemented`、`helper_unavailable`、`timeout`；移除 `open_editor`（`draft-and-editor.ts` 改名 `draft.ts`）；新增型別 `BridgeResponse`。頁面送的 `BridgeRequest` 形狀不變，id 只在 service worker↔helper 之間。
+- helper：`bridge/envelope.ts` 先取 id 再交給 `dispatch`；`host.ts` 改成並行處理、完成先回、以 id 回覆。id 不合法→等在途回完、送 id 為 null 的 `invalid_request`、結束碼 3；id 重複（本連線出現過，含已回覆）→同上，原請求只回一次；id 合法但信封多／缺欄位→以該 id 回 `invalid_request`、連線繼續。在途上限沿用 32（取自 contracts）。未接服務改回 `not_implemented`。日誌不記 id。
+- extension：`bridge/client.ts` 配 `r<遞增>` id（客戶端生命週期內不重用，跨重連也不重用），可同時多則在途；達上限排隊；逾時只讓該請求回 `timeout`，id 記為已放棄、晚到回覆丟棄、仍占名額直到 helper 回覆（名額全被占住則斷線重來）；未知 id／null id／信封不合法→斷線、在途回 `internal_error`；host 斷線／送不出去→`helper_unavailable`；單則回應不符 schema 只影響該請求、不再斷線。
+- 共用常數：helper、extension（service worker、relay）、editor 都從 contracts 匯入；`apps/*/src/index.ts` 的既有匯出改為轉出 contracts 的值（檔案未改）。
+- `open_editor`：移除。工具列按鈕本來就由 service worker 直接 `chrome.tabs.create`；helper 無法開瀏覽器分頁，編輯器頁也不需要「開自己」，content script 本來就被禁止呼叫它。bridge.md 加操作表、信封與錯誤碼語意；ADR-0006 第 8 列定案。
+- 分塊：**本 Task 不實作**。目前 3 個操作的回應都是 id，遠小於 1 MB；回應超過上限時 helper 以同一 id 回 `internal_error`。P1-T027 若要經橋接傳 PDF，再以同一 id 加分塊訊息形狀（additive）。
+- `vitest.config.ts` 收 `*.test.{ts,tsx}`。
+- 測試：contracts（id 邊界、信封、錯誤碼、open_editor 移除）、helper host（id 缺漏／非字串／空／超長／路徑字元／原型鏈名稱／舊格式、重複 id 進行中與已回覆、信封多欄位、並行與亂序完成、上限、P1-T014 同 chunk 合法框＋壞框回歸）、extension client（亂序回覆對應、id 不重用、上限排隊、逾時不影響他人與晚到丟棄、未知／null／不合法信封斷線、同 id 回兩次、helper_unavailable）、editor。Chrome e2e 加「同時兩則、假 host 亂序回覆」「host 結束回 helper_unavailable 並自動重連」「host 收到的都是 `{ id, request }` 且 id 不重複」。
+- 超出 write_paths（breaking change 不改就無法通過驗證，請協調者裁定）：`apps/helper/src/__fixtures__/requests.ts`（移除 open_editor、加信封 helper）、`apps/helper/src/main.test.ts`（改送信封、改 not_implemented、加無 id 案例）、`apps/extension/scripts/chrome-e2e.mjs`（假 host 回信封、案例更新）。

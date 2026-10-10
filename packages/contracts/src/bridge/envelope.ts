@@ -1,11 +1,6 @@
 import { z } from 'zod';
 
-import {
-  OpenEditorRequest,
-  OpenEditorResponse,
-  RequestDraftRequest,
-  RequestDraftResponse,
-} from './draft-and-editor.ts';
+import { RequestDraftRequest, RequestDraftResponse } from './draft.ts';
 import { SubmitJobCaptureRequest, SubmitJobCaptureResponse } from './job-capture.ts';
 import { SubmitMessageCaptureRequest, SubmitMessageCaptureResponse } from './message-capture.ts';
 import type { BridgeOperation } from './operations.ts';
@@ -15,7 +10,6 @@ export const BridgeRequest = z.discriminatedUnion('op', [
   SubmitJobCaptureRequest,
   SubmitMessageCaptureRequest,
   RequestDraftRequest,
-  OpenEditorRequest,
 ]);
 export type BridgeRequest = z.infer<typeof BridgeRequest>;
 
@@ -27,5 +21,7 @@ export const BRIDGE_SCHEMAS = {
     response: SubmitMessageCaptureResponse,
   },
   request_draft: { request: RequestDraftRequest, response: RequestDraftResponse },
-  open_editor: { request: OpenEditorRequest, response: OpenEditorResponse },
 } as const satisfies Record<BridgeOperation, { request: z.ZodType; response: z.ZodType }>;
+
+/** 任一操作的回應（成功或 BridgeFailure）。 */
+export type BridgeResponse = z.infer<(typeof BRIDGE_SCHEMAS)[BridgeOperation]['response']>;

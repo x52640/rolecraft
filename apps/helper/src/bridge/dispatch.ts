@@ -7,7 +7,6 @@ import {
   type BridgeFailure,
 } from '@rolecraft/contracts';
 
-import { openEditor } from '../handlers/open-editor.ts';
 import { requestDraft } from '../handlers/request-draft.ts';
 import type { HelperServices } from '../handlers/services.ts';
 import { submitJobCapture } from '../handlers/submit-job-capture.ts';
@@ -36,8 +35,6 @@ function runHandler(request: BridgeRequest, services: HelperServices): Promise<u
       return submitMessageCapture(request.payload, services);
     case 'request_draft':
       return requestDraft(request.payload, services);
-    case 'open_editor':
-      return openEditor(services);
   }
 }
 

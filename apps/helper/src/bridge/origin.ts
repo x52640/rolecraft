@@ -2,8 +2,8 @@
 // host manifest 的 allowed_origins 已先擋一次；host 再依自己的允許清單逐字比對一次。
 // 來源驗證只回答「是誰在呼叫」，不代表請求內容可信。
 
-/** Native Messaging host 名稱；須與擴充功能端（apps/extension）及 host manifest 一致。 */
-export const NATIVE_HOST_NAME = 'com.rolecraft.helper';
+/** Native Messaging host 名稱；唯一定義在 contracts，與擴充功能端共用。 */
+export { NATIVE_HOST_NAME } from '@rolecraft/contracts';
 
 /** 擴充功能 origin 格式：chrome-extension://<32 個 a–p 字元>/ 。 */
 const EXTENSION_ORIGIN = /^chrome-extension:\/\/[a-p]{32}\/$/;

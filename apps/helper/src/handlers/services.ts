@@ -1,6 +1,6 @@
 // handler 透過這些介面呼叫 storage／sources／pipeline（服務組裝在 helper 啟動時注入）。
 // 介面只收 schema 驗證過的 payload，回傳 ID；不接受也不回傳路徑、指令或模型設定（R7）。
-// 尚未接上的服務留空，handler 回明確的「尚未支援」失敗，不偽造成功。
+// 尚未接上的服務留空，handler 回 not_implemented，不偽造成功。
 import type {
   BridgeFailure,
   RequestDraftRequest,
@@ -23,22 +23,13 @@ export interface DraftService {
   request(payload: RequestDraftRequest['payload']): Promise<{ workJobId: string }>;
 }
 
-export interface EditorService {
-  /** 開啟編輯器分頁。 */
-  open(): Promise<void>;
-}
-
 export interface HelperServices {
   jobCapture?: JobCaptureService;
   messageCapture?: MessageCaptureService;
   draft?: DraftService;
-  editor?: EditorService;
 }
 
-/** contracts 尚無「未實作」代碼，暫用 internal_error 並在訊息標明。 */
+/** 服務尚未接上：回 not_implemented。 */
 export function notImplemented(): BridgeFailure {
-  return {
-    ok: false,
-    error: { code: 'internal_error', message: '此操作尚未支援（not_implemented）' },
-  };
+  return { ok: false, error: { code: 'not_implemented', message: '此操作尚未支援' } };
 }

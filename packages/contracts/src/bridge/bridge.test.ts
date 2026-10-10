@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { BRIDGE_SCHEMAS, BridgeOperation, BridgeRequest } from '../index.ts';
+import { BRIDGE_SCHEMAS, BridgeErrorCode, BridgeOperation, BridgeRequest } from '../index.ts';
 
 const T = '2026-10-10T08:00:00+08:00';
 
@@ -34,7 +34,6 @@ const requests = {
     },
   },
   request_draft: { op: 'request_draft', payload: { messageDraftId: 'm-1', replyIntent: '婉拒' } },
-  open_editor: { op: 'open_editor', payload: {} },
 } as const;
 
 /** 遞迴收集 schema 中所有物件鍵名。 */
@@ -145,12 +144,24 @@ describe('bridge schemas', () => {
   });
 
   it('response：成功與失敗形狀都驗證，未知錯誤代碼被拒', () => {
-    const res = BRIDGE_SCHEMAS.open_editor.response;
-    expect(res.safeParse({ ok: true }).success).toBe(true);
-    const failure = { ok: false, error: { code: 'invalid_request', message: 'x' } };
-    expect(res.safeParse(failure).success).toBe(true);
+    const res = BRIDGE_SCHEMAS.request_draft.response;
+    expect(res.safeParse({ ok: true, workJobId: 'w-1' }).success).toBe(true);
+    for (const code of BridgeErrorCode.options) {
+      expect(res.safeParse({ ok: false, error: { code, message: 'x' } }).success).toBe(true);
+    }
     const unknownCode = { ok: false, error: { code: 'teapot', message: 'x' } };
     expect(res.safeParse(unknownCode).success).toBe(false);
-    expect(res.safeParse({ ok: true, extra: 1 }).success).toBe(false);
+    expect(res.safeParse({ ok: true, workJobId: 'w-1', extra: 1 }).success).toBe(false);
+  });
+
+  it('錯誤代碼包含 not_implemented、helper_unavailable、timeout', () => {
+    expect(BridgeErrorCode.options).toEqual(
+      expect.arrayContaining(['not_implemented', 'helper_unavailable', 'timeout']),
+    );
+  });
+
+  it('open_editor 已移除：開編輯器不經 helper', () => {
+    expect(BridgeOperation.options).not.toContain('open_editor');
+    expect(BridgeRequest.safeParse({ op: 'open_editor', payload: {} }).success).toBe(false);
   });
 });

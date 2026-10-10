@@ -21,13 +21,3 @@ export const RequestDraftResponse = withFailure(
   z.strictObject({ ok: z.literal(true), workJobId: Id }),
 );
 export type RequestDraftResponse = z.infer<typeof RequestDraftResponse>;
-
-/** open_editor：開啟編輯器分頁（R7）。不帶任何參數。 */
-export const OpenEditorRequest = z.strictObject({
-  op: z.literal('open_editor'),
-  payload: z.strictObject({}),
-});
-export type OpenEditorRequest = z.infer<typeof OpenEditorRequest>;
-
-export const OpenEditorResponse = withFailure(z.strictObject({ ok: z.literal(true) }));
-export type OpenEditorResponse = z.infer<typeof OpenEditorResponse>;

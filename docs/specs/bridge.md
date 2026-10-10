@@ -6,9 +6,52 @@
 
 ## R7 本機橋接介面的能力邊界（C7）
 
-- 擴充功能、編輯器分頁與本機輔助程式之間只提供固定的操作清單，例如：送入職缺頁擷取內容、送入使用者選定的訊息、要求產生草稿、開啟編輯器。
+- 擴充功能、編輯器分頁與本機輔助程式之間只提供固定的操作清單，例如：送入職缺頁擷取內容、送入使用者選定的訊息、要求產生草稿、開啟編輯器（P1-T034：開啟編輯器改由擴充功能自己開分頁，不是橋接操作；現行清單見下方「操作」）。
 - 頁面、文件、訊息與模型輸出的內容一律只是資料欄位，不能變成檔案路徑、CLI 參數、模型設定或指令。
 - 檔案只能經由使用者在系統選取器加上預覽確認的流程進入授權集合（R4）；介面不接受外部傳入的任意路徑。
 - 介面沒有送出訊息、投遞或在求職網站上填寫的操作（D7）。
 - 來源驗證只回答「是誰在呼叫」，不代表請求的內容可信。
 - Q3 通訊方式與資料夾選取：依 `docs/adr/0003-bridge-transport.md`（Chrome 已實測；待擁有者手動驗證 Arc／Edge）。
+
+## 操作清單與通訊協定（P1-T034 定案）
+
+欄位以 `packages/contracts/src/bridge/` 為準，這裡只寫語意。
+
+### 操作
+
+| 操作 | 誰可以呼叫 | 語意 |
+| --- | --- | --- |
+| `submit_job_capture` | 編輯器頁；已註冊職缺頁主框架的 content script（只能送該站、自動擷取） | 送入職缺頁擷取內容，回職缺快照 id |
+| `submit_message_capture` | 同上 | 送入使用者選定的訊息，回訊息草稿 id |
+| `request_draft` | 編輯器頁 | 要求產生回覆草稿，回工作 id（不送出，D7） |
+
+- R7 舉例的「開啟編輯器」**不是橋接操作**：工具列按鈕由擴充功能 service worker 直接開擴充功能頁；helper 開不了瀏覽器分頁（也不得為此執行指令），所以 `open_editor` 已移除。
+- 新增操作要先改本節，再改 contracts（additive）。
+
+### 信封與請求 id
+
+- 頁面 → service worker：`{ channel, request }`；頁面不帶 id（`chrome.runtime.sendMessage` 本身一問一答）。
+- service worker → helper：`{ id, request }`；helper → service worker：`{ id, response }`。id 由 service worker 產生，是不透明字串（1–64 個英數、`_`、`-`），只用來對應回覆，helper 不解讀、不記日誌。
+- 回覆依 id 對應，不靠順序；helper 同時處理多則，完成先回。同一連線上 helper 尚未回覆的請求有上限，客戶端達上限就排隊等名額。
+- helper 對同一 id 只回一次：
+  - id 缺漏或不合法（非字串、空、超長、含其他字元）：無法歸屬，helper 等在途請求回完，送一則 id 為 `null` 的 `invalid_request` 後斷線。
+  - id 在本連線出現過（不論是否已回覆）：同上斷線；原請求照常只回一次。
+  - id 合法但信封多帶或缺欄位：以該 id 回 `invalid_request`，連線繼續。
+- 客戶端收到未知 id、id 為 `null` 或信封不合法：協定已不可信，斷線，在途請求回 `internal_error`。已逾時請求的晚到回覆直接丟棄；逾時請求在 helper 回覆前仍占名額，名額全被占住時斷線重來。
+- 分塊：host→瀏覽器單則 1 MB 上限仍在；尚未實作分塊，回應超過上限時 helper 以同一 id 回 `internal_error`。之後需要分塊時以同一 id 加新的訊息形狀（additive）。
+
+### 錯誤碼
+
+| 代碼 | 誰產生 | 語意 |
+| --- | --- | --- |
+| `invalid_request` | 頁面、service worker、helper | 請求不符 schema、發送者不允許該操作，或違反信封協定 |
+| `internal_error` | 頁面、service worker、helper | helper 內部錯誤、回應不符 schema、協定錯誤，或編輯器頁連不到 service worker |
+| `not_implemented` | helper | 該操作的服務尚未接上；不偽造成功 |
+| `helper_unavailable` | service worker | 本機輔助程式未安裝、未啟動、連線中斷或送不出去 |
+| `timeout` | service worker | 等待 helper 回覆逾時；不影響同一連線上的其他請求 |
+
+錯誤訊息是給人看的固定文字，不回填請求內容；程式判斷只看代碼。
+
+### 共用常數
+
+Native Messaging host 名稱、頁面↔service worker 轉送通道、在途上限只定義在 contracts，helper、extension、editor 都從那裡匯入。

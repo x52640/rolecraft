@@ -17,5 +17,6 @@ export * from './entities/work-job.ts';
 export * from './bridge/operations.ts';
 export * from './bridge/job-capture.ts';
 export * from './bridge/message-capture.ts';
-export * from './bridge/draft-and-editor.ts';
+export * from './bridge/draft.ts';
 export * from './bridge/envelope.ts';
+export * from './bridge/protocol.ts';

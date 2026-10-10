@@ -2,13 +2,7 @@
 import { BRIDGE_SCHEMAS, BridgeOperation } from '@rolecraft/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  SECRET,
-  anyString,
-  containing,
-  recordingLogger,
-  requests,
-} from '../__fixtures__/requests.ts';
+import { SECRET, anyString, recordingLogger, requests } from '../__fixtures__/requests.ts';
 import type { HelperServices } from '../handlers/services.ts';
 import { dispatch } from './dispatch.ts';
 
@@ -16,7 +10,6 @@ const okServices = (): Required<HelperServices> => ({
   jobCapture: { submit: vi.fn(() => Promise.resolve({ jobSnapshotId: 'j-1' })) },
   messageCapture: { submit: vi.fn(() => Promise.resolve({ messageDraftId: 'm-1' })) },
   draft: { request: vi.fn(() => Promise.resolve({ workJobId: 'w-1' })) },
-  editor: { open: vi.fn(() => Promise.resolve()) },
 });
 
 async function run(message: unknown, services: HelperServices = okServices()) {
@@ -57,13 +50,13 @@ describe('dispatch：操作清單', () => {
 
   it('JSON.parse 產生的 __proto__ 鍵與缺 op 都被拒', async () => {
     expect(
-      (await run(JSON.parse('{"__proto__":{"op":"open_editor"},"payload":{}}'))).response,
+      (await run(JSON.parse('{"__proto__":{"op":"request_draft"},"payload":{}}'))).response,
     ).toEqual(INVALID);
     expect((await run({ payload: {} })).response).toEqual(INVALID);
-    expect((await run({ op: ['open_editor'], payload: {} })).response).toEqual(INVALID);
+    expect((await run({ op: ['request_draft'], payload: {} })).response).toEqual(INVALID);
   });
 
-  it.each([null, 1, 'open_editor', [], [{ op: 'open_editor', payload: {} }], true])(
+  it.each([null, 1, 'request_draft', [], [requests.request_draft], true])(
     '非物件訊息 %j 被拒',
     async (message) => {
       expect((await run(message)).response).toEqual(INVALID);
@@ -88,7 +81,7 @@ describe('dispatch：schema', () => {
     const job = requests.submit_job_capture;
     const fields = { ...job.payload.fields, location: { status: 'not_provided', args: ['-c'] } };
     expect((await run({ ...job, payload: { ...job.payload, fields } })).response).toEqual(INVALID);
-    expect((await run({ op: 'open_editor' })).response).toEqual(INVALID);
+    expect((await run({ op: 'request_draft' })).response).toEqual(INVALID);
     const draft = { op: 'request_draft', payload: { messageDraftId: 7, replyIntent: 'x' } };
     expect((await run(draft)).response).toEqual(INVALID);
   });
@@ -112,17 +105,17 @@ describe('dispatch：內容只當資料', () => {
       requests.submit_message_capture.payload,
     );
     expect(services.draft.request).toHaveBeenCalledWith(requests.request_draft.payload);
-    expect(services.editor.open).not.toHaveBeenCalled();
   });
 });
 
 describe('dispatch：handler 失敗', () => {
-  it.each(BridgeOperation.options)('%s 未接服務時回明確失敗，不偽造成功', async (op) => {
+  it.each(BridgeOperation.options)('%s 未接服務時回 not_implemented，不偽造成功', async (op) => {
     const { response } = await run(requests[op], {});
     expect(response).toEqual({
       ok: false,
-      error: { code: 'internal_error', message: containing('not_implemented') },
+      error: { code: 'not_implemented', message: anyString },
     });
+    expect(BRIDGE_SCHEMAS[op].response.safeParse(response).success).toBe(true);
   });
 
   it('handler 拋例外：回 internal_error，回應與日誌都不含例外內容', async () => {
@@ -149,13 +142,13 @@ describe('dispatch：handler 失敗', () => {
 
   it('handler 同步拋出非 Error 值也被攔下', async () => {
     const services: HelperServices = {
-      editor: {
-        open: () => {
+      draft: {
+        request: () => {
           throw SECRET as unknown as Error;
         },
       },
     };
-    const { response, logger } = await run(requests.open_editor, services);
+    const { response, logger } = await run(requests.request_draft, services);
     expect(response).toEqual(INTERNAL);
     expect(logger.text()).not.toContain('王小明');
   });

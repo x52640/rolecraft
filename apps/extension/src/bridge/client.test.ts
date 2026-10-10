@@ -2,22 +2,30 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createBridgeClient, type NativePort } from './client.ts';
 
+interface Sent {
+  id: string;
+  request: { op: string };
+}
+
 class FakePort implements NativePort {
-  sent: unknown[] = [];
+  sent: Sent[] = [];
   disconnected = false;
+  throwOnPost = false;
   private messageListeners: ((m: unknown) => void)[] = [];
   private disconnectListeners: (() => void)[] = [];
   onMessage = { addListener: (cb: (m: unknown) => void) => void this.messageListeners.push(cb) };
   onDisconnect = { addListener: (cb: () => void) => void this.disconnectListeners.push(cb) };
-  private readonly reply: ((m: unknown) => unknown) | undefined;
-  constructor(reply?: (m: unknown) => unknown) {
+  private readonly reply: ((m: Sent) => unknown) | undefined;
+  constructor(reply?: (m: Sent) => unknown) {
     this.reply = reply;
   }
   postMessage(message: unknown): void {
-    this.sent.push(message);
+    if (this.throwOnPost) throw new Error('Attempting to use a disconnected port object');
+    const m = message as Sent;
+    this.sent.push(m);
     if (this.reply) {
-      const r = this.reply(message);
-      queueMicrotask(() => this.emit(r));
+      const r = this.reply(m);
+      queueMicrotask(() => this.emit({ id: m.id, response: r }));
     }
   }
   disconnect(): void {
@@ -26,15 +34,32 @@ class FakePort implements NativePort {
   emit(message: unknown): void {
     for (const cb of this.messageListeners) cb(message);
   }
+  /** 以第 i 則送出的 id 回覆。 */
+  answer(i: number, response: unknown): void {
+    this.emit({ id: this.sent[i]?.id, response });
+  }
   hostDisconnect(): void {
     for (const cb of this.disconnectListeners) cb();
   }
 }
 
-const OPEN = { op: 'open_editor', payload: {} };
+const MSG = {
+  op: 'submit_message_capture',
+  payload: {
+    platform: 'cake',
+    captureMethod: 'auto',
+    selectedMessageText: 'hi',
+    jobSnapshotId: null,
+  },
+};
 const DRAFT = { op: 'request_draft', payload: { messageDraftId: 'm-1', replyIntent: '婉拒' } };
+const MSG_OK = { ok: true, messageDraftId: 'm-1' };
+const DRAFT_OK = { ok: true, workJobId: 'w-1' };
 
-function setup(reply?: (m: unknown) => unknown, lastError?: string) {
+function setup(
+  reply?: (m: Sent) => unknown,
+  opts: { lastError?: string; maxInFlight?: number } = {},
+) {
   const ports: FakePort[] = [];
   const client = createBridgeClient({
     connect: () => {
@@ -42,33 +67,38 @@ function setup(reply?: (m: unknown) => unknown, lastError?: string) {
       ports.push(p);
       return p;
     },
-    lastError: () => lastError,
+    lastError: () => opts.lastError,
     timeoutMs: 1000,
+    ...(opts.maxInFlight === undefined ? {} : { maxInFlight: opts.maxInFlight }),
   });
   return { client, ports };
 }
+
+const anyString: unknown = expect.any(String);
+const code = (c: string) => ({ ok: false, error: { code: c, message: anyString } });
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('bridge client', () => {
-  it('合法請求送出，合法回應原樣回傳', async () => {
-    const { client, ports } = setup(() => ({ ok: true }));
-    await expect(client.send(OPEN)).resolves.toEqual({ ok: true });
-    expect(ports[0]?.sent).toEqual([OPEN]);
+describe('bridge client：基本往返', () => {
+  it('合法請求包成 { id, request } 送出，依 id 取回應', async () => {
+    const { client, ports } = setup(() => MSG_OK);
+    await expect(client.send(MSG)).resolves.toEqual(MSG_OK);
+    expect(ports[0]?.sent).toEqual([{ id: 'r1', request: MSG }]);
   });
 
   it.each([
     ['未知操作', { op: 'run_command', payload: { cmd: 'ls' } }],
     ['送出訊息不在清單（D7）', { op: 'send_message', payload: {} }],
-    ['多帶路徑欄位', { ...OPEN, payload: { path: '/etc/passwd' } }],
-    ['頂層多帶欄位', { ...OPEN, cwd: '/tmp' }],
-    ['不是物件', 'open_editor'],
+    ['open_editor 已移除', { op: 'open_editor', payload: {} }],
+    ['多帶路徑欄位', { ...DRAFT, payload: { ...DRAFT.payload, path: '/etc/passwd' } }],
+    ['頂層多帶欄位', { ...DRAFT, cwd: '/tmp' }],
+    ['頁面自帶 id（信封由 service worker 包）', { id: 'r9', request: DRAFT }],
+    ['不是物件', 'request_draft'],
   ])('%s：本地拒絕，不連線', async (_name, bad) => {
-    const { client, ports } = setup(() => ({ ok: true }));
-    const res = await client.send(bad);
-    expect(res).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
+    const { client, ports } = setup(() => DRAFT_OK);
+    expect(await client.send(bad)).toEqual(code('invalid_request'));
     expect(ports).toHaveLength(0);
   });
 
@@ -76,66 +106,215 @@ describe('bridge client', () => {
     ['型別不符', { ok: true, workJobId: 123 }],
     ['多帶欄位', { ok: true, workJobId: 'w-1', extra: 1 }],
     ['未知錯誤代碼', { ok: false, error: { code: 'teapot', message: 'x' } }],
-    ['不是物件', 'ok'],
-  ])('回應%s：轉成 internal_error 並斷線', async (_name, badReply) => {
-    const { client, ports } = setup(() => badReply);
-    const res = await client.send(DRAFT);
-    expect(res).toMatchObject({ ok: false, error: { code: 'internal_error' } });
-    expect(ports[0]?.disconnected).toBe(true);
-  });
-
-  it('helper 回的失敗回應合法就原樣回傳', async () => {
-    const failure = { ok: false, error: { code: 'invalid_request', message: '不行' } };
-    const { client } = setup(() => failure);
-    await expect(client.send(OPEN)).resolves.toEqual(failure);
-  });
-
-  it('同時多個請求依序送出，一次只有一則在途', async () => {
-    const { client, ports } = setup();
-    const a = client.send(OPEN);
-    const b = client.send(DRAFT);
-    await vi.waitFor(() => expect(ports[0]?.sent).toHaveLength(1));
-    ports[0]?.emit({ ok: true });
-    await expect(a).resolves.toEqual({ ok: true });
-    await vi.waitFor(() => expect(ports[0]?.sent).toHaveLength(2));
-    ports[0]?.emit({ ok: true, workJobId: 'w-1' });
-    await expect(b).resolves.toEqual({ ok: true, workJobId: 'w-1' });
+    ['別的操作的成功形狀', MSG_OK],
+  ])('回應%s：該請求回 internal_error，連線保留', async (_name, badReply) => {
+    const { client, ports } = setup((m) => (m.request.op === 'request_draft' ? badReply : MSG_OK));
+    expect(await client.send(DRAFT)).toEqual(code('internal_error'));
+    expect(ports[0]?.disconnected).toBe(false);
+    await expect(client.send(MSG)).resolves.toEqual(MSG_OK);
     expect(ports).toHaveLength(1);
   });
 
-  it('host 斷線：在途請求回 internal_error 帶原因，下次重連', async () => {
-    const { client, ports } = setup(undefined, 'Specified native messaging host not found.');
-    const a = client.send(OPEN);
-    await vi.waitFor(() => expect(ports[0]?.sent).toHaveLength(1));
+  it.each(['invalid_request', 'not_implemented', 'internal_error'])(
+    'helper 回的 %s 失敗合法就原樣回傳',
+    async (c) => {
+      const failure = { ok: false, error: { code: c, message: '不行' } };
+      const { client } = setup(() => failure);
+      await expect(client.send(DRAFT)).resolves.toEqual(failure);
+    },
+  );
+});
+
+describe('bridge client：請求 id 與並行', () => {
+  it('同時多則：全部立即送出，亂序回覆依 id 對回各自請求', async () => {
+    const { client, ports } = setup();
+    const a = client.send(MSG);
+    const b = client.send(DRAFT);
+    const c = client.send(DRAFT);
+    const port = ports[0];
+    expect(port?.sent.map((s) => s.id)).toEqual(['r1', 'r2', 'r3']);
+    port?.answer(2, { ok: true, workJobId: 'w-3' });
+    port?.answer(0, MSG_OK);
+    port?.answer(1, { ok: true, workJobId: 'w-2' });
+    expect(await Promise.all([a, b, c])).toEqual([
+      MSG_OK,
+      { ok: true, workJobId: 'w-2' },
+      { ok: true, workJobId: 'w-3' },
+    ]);
+    expect(port?.disconnected).toBe(false);
+  });
+
+  it('id 在客戶端生命週期內不重複，重連後也不重用', async () => {
+    const { client, ports } = setup(() => DRAFT_OK);
+    await client.send(DRAFT);
+    ports[0]?.hostDisconnect();
+    await client.send(DRAFT);
+    await client.send(DRAFT);
+    const ids = ports.flatMap((p) => p.sent.map((s) => s.id));
+    expect(ids).toEqual(['r1', 'r2', 'r3']);
+  });
+
+  it('在途達上限：多的請求排隊，有回覆才送出（不讓 helper 因超量斷線）', async () => {
+    const { client, ports } = setup(undefined, { maxInFlight: 2 });
+    const a = client.send(DRAFT);
+    const b = client.send(DRAFT);
+    const c = client.send(MSG);
+    const port = ports[0];
+    expect(port?.sent).toHaveLength(2);
+    port?.answer(1, DRAFT_OK);
+    await expect(b).resolves.toEqual(DRAFT_OK);
+    expect(port?.sent).toHaveLength(3);
+    expect(port?.sent[2]?.request).toEqual(MSG);
+    port?.answer(0, DRAFT_OK);
+    port?.answer(2, MSG_OK);
+    expect(await Promise.all([a, c])).toEqual([DRAFT_OK, MSG_OK]);
+  });
+});
+
+describe('bridge client：協定錯誤一律斷線', () => {
+  it.each<[string, (p: FakePort) => void]>([
+    ['未知 id', (p) => p.emit({ id: 'r999', response: DRAFT_OK })],
+    [
+      'id 為 null（helper 回報協定錯誤）',
+      (p) => p.emit({ id: null, response: code('invalid_request') }),
+    ],
+    ['缺 id', (p) => p.emit({ response: DRAFT_OK })],
+    ['id 不是字串', (p) => p.emit({ id: 1, response: DRAFT_OK })],
+    ['id 超長', (p) => p.emit({ id: 'x'.repeat(65), response: DRAFT_OK })],
+    ['信封多帶欄位', (p) => p.emit({ id: p.sent[0]?.id, response: DRAFT_OK, path: '/x' })],
+    ['舊格式（沒有信封）', (p) => p.emit(DRAFT_OK)],
+    ['不是物件', (p) => p.emit('ok')],
+  ])('%s：斷線，在途請求回 internal_error', async (_name, act) => {
+    const { client, ports } = setup();
+    const a = client.send(DRAFT);
+    const port = ports[0] as FakePort;
+    act(port);
+    expect(await a).toEqual(code('internal_error'));
+    expect(port.disconnected).toBe(true);
+    // 之後重連照常
+    const b = client.send(DRAFT);
+    ports[1]?.answer(0, DRAFT_OK);
+    await expect(b).resolves.toEqual(DRAFT_OK);
+  });
+
+  it('同一 id 回兩次：第二次視為未知 id，斷線', async () => {
+    const { client, ports } = setup();
+    const a = client.send(DRAFT);
+    const b = client.send(DRAFT);
+    const port = ports[0] as FakePort;
+    port.answer(0, DRAFT_OK);
+    await expect(a).resolves.toEqual(DRAFT_OK);
+    port.answer(0, DRAFT_OK);
+    expect(await b).toEqual(code('internal_error'));
+    expect(port.disconnected).toBe(true);
+  });
+
+  it('舊連線晚到的訊息被忽略，不影響新連線', async () => {
+    const { client, ports } = setup();
+    const a = client.send(DRAFT);
+    ports[0]?.hostDisconnect();
+    await a;
+    const b = client.send(DRAFT);
+    ports[0]?.emit({ id: 'r999', response: DRAFT_OK });
+    ports[1]?.answer(0, DRAFT_OK);
+    await expect(b).resolves.toEqual(DRAFT_OK);
+    expect(ports[1]?.disconnected).toBe(false);
+  });
+});
+
+describe('bridge client：helper_unavailable 與 timeout', () => {
+  it('host 斷線（例如未安裝）：在途請求回 helper_unavailable 帶原因，下次重連', async () => {
+    const { client, ports } = setup(undefined, {
+      lastError: 'Specified native messaging host not found.',
+    });
+    const a = client.send(DRAFT);
+    const b = client.send(MSG);
     ports[0]?.hostDisconnect();
     const res = await a;
-    expect(res).toMatchObject({ ok: false, error: { code: 'internal_error' } });
+    expect(res).toEqual(code('helper_unavailable'));
     expect(JSON.stringify(res)).toContain('not found');
-    const b = client.send(OPEN);
-    await vi.waitFor(() => expect(ports).toHaveLength(2));
-    ports[1]?.emit({ ok: true });
-    await expect(b).resolves.toEqual({ ok: true });
+    expect(await b).toEqual(code('helper_unavailable'));
+    const c = client.send(DRAFT);
+    ports[1]?.answer(0, DRAFT_OK);
+    await expect(c).resolves.toEqual(DRAFT_OK);
   });
 
-  it('逾時：回 internal_error 並斷線，晚到的回覆不會配給下一個請求', async () => {
+  it('送出時丟例外：回 helper_unavailable', async () => {
+    const { client, ports } = setup();
+    const a = client.send(DRAFT);
+    ports[0]?.answer(0, DRAFT_OK);
+    await a;
+    (ports[0] as FakePort).throwOnPost = true;
+    expect(await client.send(DRAFT)).toEqual(code('helper_unavailable'));
+    expect(ports[0]?.disconnected).toBe(true);
+  });
+
+  it('connect 本身丟例外：回 helper_unavailable', async () => {
+    const client = createBridgeClient({
+      connect: () => {
+        throw new Error('nativeMessaging permission missing');
+      },
+      lastError: () => undefined,
+    });
+    expect(await client.send(DRAFT)).toEqual(code('helper_unavailable'));
+  });
+
+  it('close：在途請求回 helper_unavailable', async () => {
+    const { client, ports } = setup();
+    const a = client.send(DRAFT);
+    client.close();
+    expect(await a).toEqual(code('helper_unavailable'));
+    expect(ports[0]?.disconnected).toBe(true);
+  });
+
+  it('逾時：只有該請求回 timeout，連線保留，晚到回覆被丟棄不配給別人', async () => {
     vi.useFakeTimers();
     const { client, ports } = setup();
-    const a = client.send(OPEN);
-    await vi.waitFor(() => expect(ports[0]?.sent).toHaveLength(1));
-    await vi.advanceTimersByTimeAsync(1000);
-    await expect(a).resolves.toMatchObject({ ok: false, error: { code: 'internal_error' } });
-    expect(ports[0]?.disconnected).toBe(true);
-    const b = client.send(DRAFT);
-    await vi.waitFor(() => expect(ports).toHaveLength(2));
-    ports[0]?.emit({ ok: true }); // 舊連線晚到
-    ports[1]?.emit({ ok: true, workJobId: 'w-2' });
-    await expect(b).resolves.toEqual({ ok: true, workJobId: 'w-2' });
+    const slow = client.send(DRAFT);
+    await vi.advanceTimersByTimeAsync(600);
+    const other = client.send(DRAFT);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(await slow).toEqual(code('timeout'));
+    const port = ports[0] as FakePort;
+    expect(port.disconnected).toBe(false);
+    port.answer(0, { ok: true, workJobId: 'late' }); // 晚到
+    port.answer(1, DRAFT_OK);
+    await expect(other).resolves.toEqual(DRAFT_OK);
+    expect(port.disconnected).toBe(false);
+    expect(ports).toHaveLength(1);
   });
 
-  it('沒人在等時收到訊息：視為順序錯亂，斷線', async () => {
-    const { client, ports } = setup(() => ({ ok: true }));
-    await client.send(OPEN);
-    ports[0]?.emit({ ok: true });
+  it('逾時的請求在 helper 回覆前仍占名額；晚到回覆後釋放', async () => {
+    vi.useFakeTimers();
+    const { client, ports } = setup(undefined, { maxInFlight: 2 });
+    const a = client.send(DRAFT);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await a).toEqual(code('timeout'));
+    const b = client.send(DRAFT);
+    const c = client.send(MSG);
+    const port = ports[0] as FakePort;
+    expect(port.sent).toHaveLength(2); // a 仍占名額，c 排隊
+    port.answer(0, DRAFT_OK); // a 晚到
+    expect(port.sent).toHaveLength(3);
+    port.answer(1, DRAFT_OK);
+    port.answer(2, MSG_OK);
+    expect(await Promise.all([b, c])).toEqual([DRAFT_OK, MSG_OK]);
+  });
+
+  it('名額全被逾時請求占住（helper 疑似卡死）：斷線重來，排隊的請求改走新連線', async () => {
+    vi.useFakeTimers();
+    const { client, ports } = setup(undefined, { maxInFlight: 1 });
+    const a = client.send(DRAFT);
+    await vi.advanceTimersByTimeAsync(500);
+    const queued = client.send(MSG);
+    expect(ports[0]?.sent).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(await a).toEqual(code('timeout'));
     expect(ports[0]?.disconnected).toBe(true);
+    expect(ports[1]?.sent.map((s) => s.request)).toEqual([MSG]);
+    ports[1]?.answer(0, MSG_OK);
+    await expect(queued).resolves.toEqual(MSG_OK);
+    ports[0]?.answer(0, DRAFT_OK); // 舊連線晚到：忽略
+    expect(ports[1]?.disconnected).toBe(false);
   });
 });

@@ -1,8 +1,12 @@
+import { RELAY_CHANNEL } from '@rolecraft/contracts';
+
 /**
  * 頁面（編輯器頁、content script）→ service worker 的轉送訊息。
  * 頁面不直接連 Native Messaging（ADR-0003），只能把橋接請求包成這個形狀交給 service worker。
+ * 頁面不帶請求 id：chrome.runtime.sendMessage 本身就一問一答，id 由 service worker 配。
+ * 通道名稱唯一定義在 contracts，與編輯器共用。
  */
-export const RELAY_CHANNEL = 'rolecraft.bridge';
+export { RELAY_CHANNEL };
 
 export interface RelayMessage {
   channel: typeof RELAY_CHANNEL;

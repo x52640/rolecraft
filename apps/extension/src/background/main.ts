@@ -1,6 +1,8 @@
 // service worker 入口：唯一持有 Native Messaging 連線的地方（ADR-0003）。
+// 開編輯器只由工具列按鈕在這裡直接開分頁，不經 helper（bridge.md）。
+import { NATIVE_HOST_NAME } from '@rolecraft/contracts';
+
 import { createBridgeClient } from '../bridge/client.ts';
-import { NATIVE_HOST_NAME } from '../bridge/host.ts';
 import { CAPTURE_COMMAND } from '../manifest.ts';
 import { handleRelay } from '../relay/handler.ts';
 import { isRelayMessage } from '../relay/messages.ts';

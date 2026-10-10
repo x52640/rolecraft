@@ -9,7 +9,11 @@ export type LogEvent =
   | { event: 'host_stopped'; exitCode: number }
   | { event: 'origin_rejected'; originFormatValid: boolean }
   | { event: 'config_invalid' }
-  | { event: 'protocol_error'; code: FrameErrorCode | 'too_many_pending' | 'write_failed' }
+  | {
+      event: 'protocol_error';
+      code: FrameErrorCode | 'too_many_pending' | 'write_failed' | 'invalid_id' | 'duplicate_id';
+    }
+  | { event: 'envelope_rejected' }
   | { event: 'stream_truncated' }
   | {
       event: 'request_rejected';
