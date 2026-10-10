@@ -1,7 +1,7 @@
 ---
 id: P1-T016
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T015"]
 specs: ["architecture.md"]
 track: editor

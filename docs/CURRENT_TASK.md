@@ -10,7 +10,6 @@
 - P1-T008 sources：資料夾列舉、授權集合與安全讀檔（`docs/tasks/P1-T008-sources-authorization.md`）
 - P1-T010 providers：適配介面、環境清理與 R6 紀錄（`docs/tasks/P1-T010-providers-core.md`）
 - P1-T014 helper：橋接端點與操作清單分派（`docs/tasks/P1-T014-helper-host.md`）
-- P1-T016 editor：React 骨架與路由（`docs/tasks/P1-T016-editor-skeleton.md`）
 
 ## ready
 
@@ -42,6 +41,7 @@
 - P1-T015 `859b505`
 - P1-T026 `9ea7487`
 - P1-T003 `9cd8ec9`、`8c5bb79`（實作＋對抗驗證修正）
+- P1-T016 `e1cbf9e`
 
 ## 已知殘餘（記錄，不擋上線）
 
@@ -63,6 +63,8 @@
 
 - 擴充功能（P1-T015）：橋接無請求 id，客戶端一次一則；Native Messaging host 名稱 `com.rolecraft.helper`（暫在 extension，應移至 contracts）；錯誤碼尚無「helper 未安裝」「逾時」（P1-T016／T030 需要時加）；擴充功能 ID 未固定（P1-T031）；`open_editor` 經 helper 的語意待定義；站點註冊表只有職缺頁路徑。
 - PDF 匯出（ADR-0005）：HTML＋CSS 交給本機 Chrome 背景列印（puppeteer-core），附 Noto Sans TC 400／700 完整字型（+14.2 MB，D17 自用可接受），匯出前用 HarfBuzz 裁字型；缺字會被 Chrome 偷補系統字型，P1-T027 要擋。依賴本機 Chrome；Arc 啟動逾時未查明、Edge 未裝。
+
+- 待開 Task「橋接 contract 升級」（contract_change）：請求 id（並行、P1-T027 分塊）、錯誤碼（not_implemented／helper_unavailable／timeout）、host 名稱 `com.rolecraft.helper` 與轉送通道 `rolecraft.bridge` 移入 contracts（目前 extension／editor／helper 各寫一份）、`open_editor` 語意；另 vitest 收 `*.test.tsx`。
 
 ## 治理
 
