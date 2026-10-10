@@ -145,8 +145,17 @@ export const runCheckRecord = (over: Partial<RunCheckRecord> = {}): RunCheckReco
   id: newId(),
   provider: 'claude',
   model: 'sonnet',
+  trigger: 'run_start',
   checkedAt: T,
+  items: {
+    subscriptionLogin: { outcome: 'passed', basis: 'login status' },
+    environmentSanitized: { outcome: 'passed', basis: 'env' },
+    cliConfig: { outcome: 'passed', basis: 'config' },
+    executionMode: { outcome: 'passed', basis: 'mode' },
+  },
+  removedEnvVarNames: [],
   subscriptionOnly: 'passed',
+  executed: true,
   ...over,
 });
 

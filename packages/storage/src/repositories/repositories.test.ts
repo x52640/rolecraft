@@ -140,7 +140,7 @@ describe('JobSnapshot / ResumeVersion / MessageDraft', () => {
 describe('RunCheckRecordRepository', () => {
   it('is append-only', () => {
     const r1 = runCheckRecord();
-    const r2 = runCheckRecord({ subscriptionOnly: 'unknown' });
+    const r2 = runCheckRecord({ subscriptionOnly: 'unknown', executed: false });
     repos.runCheckRecords.append(r1);
     repos.runCheckRecords.append(r2);
     repos.runCheckRecords.append(runCheckRecord({ provider: 'codex' }));
