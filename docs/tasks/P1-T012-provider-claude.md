@@ -93,3 +93,21 @@ npm run verify
   - 重跑：`RUN_LIVE=1 npx vitest run packages/providers/src/claude/live.test.ts`（加 `RUN_LIVE_MODELS=1` 逐一驗證模型）；結果另寫 `$TMPDIR/rolecraft-claude-live-results.jsonl`。
   - 呼叫次數（跑了 2 次 live：第 1 次只跑注入＋正式路徑，因 vitest 不顯示通過測試的 console 而補寫結果檔後重跑並加模型驗證）：模型呼叫 8 次（haiku 5、sonnet 1、opus 1、fable 1）、`auth status` 8 次、`--version` 8 次；另手動本機 `--version`／`--help` 4 次。未使用 `--bare`、`--settings`，未改家目錄設定。
 - 與 ADR-0002 §6 的差異（core 限制，未改 core）：子程序環境多了 core 白名單的 `LC_*`、`TZ`、`TERM`、`NO_COLOR`、`__CF_USER_TEXT_ENCODING`；`TMPDIR` 是父程序的值（工作目錄就在其下），不是指向沙箱。`ExecutionResult` 只有文字，contextWindow／版本只能從 `adapter.lastRun` 取。
+
+### 對抗驗證修正
+
+E3 對抗驗證找到 5 項（PoC 已重現），全部在 `packages/providers/src/claude/` 內修正，未改 core：
+
+| 缺陷 | 修正 | 測試 |
+| --- | --- | --- |
+| （major）`parseVersion` 用 `\b`，`2.1.296-beta.1`／`.7`／`+dev`／`-rc` 被截成 `2.1.296` 而通過 | 整行嚴格比對 `<版本>` 或 `<版本> (Claude Code)`，回傳完整版本字串；只有與驗證版本完全相同才 passed，其他一律 unknown（不執行） | `constants.test.ts` |
+| （major→minor）串流守門要呼叫端自己包 | `verifyClaudeModel` 內部強制套守門；新增 `claudeRunDeps(base)`（RunDeps／ConnectionDeps 皆可，已包過不重複包）與 `isClaudeStreamGuarded`；adapter／guard 文件寫明 helper 只能用 `claudeRunDeps` 產生 deps | `hardening.test.ts`：未包裝 spawn＋init `apiKeySource=ANTHROPIC_API_KEY`，第一行就終止 |
+| （minor）確認與執行各自 `locate()` | 確認時解析的實際路徑以該次 `launch` 為鍵記下（WeakMap，可並行）；execute 只用它，沒有確認紀錄、或重新 locate 結果不同就拒絕；一次確認只給一次執行 | `hardening.test.ts` |
+| （minor）`verifyClaudeModel` 讀共用 `lastRun` | 新增 `executeDetailed`（回傳 `{ result, info }`）；`verifyClaudeModel` 用每次呼叫自己的 info。`lastRun`／`lastCliVersion` 保留，只作除錯，並行時不保證對應 | `hardening.test.ts`：`Promise.all` 驗 4 個別名 |
+| （minor）守門只殺 CLI 本體 | stream-json 子程序改以 `detached` 建立（自成程序群組），違規時對 `-pid` 送 SIGKILL；fork 當下可能漏接（PoC 實測首發會漏），之後每 25ms 補送直到群組消失（上限約 2 秒） | `hardening.test.ts`：假 CLI（`/bin/sh` 腳本）的孫程序被終止 |
+
+殘餘（需改 core 才能消除）：
+
+- 適配器拿不到 spawn，一般 `runWithSubscriptionCheck`／`checkConnection` 若 helper 沒用 `claudeRunDeps`，仍只能事後丟棄違規輸出、無法立即終止；要真正強制需 core 提供適配器層的 spawn 包裝掛點。
+- core 的取消（AbortSignal）與輸出超量終止仍只對 CLI 本體送訊號，不含孫程序。
+- 上方「`ExecutionResult` 只有文字，contextWindow／版本只能從 `adapter.lastRun` 取」已由 `executeDetailed` 取代（Claude 專用，不經 core 介面）。

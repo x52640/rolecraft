@@ -1,13 +1,17 @@
 import type { RunCheckRecord } from '@rolecraft/contracts';
 
-import type { ProviderError } from '../core/adapter.ts';
+import type { ProviderAdapter, ProviderError } from '../core/adapter.ts';
 import { type RunDeps, runWithSubscriptionCheck } from '../core/run-check.ts';
 import type { ClaudeAdapter } from './adapter.ts';
+import { claudeRunDeps } from './guard.ts';
+import type { ClaudeRunInfo } from './result.ts';
 
 /**
  * 模型可用性驗證（F01：模型選單依實際可用與帳號資格產生）。
  * CLI 沒有列模型的指令，所以使用者選定候選別名前，用一次極短呼叫驗證；
  * 走 runWithSubscriptionCheck，所以同樣先過 R6 確認並留下 RunCheckRecord。
+ * deps 一律經 claudeRunDeps 套上串流守門（呼叫端忘了包也一樣），init 異常立即終止。
+ * 模型資訊取自這次呼叫自己的 executeDetailed 回傳，不讀共用的 adapter.lastRun（可並行）。
  */
 
 export const MODEL_PROBE_PROMPT = '只回覆 OK 兩個字母。';
@@ -29,10 +33,19 @@ export async function verifyClaudeModel(
   deps: RunDeps,
   signal?: AbortSignal,
 ): Promise<ModelProbeResult> {
+  let info: ClaudeRunInfo | null = null;
+  const probe: ProviderAdapter = {
+    ...adapter,
+    execute: async (request) => {
+      const run = await adapter.executeDetailed(request);
+      info = run.info;
+      return run.result;
+    },
+  };
   const outcome = await runWithSubscriptionCheck(
-    adapter,
+    probe,
     { model, prompt: MODEL_PROBE_PROMPT, trigger: 'run_start', ...(signal ? { signal } : {}) },
-    deps,
+    claudeRunDeps(deps),
   );
   if (outcome.status === 'blocked') {
     return {
@@ -44,12 +57,12 @@ export async function verifyClaudeModel(
       record: outcome.record,
     };
   }
-  const info = adapter.lastRun;
+  const ran = info as ClaudeRunInfo | null;
   return {
     model,
     available: outcome.result.ok,
-    resolvedModel: info?.model ?? null,
-    contextWindow: info?.contextWindow ?? null,
+    resolvedModel: ran?.model ?? null,
+    contextWindow: ran?.contextWindow ?? null,
     error: outcome.result.ok ? null : outcome.result.error,
     record: outcome.record,
   };

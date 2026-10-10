@@ -76,6 +76,34 @@ describe('auth status／版本判定', () => {
     expect(versionItem(null).outcome).toBe('unknown');
   });
 
+  it.each([
+    '2.1.296-beta.1 (Claude Code)\n',
+    '2.1.296.7 (Claude Code)\n',
+    '2.1.296+dev\n',
+    '2.1.296-rc\n',
+    '2.1.2960 (Claude Code)\n',
+  ])('預發布／組建字尾不截短，與驗證版本不同 → unknown：%j', (stdout) => {
+    const version = parseVersion({
+      stdout,
+      exitCode: 0,
+      stderr: '',
+      aborted: false,
+      truncated: false,
+    });
+    expect(version).toBe(stdout.replace(/ \(Claude Code\)/, '').trim());
+    expect(versionItem(version).outcome).toBe('unknown');
+  });
+
+  it.each([
+    '2.1.296 (Claude Code) extra\n',
+    ' 2.1.296 (Claude Code)\n',
+    '2.1.296 (Claude Code)\nx\n',
+  ])('整行格式不符 → 無法解析（unknown）：%j', (stdout) => {
+    expect(
+      parseVersion({ stdout, exitCode: 0, stderr: '', aborted: false, truncated: false }),
+    ).toBeNull();
+  });
+
   it('其他供應商（Bedrock 等）或缺欄位', () => {
     const s = {
       loggedIn: true,

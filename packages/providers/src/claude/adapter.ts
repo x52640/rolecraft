@@ -10,7 +10,7 @@ import type {
   ProviderAdapter,
   SubscriptionRouteChecks,
 } from '../core/adapter.ts';
-import type { ProcessOutput } from '../core/process.ts';
+import type { Launch, ProcessOutput } from '../core/process.ts';
 import {
   type AuthStatus,
   cliConfigItem,
@@ -35,6 +35,11 @@ import { analyzeRun, type ClaudeRunInfo } from './result.ts';
  * Claude 適配器（D13、ADR-0002）。每次執行前 core 會呼叫 verifySubscriptionRoute：
  * 版本（記錄＋比對驗證版本）→ auth status（訂閱登入、無 apiKeySource）→ 受管設定。
  * 執行時固定命令列、提示走 stdin，結束後用 analyzeRun 判定（隔離違規丟棄輸出）。
+ * execute 只用該次確認時解析到的 CLI 路徑；沒有確認紀錄或路徑已變就不執行。
+ *
+ * 呼叫端（helper）規則：runWithSubscriptionCheck／checkConnection 的 deps 只能用
+ * claudeRunDeps(base) 產生（guard.ts），才有串流守門的「init 異常立即終止」。
+ * 適配器拿不到 spawn，無法自己強制；verifyClaudeModel 內部已強制套用。
  */
 
 export interface ClaudeAdapterOptions {
@@ -44,11 +49,22 @@ export interface ClaudeAdapterOptions {
   readonly findManagedSettings?: () => Promise<string[]>;
 }
 
+export interface ClaudeExecution {
+  readonly result: ExecutionResult;
+  /** 這次執行的附帶資訊（版本、上下文上限、額度狀態）；不含模型文字 */
+  readonly info: ClaudeRunInfo | null;
+}
+
 export interface ClaudeAdapter extends ProviderAdapter {
-  /** 最近一次 verifySubscriptionRoute 取得的 CLI 版本 */
+  /** 最近一次 verifySubscriptionRoute 取得的 CLI 版本（除錯用；並行時不保證對應哪一次） */
   readonly lastCliVersion: string | null;
-  /** 最近一次 execute 的附帶資訊（版本、上下文上限、額度狀態）；不含模型文字 */
+  /**
+   * 最近一次 execute 的附帶資訊；只供除錯與手動測試觀察。
+   * 並行時會被別次執行覆寫，程式要取每次的資訊請用 executeDetailed 的回傳值。
+   */
   readonly lastRun: ClaudeRunInfo | null;
+  /** 與 execute 相同，但直接回傳這次的附帶資訊（不經共用狀態） */
+  executeDetailed(request: ExecuteRequest): Promise<ClaudeExecution>;
 }
 
 const item = (outcome: RunCheckItem['outcome'], basis: string): RunCheckItem => ({
@@ -57,12 +73,17 @@ const item = (outcome: RunCheckItem['outcome'], basis: string): RunCheckItem => 
 });
 
 const NOT_FOUND = '找不到官方 Claude CLI（原生執行檔）';
+const NOT_CONFIRMED = '這次執行沒有經過執行前確認（找不到確認時的 CLI 路徑），不執行';
+const PATH_CHANGED = 'Claude CLI 路徑在執行前確認之後改變（可能自動更新），不執行；請重新確認';
 
 export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): ClaudeAdapter {
   const locate = options.locate ?? (() => locateClaude());
   const managed = options.findManagedSettings ?? (() => findManagedSettings());
   let lastCliVersion: string | null = null;
   let lastRun: ClaudeRunInfo | null = null;
+  // 執行前確認時解析到的實際路徑，以該次的 launch 為鍵（core 每次執行建立一個 launch），
+  // execute 只用這個路徑，避免「確認 A、執行 B」，並行執行也不互相干擾。
+  const confirmedPath = new WeakMap<Launch, string>();
 
   const run = async (
     ctx: ProbeContext,
@@ -121,6 +142,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): ClaudeA
         const missing = item('unknown', NOT_FOUND);
         return { subscriptionLogin: missing, cliConfig: missing, executionMode: missing };
       }
+      confirmedPath.set(ctx.launch, path);
       const version = parseVersion(await run(ctx, path, CLAUDE_VERSION_COMMAND));
       lastCliVersion = version;
       const executionMode = versionItem(version);
@@ -135,12 +157,28 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): ClaudeA
     },
 
     async execute(request: ExecuteRequest): Promise<ExecutionResult> {
+      return (await adapter.executeDetailed(request)).result;
+    },
+
+    async executeDetailed(request: ExecuteRequest): Promise<ClaudeExecution> {
+      const fail = (message: string): ClaudeExecution => ({
+        result: { ok: false, error: { kind: 'other', message } },
+        info: null,
+      });
       lastRun = null;
+      const path = confirmedPath.get(request.launch);
+      // 一次確認只給一次執行用
+      confirmedPath.delete(request.launch);
       if (request.signal?.aborted) {
-        return { ok: false, error: { kind: 'cancelled', message: '使用者已取消' } };
+        return {
+          result: { ok: false, error: { kind: 'cancelled', message: '使用者已取消' } },
+          info: null,
+        };
       }
-      const path = await locate();
-      if (!path) return { ok: false, error: { kind: 'other', message: NOT_FOUND } };
+      if (!path) return fail(NOT_CONFIRMED);
+      const current = await locate();
+      if (!current) return fail(NOT_FOUND);
+      if (current !== path) return fail(PATH_CHANGED);
       const output = await request.launch({
         executablePath: path,
         command: CLAUDE_RUN_COMMAND,
@@ -150,7 +188,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): ClaudeA
       });
       const analysis = analyzeRun(output);
       lastRun = analysis.info;
-      return analysis.result;
+      return { result: analysis.result, info: analysis.info };
     },
   };
   return adapter;

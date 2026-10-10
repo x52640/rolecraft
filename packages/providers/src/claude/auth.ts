@@ -86,10 +86,16 @@ export function eligibilityOutcome(status: AuthStatus | null): CheckOutcome {
   return status?.subscriptionType ? 'passed' : 'unknown';
 }
 
-/** `2.1.296 (Claude Code)` → `2.1.296`；無法解析回 null。 */
+/**
+ * 整行嚴格比對：輸出必須只有一行 `<版本>` 或 `<版本> (Claude Code)`，回傳完整版本字串。
+ * 不截短預發布或組建字尾（`2.1.296-beta.1`、`2.1.296.7`、`2.1.296+dev` 原樣回傳），
+ * 所以只有與驗證版本完全相同才會通過 versionItem；其他格式回 null（unknown）。
+ */
+const VERSION_LINE = /^(\d+\.\d+\.\d+[0-9A-Za-z.+-]*)(?: \(Claude Code\))?$/;
+
 export function parseVersion(output: ProcessOutput): string | null {
   if (output.exitCode !== 0) return null;
-  const match = /^\s*(\d+\.\d+\.\d+)\b/.exec(output.stdout);
+  const match = VERSION_LINE.exec(output.stdout.replace(/\r?\n$/, ''));
   return match?.[1] ?? null;
 }
 

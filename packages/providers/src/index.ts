@@ -49,6 +49,7 @@ export { createUnsupportedAdapter } from './core/unsupported.ts';
 export {
   type ClaudeAdapter,
   type ClaudeAdapterOptions,
+  type ClaudeExecution,
   createClaudeAdapter,
 } from './claude/adapter.ts';
 export {
@@ -58,7 +59,12 @@ export {
   CLAUDE_VERIFIED_VERSION,
   findForbiddenClaudeArgs,
 } from './claude/constants.ts';
-export { createClaudeStreamGuard, type StreamGuardOptions } from './claude/guard.ts';
+export {
+  claudeRunDeps,
+  createClaudeStreamGuard,
+  isClaudeStreamGuarded,
+  type StreamGuardOptions,
+} from './claude/guard.ts';
 export { locateClaude } from './claude/locate.ts';
 export { MODEL_PROBE_PROMPT, type ModelProbeResult, verifyClaudeModel } from './claude/models.ts';
 export type { ClaudeRunInfo } from './claude/result.ts';
