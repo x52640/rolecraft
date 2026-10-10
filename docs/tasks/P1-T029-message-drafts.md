@@ -6,7 +6,7 @@ depends_on: ["P1-T024", "P1-T016"]
 specs: ["jobs-and-messages.md"]
 track: pipeline
 primary_repo: rolecraft
-write_paths: ["packages/pipeline/src/messages/", "apps/editor/src/pages/messages/", "apps/helper/src/handlers/messages/", "apps/editor/src/app/routes.ts", "apps/helper/src/main.ts"]
+write_paths: ["packages/pipeline/src/messages/", "apps/editor/src/pages/messages/", "apps/helper/src/handlers/messages/", "apps/editor/src/app/routes.ts", "apps/helper/src/main.ts", "packages/pipeline/src/index.ts", "apps/editor/src/app/App.test.ts", "apps/extension/scripts/chrome-e2e.mjs"]
 contract_change: none
 expected_commit: "feat(P1-T029): 招募訊息回覆草稿（手動貼上）"
 ---
