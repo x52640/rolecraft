@@ -79,7 +79,8 @@ export function openHelperRuntime(config: RuntimeConfig, deps: RuntimeDeps = {})
   const { db } = openDatabase(path.join(config.dataDir, DATABASE_FILE));
   try {
     const fileStore = createLocalFileStore(path.join(config.dataDir, FILES_DIR));
-    const sweep = (deps.sweep ?? sweepStorage)(db, fileStore);
+    // 啟動清掃帶寬限期：其他 helper 行程可能剛寫入 PDF、還沒寫資料列（ADR-0003 每次連線一個行程）
+    const sweep = (deps.sweep ?? sweepStorage)(db, fileStore, { orphanGrace: true });
     const readFonts = deps.loadFonts ?? loadBundledFonts;
     let fonts: Promise<FontSet> | null = null;
     return {

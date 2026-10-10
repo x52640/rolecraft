@@ -6,6 +6,8 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -32,6 +34,8 @@ export interface FileStoreInternals {
   delete(hash: string): boolean;
   /** 列出儲存區內所有檔案的雜湊 */
   listHashes(): string[];
+  /** 檔案最後修改時間（毫秒）；不存在回 null。孤兒清掃的寬限期用 */
+  modifiedAtMs(hash: string): number | null;
 }
 
 const internals = new WeakMap<FileStore, FileStoreInternals>();
@@ -64,7 +68,15 @@ export function createLocalFileStore(root: string): FileStore {
       const hash = sha256Hex(content);
       const target = pathOf(hash);
       // 既有檔案內容不符雜湊（損壞或被外部修改）就原子覆寫，不回報假成功（codex review P1-T006）
-      if (!existsSync(target) || sha256Hex(readFileSync(target)) !== hash) {
+      if (existsSync(target) && sha256Hex(readFileSync(target)) === hash) {
+        // 同內容已存在（可能是等待清掃的孤兒）：更新修改時間，讓其他行程的啟動清掃在寬限期內不刪它
+        try {
+          const now = new Date();
+          utimesSync(target, now, now);
+        } catch {
+          // 盡力而為：更新失敗不影響存入
+        }
+      } else {
         mkdirSync(path.dirname(target), { recursive: true });
         const temp = `${target}.${randomUUID()}.tmp`;
         try {
@@ -101,6 +113,13 @@ export function createLocalFileStore(root: string): FileStore {
       if (!existsSync(target)) return false;
       rmSync(target);
       return true;
+    },
+    modifiedAtMs(hash) {
+      try {
+        return statSync(pathOf(hash)).mtimeMs;
+      } catch {
+        return null;
+      }
     },
     listHashes() {
       const base = path.join(root, 'sha256');

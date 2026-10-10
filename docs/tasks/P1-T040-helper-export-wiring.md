@@ -74,8 +74,8 @@ npm run verify
 
 - 最後完成：匯出 handler／服務、ResumeDocument 組裝規則、contracts 段落歸屬欄位、helper 資料區與啟動清掃、Claude deps 入口、測試
 - 已通過驗證：worktree `npm run verify` 綠（Vitest 1976 通過、11 略過）；`RUN_CHROME=1` 的匯出接線整合測試本機 Chrome 實跑通過
-- 下一步：對抗驗證屬實項：清單單筆遺失已修；孤兒 PDF 寬限期待協調者裁定做法（見完成結果「待裁定」）
-- Blocker：寬限期會讓 D19 刪素材後的 PDF 延後刪除，且需改範圍外的呼叫端與測試
+- 下一步：協調者收官（對抗驗證屬實 2 項已修：清單單筆遺失、啟動清掃寬限期）
+- Blocker：無
 
 ## 完成結果
 
@@ -89,5 +89,6 @@ npm run verify
 - 測試：段落歸屬 schema；組裝規則（Profile 欄位、順序、空白段落、對不到經歷、無歸屬、連結）；R1 未過不匯出；**同一份版本**（repo 第二次讀回換過的版本、檢查後改資料庫或改讀出的物件，印出與存下的仍是檢查時那份，且交給匯出器的 R1 結果等於對印出段落重跑的結果）；錯誤對應；分塊拼回與邊界；未設資料區回 not_implemented；sweep 恰呼叫一次、孤兒 PDF 清掉、清掃失敗關資料庫；main 子行程端到端；Chrome 實際匯出（`RUN_CHROME=1` 才跑）。
 - 手動驗證：無（真實 104 PDF 與安裝後字型路徑留 P1-T031／P1-T032）。
 - 對抗驗證修正：`export.list_versions` 遇單一版本 PDF 遺失或內容與雜湊不符（StorageError）時只略過該筆，其他版本照常列出（不填假大小；contracts 沒有損壞標記）；該版本仍可用 `get_version` 讀內容，`read_pdf` 回 `internal_error`。其他例外照拋。
-- 待裁定：孤兒 PDF 清掃加寬限期。`sweepOrphanPdfs` 也被 `deleteMaterial`、投遞紀錄刪除用來刪「剛刪掉的未投遞匯出版本」的 PDF（D19），加寬限期會讓含已刪素材的 PDF 留到寬限期過後，`d19-hardening.test.ts`、`application-record.test.ts`、helper `applications.test.ts` 的立即刪除斷言會失敗；這些檔與呼叫端不在 write_paths，尚未實作。
+- 對抗驗證修正（方案 A）：`sweepOrphanPdfs` 加選填寬限期與時間來源，預設 0（`deleteMaterial`、刪投遞紀錄仍立即刪）；`sweepStorage` 加選填 `orphanGrace`，helper 啟動清掃帶 `ORPHAN_PDF_GRACE_MS`（15 分鐘），只刪修改時間早於寬限期的孤兒，避免刪到其他 helper 行程剛寫入、尚未寫資料列的 PDF；啟動清掃補刪的 D19 版本 PDF 不受寬限期影響、立即刪。同內容 PDF 再次存入時 `put` 會更新修改時間（避免重用舊孤兒時被刪）。
+- 殘餘：「另一行程刪素材（寬限期 0 的清掃）時撞上本行程正在匯出」的競態仍在（機率極低），需跨行程鎖，另開 Task。
 - 殘餘：匯出版本沒有保存 Profile 印出內容（姓名、聯絡方式、公司職稱日期、技能）的結構化快照；PDF 與雜湊有保存。需要 contracts＋storage 變更，在面試教練（第二階段）前另開 Task。

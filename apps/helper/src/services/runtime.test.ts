@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -26,6 +26,12 @@ function tempDir(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'rolecraft-helper-runtime-'));
   dirs.push(dir);
   return dir;
+}
+
+/** 把檔案修改時間改到寬限期之前（ORPHAN_PDF_GRACE_MS 為 15 分鐘）。 */
+function ageFile(dataDir: string, hash: string): void {
+  const old = new Date(Date.now() - 16 * 60 * 1000);
+  utimesSync(path.join(dataDir, FILES_DIR, 'sha256', hash.slice(0, 2), hash), old, old);
 }
 
 const FONTS = { regular: new Uint8Array([1]), bold: new Uint8Array([2]) };
@@ -56,18 +62,21 @@ describe('openHelperRuntime：啟動時清掃一次（sweepStorage）', () => {
     const sweep = vi.fn(sweepStorage);
     const runtime = openHelperRuntime({ dataDir: tempDir(), fontsDir: '/f' }, { sweep });
     expect(sweep).toHaveBeenCalledTimes(1);
-    expect(sweep).toHaveBeenCalledWith(runtime.db, runtime.fileStore);
+    expect(sweep).toHaveBeenCalledWith(runtime.db, runtime.fileStore, { orphanGrace: true });
     runtime.close();
   });
 
-  it('真實清掃：上次留下的孤兒 PDF 在下次啟動時清掉', () => {
+  it('真實清掃：超過寬限期的孤兒 PDF 清掉；剛寫入的（可能是其他行程匯出中）保留', () => {
     const dataDir = tempDir();
     const first = openHelperRuntime({ dataDir, fontsDir: '/f' });
-    const orphan = first.fileStore.put(new TextEncoder().encode('%PDF orphan'));
+    const old = first.fileStore.put(new TextEncoder().encode('%PDF old orphan'));
+    const fresh = first.fileStore.put(new TextEncoder().encode('%PDF fresh'));
     first.close();
+    ageFile(dataDir, old.hash);
     const second = openHelperRuntime({ dataDir, fontsDir: '/f' });
-    expect(second.sweep.releasedPdfHashes).toEqual([orphan.hash]);
-    expect(second.fileStore.has(orphan.hash)).toBe(false);
+    expect(second.sweep.releasedPdfHashes).toEqual([old.hash]);
+    expect(second.fileStore.has(old.hash)).toBe(false);
+    expect(second.fileStore.has(fresh.hash)).toBe(true);
     second.close();
   });
 
@@ -121,6 +130,7 @@ describe('main（真實子行程）：資料區接線', () => {
     const orphan = createLocalFileStore(path.join(dataDir, FILES_DIR)).put(
       new TextEncoder().encode('%PDF orphan'),
     );
+    ageFile(dataDir, orphan.hash);
     const env = {
       [ALLOWED_ORIGINS_ENV]: ALLOWED,
       [DATA_DIR_ENV]: dataDir,

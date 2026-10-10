@@ -47,15 +47,40 @@ export function releasePdfs(db: DatabaseSync, fileStore: FileStore, hashes: stri
   return released;
 }
 
+export interface OrphanSweepOptions {
+  /**
+   * 寬限期（毫秒）：最後修改時間在這段時間內的孤兒檔不刪。預設 0（立即刪，D19 刪除路徑用）。
+   * 啟動清掃帶寬限期（storage-sweep.ts），因為可能有另一個 helper 行程剛寫入、還沒寫資料列。
+   */
+  readonly graceMs?: number;
+  /** 現在時間（毫秒）；測試可注入 */
+  readonly now?: () => number;
+}
+
 /**
  * 孤兒 PDF 清掃：刪掉檔案區中雜湊不在 export_versions 的檔案。
  * 補救「交易已提交但刪檔失敗／程序中斷」留下的檔案。不能在外層交易中呼叫。
- * 前提：單一程序使用資料庫（create 的「寫檔→寫列」是同步的，中間不會被清掃插入）。
+ * 多行程：每次 connectNative 都是一個 helper 行程（ADR-0003），create 的「寫檔→寫列」
+ * 在同一行程內是同步的，但其他行程的清掃可能插在中間。啟動清掃用寬限期避開剛寫入的檔
+ * （同內容重複存入時 put 也會更新修改時間）；寬限期 0 的呼叫端（deleteMaterial、刪投遞紀錄）
+ * 與其他行程的匯出仍可能互撞（機率極低），徹底解決需要跨行程鎖。
  */
-export function sweepOrphanPdfs(db: DatabaseSync, fileStore: FileStore): string[] {
+export function sweepOrphanPdfs(
+  db: DatabaseSync,
+  fileStore: FileStore,
+  options: OrphanSweepOptions = {},
+): string[] {
   assertNotInTransaction(db, '清掃孤兒 PDF');
-  const orphans = fileStoreInternals(fileStore)
+  const files = fileStoreInternals(fileStore);
+  const graceMs = options.graceMs ?? 0;
+  const cutoff = (options.now ?? Date.now)() - graceMs;
+  const orphans = files
     .listHashes()
-    .filter((hash) => !isPdfReferenced(db, hash));
+    .filter((hash) => !isPdfReferenced(db, hash))
+    .filter((hash) => {
+      if (graceMs <= 0) return true;
+      const modified = files.modifiedAtMs(hash);
+      return modified !== null && modified < cutoff;
+    });
   return releasePdfs(db, fileStore, orphans);
 }
