@@ -1,7 +1,7 @@
 ---
 id: P1-T027
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T026", "P1-T007"]
 specs: ["resume-output.md"]
 track: pdf
@@ -22,10 +22,11 @@ F07、R3：產出可選取文字的中文 PDF 並凍結版本。
 
 - 依 ADR-0005 實作 1–2 頁中文模板（D15）
 - 匯出前檢查：缺字、截斷、分頁、連結、空白頁
-- 匯出時建立不可變 ExportVersion（P1-T007）
+- ~~匯出時建立不可變 ExportVersion（P1-T007）~~ → 協調者 2026-10-10 移出本 Task（P1-T034 同時改橋接），由後續 helper 接線 Task 處理
 
 ### 不包含
 
+- helper handler 與建立 ExportVersion（見上）
 - 模板視覺設計細節（先求正確）
 
 ## 工作區與 Context

@@ -6,7 +6,6 @@
 ## 進行中
 
 - P1-T012 providers：Claude 適配器（`docs/tasks/P1-T012-provider-claude.md`）
-- P1-T027 pdf-export：中文模板與匯出檢查（`docs/tasks/P1-T027-pdf-export.md`）
 - P1-T034 橋接 contract 升級：請求 id、錯誤碼、共用常數（`docs/tasks/P1-T034-bridge-contract-v2.md`）
 
 ## ready
@@ -55,6 +54,7 @@
 - P1-T007 `af9e0d9`、`50c8639`
 - P1-T002 `8110afb`、`5b7e7db`
 - P1-T011 `51738d8`、`d124f79`
+- P1-T027 `e36f2cd`
 
 ## 已知殘餘（記錄，不擋上線）
 
@@ -88,6 +88,8 @@
 - 數字檢查（P1-T002）：fail-closed；數字後接未知字母（3D、5G、100ms、1080p）一律無法辨識需逐段確認，誤擋偏吵，可改整串字面比對；「一個／一套」等列入排除表（代價：「一個人完成」不檢查）。
 
 - Claude CLI（ADR-0002）：隔離模式仍開本機訊息 socket（`/tmp/cc-socks/<pid>.sock`），無旗標可關；必須用真實 HOME，CLI 每次執行會改寫 `~/.claude.json`（CLI 自身狀態）；CLI 自動更新，P1-T012 要記版本、版本變了重跑 spike。P1-T011 的對抗驗證併入 P1-T012（需真實 CLI 呼叫，避免重複耗額度）。
+
+- 待開「helper 匯出接線」Task：helper 呼叫 `exportResumePdf` → `exports.create()`；從 Profile＋ResumeVersion 組 ResumeDocument 的規則（contracts ResumeSection 缺段落歸屬／項目類型，可能需加欄位）；R1 結果與 document 同一份內容的測試；可順帶接 `sweepStorage` 與 Claude stream guard。字型打包與 OFL.txt 來源固定留 P1-T031。模板禁用 CSS `position`（會打亂 PDF 文字順序，已有測試）。
 
 ## 治理
 
