@@ -6,7 +6,6 @@
 ## 進行中
 
 - P1-T022 pipeline：文件分析成事實項（`docs/tasks/P1-T022-pipeline-analysis.md`）
-- P1-T039 Claude CLI 版本變更時自動重新驗證（`docs/tasks/P1-T039-claude-auto-reverify.md`）
 - P1-T041 橋接：編輯器頁面所需操作清單（`docs/tasks/P1-T041-bridge-editor-ops.md`）
 
 ## ready

@@ -1,7 +1,7 @@
 ---
 id: P1-T039
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T012", "P1-T037"]
 specs: ["providers.md"]
 track: providers
@@ -74,7 +74,7 @@ npm run verify
 ## 中斷／接手紀錄
 
 - 最後完成：對抗驗證 2 項修正（使用者設定欄位嚴格檢查、呼叫模型前先寫暫定失敗紀錄）
-- 已通過驗證：`npm run verify` 綠（verify:docs 只剩 index 過期）；live 測試未執行（等協調者）
+- 已通過驗證：主樹 `npm run verify` 綠；對抗驗證（E3）2 項屬實已修（ee57cc4）；live 測試 2026-10-10 協調者以 2.1.296 跑一次：12 案例全過，模型呼叫 2 次（haiku）、auth status 2 次、--version 3 次
 - 下一步：協調者跑一次 live（指令見完成結果）、E3 對抗驗證、收官
 - Blocker：無
 
@@ -99,3 +99,4 @@ npm run verify
 | （minor）重新驗證中途當掉，重啟後會再花模型呼叫 | 呼叫模型前先保存暫定失敗紀錄（`重新驗證未完成`），寫不進去就 0 次模型呼叫、停用；通過後保存 verified 覆蓋，讀取時同版本以最後一筆為準 | `reverify-strict.test.ts`：保存一直丟錯（多次重啟仍 0 次）、中途當掉後重啟維持停用、最後一筆為準 |
 
 殘餘：自動重新驗證不涵蓋使用者層（真實 HOME）的 CLAUDE.md／外掛／hooks 誘餌（HOME 必須是真的、不能動使用者設定），只靠 init 欄位嚴格檢查＋專案層誘餌間接涵蓋。
+- 手動驗證（live，2026-10-10）：`RUN_LIVE=1` 以 2.1.296 模擬未驗證版本，outcome=verified，12 案例全過，模型呼叫 2 次。
