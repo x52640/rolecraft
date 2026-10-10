@@ -112,25 +112,40 @@ describe('convertDrafts（R1：每個事實項都有可驗證的來源片段）'
     ]);
   });
 
-  it('requires a link to be a string inside the excerpt', () => {
-    const result = convert(
-      [
-        draft({
-          type: 'link',
-          segment: 'S2',
-          text: 'https://a.example.com',
-          excerpt: '網站 https://a.example.com 已公開。',
-        }),
-        draft({
-          type: 'link',
-          segment: 'S2',
-          text: 'https://evil.example.com',
-          excerpt: '網站 https://a.example.com 已公開。',
-        }),
-      ].map(withoutCompletion),
-    );
-    expect(result.claims).toHaveLength(1);
-    expect(result.dropped).toEqual([{ index: 1, reason: 'link_not_in_excerpt' }]);
+  it('requires a link to equal a complete URL in the excerpt', () => {
+    const excerpt = '網站 https://a.example.com 已公開。';
+    const link = (text: string): ClaimDraft => ({ segment: 'S2', type: 'link', text, excerpt });
+    const result = convert([
+      link('https://a.example.com'),
+      link('https://evil.example.com'),
+      link('https://a.example'), // 截斷
+      link('h'), // 單一字元
+      link('a'),
+      link('網站'), // 非網址文字
+      link(' https://a.example.com '), // 前後空白可（通過網址檢查）
+    ]);
+    expect(result.claims.map((c) => c.text)).toEqual(['https://a.example.com']);
+    expect(result.dropped).toEqual([
+      ...[1, 2, 3, 4, 5].map((index) => ({ index, reason: 'link_not_in_excerpt' })),
+      { index: 6, reason: 'duplicate' }, // 通過網址檢查，只因與第 0 項重複
+    ]);
+  });
+
+  it('requires every URL in any claim text to be a complete URL from the excerpt', () => {
+    const excerpt = '網站 https://a.example.com 已公開。';
+    const feature = (text: string): ClaimDraft => draft({ segment: 'S2', text, excerpt });
+    const result = convert([
+      feature('公開網站 https://a.example.com。'),
+      feature('公開網站 https://a.example.com/admin'),
+      feature('公開網站 https://a.exam'),
+      feature('公開網站 www.evil.example.com'),
+    ]);
+    expect(result.claims.map((c) => c.text)).toEqual(['公開網站 https://a.example.com。']);
+    expect(result.dropped.map((d) => d.reason)).toEqual([
+      'link_not_in_excerpt',
+      'link_not_in_excerpt',
+      'link_not_in_excerpt',
+    ]);
   });
 
   it('drops an excerpt that occurs in different blocks of the segment (ambiguous)', () => {

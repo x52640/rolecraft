@@ -61,8 +61,16 @@ export type UnitFailure =
 export type RunReport =
   | { readonly status: 'completed'; readonly job: WorkJob }
   | { readonly status: 'paused'; readonly job: WorkJob; readonly lastFailure: UnitFailure | null }
-  /** R6 不成立：沒有送出，工作狀態不變（未完成單元未記服務） */
-  | { readonly status: 'blocked'; readonly job: WorkJob; readonly record: RunCheckRecord }
+  /**
+   * R6 不成立（沒有送出），或供應商回報不可重試的錯誤（kind 'other'：401／403、隔離檢查失敗等，
+   * 不重送）：工作狀態回到送出前、不寫入。failure 是供應商錯誤時的原因；R6 不成立時為 null。
+   */
+  | {
+      readonly status: 'blocked';
+      readonly job: WorkJob;
+      readonly record: RunCheckRecord;
+      readonly failure: UnitFailure | null;
+    }
   /** 送出前發現計畫不能用（文件變了、撤銷授權等）：沒有送出，要重新規劃 */
   | {
       readonly status: 'not_sent';
@@ -78,6 +86,13 @@ export interface AnalysisRunner {
   /** 使用者取消：停止目前單元、丟棄其輸出；之後才回來的結果直接丟棄 */
   cancel(): void;
   current(): WorkRun;
+}
+
+interface Attempt {
+  readonly attemptId: string;
+  /** 送出前的狀態（不可重試時回到這裡） */
+  readonly before: WorkRun;
+  readonly record: RunCheckRecord;
 }
 
 function sameRoute<S>(record: RunCheckRecord, deps: AnalysisRunnerDeps<S>): boolean {
@@ -98,15 +113,26 @@ export function createAnalysisRunner<S>(
     return { status: 'paused', job: run.job, lastFailure };
   };
 
+  /** 回到送出前（嘗試仍是目前這次時；已被取消就保留暫停狀態）。 */
+  const rollback = (attemptId: string, before: WorkRun) => {
+    if (run.active?.attemptId === attemptId) run = before;
+  };
+
   /** 處理一次失敗；回傳 null 表示已排重試、繼續迴圈。 */
-  const fail = async (attemptId: string, failure: UnitFailure): Promise<RunReport | null> => {
+  const fail = async (attempt: Attempt, failure: UnitFailure): Promise<RunReport | null> => {
+    const { attemptId } = attempt;
     if (failure.kind === 'provider' && failure.error.kind === 'cancelled') {
       const cancelled = cancelJob(run);
       if (cancelled.ok) run = cancelled.run;
       return paused(failure);
     }
+    if (failure.kind === 'provider' && failure.error.kind === 'other') {
+      // 不可重試的錯誤（認證、隔離檢查失敗等）：不重送，比照 R6 不成立。
+      rollback(attemptId, attempt.before);
+      return { status: 'blocked', job: run.job, record: attempt.record, failure };
+    }
     const quota = failure.kind === 'provider' && failure.error.kind === 'quota_exhausted';
-    // 格式不合格與其他錯誤都當暫時性：有上限地重試，用盡就暫停，不無限制重試。
+    // 只有暫時性錯誤與輸出格式不合格會有上限地重試，用盡就暫停，不無限制重試。
     const failed = failUnit(run, {
       attemptId,
       error: quota ? 'quota_exhausted' : 'transient',
@@ -147,14 +173,14 @@ export function createAnalysisRunner<S>(
     await deps.recordRunCheck(outcome.record);
     if (!sameRoute(outcome.record, deps)) throw new Error('執行紀錄的服務或模型與單元不符');
     if (outcome.status === 'blocked') {
-      if (run.active?.attemptId === attemptId) run = before;
-      return { status: 'blocked', job: run.job, record: outcome.record };
+      rollback(attemptId, before);
+      return { status: 'blocked', job: run.job, record: outcome.record, failure: null };
     }
-    if (!outcome.result.ok)
-      return fail(attemptId, { kind: 'provider', error: outcome.result.error });
+    const attempt: Attempt = { attemptId, before, record: outcome.record };
+    if (!outcome.result.ok) return fail(attempt, { kind: 'provider', error: outcome.result.error });
 
     const parsed = parseAnalysisOutput(outcome.result.text);
-    if (!parsed.ok) return fail(attemptId, { kind: 'invalid_output', message: parsed.error });
+    if (!parsed.ok) return fail(attempt, { kind: 'invalid_output', message: parsed.error });
     const converted = convertDrafts(parsed.output, {
       unit,
       document: prepared.document,

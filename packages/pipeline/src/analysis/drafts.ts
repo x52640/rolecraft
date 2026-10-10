@@ -2,7 +2,8 @@
  * 草稿 → 事實項（R1、D4、D14）。每一項都要能在來源文件中驗證：
  * - 原文必須逐字（正規化後）落在模型所引用的片段範圍內，且能用 domain 的 `createSourceExcerpt`
  *   在目前版本的全文中定位；定位失敗或有歧義就丟棄，不猜。
- * - 事實項文字中的數字必須出現在原文裡；連結必須是原文裡的字串。
+ * - 事實項文字中的數字必須出現在原文裡；連結必須完全等於原文中的某個網址，
+ *   任何類型的文字裡出現的網址也一樣（不能截斷、拼接或捏造）。
  * - 依據只放來源片段；使用者確認一律為 null，複核狀態一律從「正常」開始（矛盾才升級）。
  */
 import { Claim, type Id, type SourceDocument, type SourceExcerpt } from '@rolecraft/contracts';
@@ -24,6 +25,7 @@ import type {
   DroppedDraft,
   DropReason,
 } from './types.ts';
+import { extractUrls } from './urls.ts';
 
 export interface DraftContext {
   readonly unit: AnalysisUnitSpec;
@@ -83,12 +85,13 @@ function fingerprintKey(location: string): string | null {
 }
 
 function groundingProblem(draft: ClaimDraft, excerptText: string): DropReason | null {
+  // 網址先比：連結必須完全等於原文中的某個網址；任何類型的文字裡出現的網址也一樣。
+  const sourceUrls = new Set(extractUrls(excerptText));
+  if (draft.type === 'link' && !sourceUrls.has(draft.text.trim())) return 'link_not_in_excerpt';
+  if (extractUrls(draft.text).some((url) => !sourceUrls.has(url))) return 'link_not_in_excerpt';
   const keys = numberKeys(excerptText);
   for (const token of extractNumbers(draft.text)) {
     if (token.key === null || !keys.has(token.key)) return 'number_not_in_excerpt';
-  }
-  if (draft.type === 'link' && !excerptText.includes(draft.text.trim())) {
-    return 'link_not_in_excerpt';
   }
   return null;
 }

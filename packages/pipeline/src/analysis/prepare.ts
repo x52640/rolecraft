@@ -12,7 +12,26 @@ import {
   promptData,
 } from '../prompts/analysis-prompt.ts';
 import { segmentLabel } from './drafts.ts';
-import type { AnalysisDocument, AnalysisUnitSpec } from './types.ts';
+import { renderGlobalSummary } from './summary.ts';
+import type { AnalysisDocument, AnalysisUnitSpec, DocumentSummary } from './types.ts';
+
+/** 送出前重查摘要各段的來源文件：不存在或不是已授權的段落移除後再組合。 */
+async function currentSummary(
+  entries: readonly DocumentSummary[],
+  loadDocument: (id: Id) => Promise<AnalysisDocument | null>,
+): Promise<string> {
+  const kept: DocumentSummary[] = [];
+  for (const entry of entries) {
+    const loaded = await loadDocument(entry.sourceDocumentId);
+    if (
+      loaded?.document.id === entry.sourceDocumentId &&
+      loaded.document.authorizationStatus === 'authorized'
+    ) {
+      kept.push(entry);
+    }
+  }
+  return renderGlobalSummary(kept);
+}
 
 export type PrepareFailure =
   | 'document_missing' // 文件已不存在
@@ -32,7 +51,7 @@ export type PreparedUnit =
 
 export async function prepareUnit(
   unit: AnalysisUnitSpec,
-  globalSummary: string,
+  globalSummary: readonly DocumentSummary[],
   loadDocument: (id: Id) => Promise<AnalysisDocument | null>,
   newId: () => Id,
 ): Promise<PreparedUnit> {
@@ -55,7 +74,7 @@ export async function prepareUnit(
     return { ok: false, reason: 'document_changed' };
   }
   const input = {
-    globalSummary,
+    globalSummary: await currentSummary(globalSummary, loadDocument),
     documentLabel: documentLabelOf(document.documentPath),
     segments: unit.segments.map((s, i) => ({
       label: segmentLabel(i),

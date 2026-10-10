@@ -39,10 +39,21 @@ export interface AnalysisUnitSpec {
   readonly budget: InputBudget;
 }
 
-/** 分析計畫：單元清單＋計畫當下的全域履歷摘要快照（續跑時沿用同一份，結果可重現）。 */
+/** 全域履歷摘要的一段：一份文件的摘要（模型整理，資料不是指令；不帶確認狀態）。 */
+export interface DocumentSummary {
+  readonly sourceDocumentId: Id;
+  /** 顯示用文件名稱（資料） */
+  readonly label: string;
+  readonly text: string;
+}
+
+/**
+ * 分析計畫：單元清單＋計畫當下的全域履歷摘要各段。摘要保持結構化（每段帶來源文件），
+ * 每次送出前重查來源文件，非已授權或不存在的段落移除後才組合（不凍結成字串）。
+ */
 export interface AnalysisPlan {
   readonly jobId: Id;
-  readonly globalSummary: string;
+  readonly globalSummary: readonly DocumentSummary[];
   readonly units: readonly AnalysisUnitSpec[];
 }
 
@@ -74,7 +85,7 @@ export type DropReason =
   | 'excerpt_not_in_segment' // 原文不在所引用的片段裡
   | 'excerpt_unlocatable' // 原文在文件中定位失敗或有歧義
   | 'number_not_in_excerpt' // 事實項文字的數字不在原文裡（或無法解析）
-  | 'link_not_in_excerpt' // 連結不在原文裡
+  | 'link_not_in_excerpt' // 連結或文字中的網址不是原文裡的完整網址
   | 'invalid_claim' // 組出的事實項不符 contracts schema
   | 'duplicate'; // 與既有或同單元的事實項重複
 

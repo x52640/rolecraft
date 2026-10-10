@@ -6,6 +6,7 @@ import { promptSkeleton } from '../prompts/analysis-prompt.ts';
 import { budget, doc, idSource } from './fixtures.test-helpers.ts';
 import { planAnalysis, type PlanAnalysisInput } from './plan.ts';
 import { prepareUnit } from './prepare.ts';
+import { globalSummaryTokenBound } from './summary.ts';
 import type { AnalysisDocument } from './types.ts';
 
 function input(overrides: Partial<PlanAnalysisInput> = {}): PlanAnalysisInput {
@@ -14,7 +15,7 @@ function input(overrides: Partial<PlanAnalysisInput> = {}): PlanAnalysisInput {
     deletedDocumentIds: [],
     analyzed: [],
     existingClaims: [],
-    globalSummary: '',
+    globalSummary: [],
     budget: budget(100_000),
     newId: idSource(),
     ...overrides,
@@ -95,11 +96,13 @@ describe('planAnalysis（增量、R2、R8）', () => {
       (_, i) => `第 ${String(i)} 段：完成功能 ${String(i)}。`,
     );
     const long = doc('long', paragraphs.join('\n\n'));
-    const fixed = estimateTokens(promptSkeleton('摘要', 'long.md')) + 60;
+    const summary = [{ sourceDocumentId: 'long', label: 'long.md', text: '摘要' }];
+    const fixed =
+      estimateTokens(promptSkeleton('', 'long.md')) + globalSummaryTokenBound(summary) + 60;
     const small = budget(fixed + Math.ceil(estimateTokens(long.text) / 3));
     const newId = idSource();
     const result = planAnalysis(
-      input({ documents: [long], budget: small, newId, globalSummary: '摘要' }),
+      input({ documents: [long], budget: small, newId, globalSummary: summary }),
     );
     if (!result.ok || !result.plan) throw new Error('plan failed');
     const { units } = result.plan;
@@ -113,7 +116,7 @@ describe('planAnalysis（增量、R2、R8）', () => {
     for (const unit of units) {
       expect(unit.estimatedTokens).toBeLessThanOrEqual(small.available);
       expect(unit.budget).toEqual(small);
-      const prepared = await prepareUnit(unit, '摘要', () => Promise.resolve(long), newId);
+      const prepared = await prepareUnit(unit, summary, () => Promise.resolve(long), newId);
       expect(prepared.ok && prepared.estimatedTokens).toBeLessThanOrEqual(small.available);
     }
   });

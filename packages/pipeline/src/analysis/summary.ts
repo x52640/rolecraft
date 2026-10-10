@@ -5,7 +5,12 @@
  */
 import type { Id } from '@rolecraft/contracts';
 
-import type { UnitAnalysisResult } from './types.ts';
+import { estimateTokens } from '@rolecraft/domain';
+
+import { EMPTY_SUMMARY } from '../prompts/analysis-prompt.ts';
+import type { DocumentSummary, UnitAnalysisResult } from './types.ts';
+
+export type { DocumentSummary } from './types.ts';
 
 /** 每份文件摘要的字元上限。 */
 export const DOCUMENT_SUMMARY_MAX_CHARS = 1_000;
@@ -13,13 +18,6 @@ export const DOCUMENT_SUMMARY_MAX_CHARS = 1_000;
 export const GLOBAL_SUMMARY_MAX_CHARS = 6_000;
 
 const TRUNCATED = '…（摘要已截斷）';
-
-export interface DocumentSummary {
-  readonly sourceDocumentId: Id;
-  /** 顯示用文件名稱（資料） */
-  readonly label: string;
-  readonly text: string;
-}
 
 function clip(text: string, max: number): string {
   if (text.length <= max) return text;
@@ -56,8 +54,21 @@ export function mergeDocumentSummaries(
   );
 }
 
+function joinEntries(entries: readonly DocumentSummary[]): string {
+  return entries.map((e) => `【${e.label}】${e.text}`).join('\n');
+}
+
 /** 彙整成放進提示的全域摘要文字（有上限）。 */
 export function renderGlobalSummary(entries: readonly DocumentSummary[]): string {
-  const text = entries.map((e) => `【${e.label}】${e.text}`).join('\n');
-  return clip(text, GLOBAL_SUMMARY_MAX_CHARS);
+  return clip(joinEntries(entries), GLOBAL_SUMMARY_MAX_CHARS);
+}
+
+/**
+ * 全域摘要估算的上界（R8）：任何子集合（送出前移除失效來源後）組合出的摘要都不會超過。
+ * 子集合的組合是全部組合（含截斷標記）的子序列，估算器對子序列不增；另外摘要最多
+ * GLOBAL_SUMMARY_MAX_CHARS 個 UTF-16 單位，每單位最多 2 token。
+ */
+export function globalSummaryTokenBound(entries: readonly DocumentSummary[]): number {
+  const all = estimateTokens(joinEntries(entries) + TRUNCATED);
+  return Math.max(Math.min(all, GLOBAL_SUMMARY_MAX_CHARS * 2), estimateTokens(EMPTY_SUMMARY));
 }
