@@ -1,7 +1,7 @@
 ---
 id: P1-T034
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T014", "P1-T015", "P1-T016"]
 specs: ["bridge.md", "architecture.md"]
 track: contracts

@@ -6,7 +6,6 @@
 ## 進行中
 
 - P1-T012 providers：Claude 適配器（`docs/tasks/P1-T012-provider-claude.md`）
-- P1-T034 橋接 contract 升級：請求 id、錯誤碼、共用常數（`docs/tasks/P1-T034-bridge-contract-v2.md`）
 
 ## ready
 
@@ -55,6 +54,7 @@
 - P1-T002 `8110afb`、`5b7e7db`
 - P1-T011 `51738d8`、`d124f79`
 - P1-T027 `e36f2cd`
+- P1-T034 `642356a`、`c61c608`
 
 ## 已知殘餘（記錄，不擋上線）
 
