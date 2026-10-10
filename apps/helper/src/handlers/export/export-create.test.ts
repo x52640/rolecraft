@@ -17,6 +17,7 @@ import {
   fakePdf,
   profile,
   resumeVersion,
+  summarySection,
   VERSION_ID,
   without,
 } from './__fixtures__/testbed.ts';
@@ -196,14 +197,32 @@ describe('export.create：不能匯出的情況', () => {
     expect(response).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
   });
 
-  it('段落沒有歸屬：invalid_request，不呼叫匯出器', async () => {
+  it('段落沒有歸屬：not_ready（與 resume.check_export 同一套段落阻擋），不呼叫匯出器', async () => {
     const { runtime } = setup();
     const noPlacement = without(citedSection(), 'placement');
     runtime.repos.resumeVersions.save(resumeVersion([noPlacement]));
     const { exportPdf } = recorder();
     const response = await createExport({ ...runtime, exportPdf }, VERSION_ID);
-    expect(response).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
+    expect(response).toEqual({ ok: true, outcome: { status: 'not_ready' } });
     expect(exportPdf).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['待接受', { decision: 'pending' }],
+    ['已退回', { decision: 'rejected' }],
+    ['沒有 decision（缺省＝待接受）', { decision: undefined }],
+  ] as const)('R1 通過但段落%s：not_ready，不呼叫匯出器、不建立匯出版本', async (_n, over) => {
+    const { runtime } = setup();
+    const section = citedSection();
+    if (over.decision === undefined) delete section.decision;
+    else section.decision = over.decision;
+    runtime.repos.resumeVersions.save(resumeVersion([summarySection(), section]));
+    const { exportPdf } = recorder();
+    const response = await createExport({ ...runtime, exportPdf }, VERSION_ID);
+    valid(response);
+    expect(response).toEqual({ ok: true, outcome: { status: 'not_ready' } });
+    expect(exportPdf).not.toHaveBeenCalled();
+    expect(runtime.exports.list()).toEqual([]);
   });
 
   it.each(['browser_not_found', 'fonts_unavailable', 'browser_failed'] as const)(

@@ -47,7 +47,7 @@ describe('服務接線', () => {
     expect(response).toMatchObject({ ok: false, error: { code: 'not_implemented' } });
   });
 
-  it('有 storage：接上逐段操作；generate 未接模型執行，回 not_implemented', async () => {
+  it('有 storage：接上逐段操作與 generate；沒有選定可用的模型時不送出（invalid_request）', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'rolecraft-resume-'));
     try {
       const wired = createServices({ db: t.db, fileStore: createLocalFileStore(dir) });
@@ -57,10 +57,10 @@ describe('服務接線', () => {
         ok: true,
         versions: [{ resumeVersionId: V }],
       });
-      expect(await send({ op: 'resume.generate', payload: { jobSnapshotId: JOB } })).toMatchObject({
-        ok: false,
-        error: { code: 'not_implemented' },
-      });
+      expect(await send({ op: 'resume.generate', payload: { jobSnapshotId: JOB } })).toMatchObject(
+        INVALID,
+      );
+      expect(t.repos.workJobs.list()).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -97,6 +97,10 @@ describe('接受、退回、刪除', () => {
     expect((await check()).blockers).toContainEqual(
       expect.objectContaining({ sectionId: 's-sum', reason: 'rejected' }),
     );
+    // 退回後可直接重新接受（等於撤回退回）
+    expect(await op('resume.accept_section', ref('s-sum'))).toEqual({ ok: true });
+    expect(t.section('s-sum')?.decision).toBe('accepted');
+    expect((await check()).blockers.some((b) => b.sectionId === 's-sum')).toBe(false);
     expect(await op('resume.accept_section', ref('s-none'))).toMatchObject(INVALID);
   });
 

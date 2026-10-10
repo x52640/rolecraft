@@ -23,6 +23,7 @@ import {
 } from '@rolecraft/pdf-export';
 import { StorageError, type ExportVersionRepository, type Repositories } from '@rolecraft/storage';
 
+import { sectionBlockers } from '../resume/readiness.ts';
 import { buildResumeDocument, type DocumentProblem } from './document.ts';
 import { fitsChunkLimit } from './chunks.ts';
 
@@ -115,6 +116,10 @@ export async function createExport(
   );
   const r1 = checkExportReadiness({ sections: version.sections, claims, profile });
   if (!r1.ok) return { ok: true, outcome: { status: 'not_ready' } };
+  // 逐段把關（F07、P1-T025）：未接受、已退回、缺歸屬的段落與 resume.check_export 同一套規則
+  if (sectionBlockers(version.sections, profile).length > 0) {
+    return { ok: true, outcome: { status: 'not_ready' } };
+  }
 
   const built = buildResumeDocument(profile, version.sections);
   if (!built.ok) return fail('invalid_request', DOCUMENT_MESSAGES[built.problem.reason]);

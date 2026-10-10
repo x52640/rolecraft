@@ -2,7 +2,8 @@
 // - 送出前先在這裡跑一次 prepareGeneration（快照、Profile、可用事實項、預算），不成立就直接回原因、不建工作。
 // - 結果與工作狀態在同一交易寫入；pipeline 的段落位置對應成 contracts ResumeSection.placement（P1-T040），
 //   對應不到的段落不帶 placement（匯出前檢查會擋）；decision 一律從 pending 開始，保留 rationale。
-// - 暫停後不自動續跑（D21）；工作狀態查詢與續跑沒有橋接操作，本 Task 不做。
+// - 執行結束為 blocked／not_sent 或丟出例外時，工作不會停在 running：以 domain restoreWorkRun
+//   改為已暫停，等使用者主動續跑（D21）。工作狀態查詢與續跑沒有橋接操作，本 Task 不做。
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
@@ -12,8 +13,9 @@ import type {
   ResumeSection,
   ResumeVersion,
   SectionPlacement,
+  WorkJob,
 } from '@rolecraft/contracts';
-import { createWorkRun, type InputBudget } from '@rolecraft/domain';
+import { createWorkRun, restoreWorkRun, type InputBudget } from '@rolecraft/domain';
 import {
   createGenerationRunner,
   planGeneration,
@@ -28,18 +30,20 @@ import { newId as storageId, transaction, type Repositories } from '@rolecraft/s
 
 import type { ResumeFailure, ResumeFailureReason } from './service.ts';
 
-/** 選定的服務、模型（只能是 helper 自己的候選常數）與輸入預算（R8）。 */
+/**
+ * 選定的服務、模型（只能是 helper 自己的候選常數）、輸入預算（R8）與執行端。
+ * execute 必須經 runWithSubscriptionCheck（Claude 一律經 helperClaudeDeps）。
+ */
 export interface GenerationSelection {
   readonly provider: Provider;
   readonly model: string;
   readonly budget: InputBudget;
+  execute(request: { prompt: string; signal: AbortSignal }): Promise<RunOutcome>;
 }
 
-/** 模型執行。execute 必須經 runWithSubscriptionCheck（Claude 一律經 helperClaudeDeps）。 */
 export interface GenerationEngine {
   /** 目前選定且可用的模型；沒有就 null（不送出） */
   select(): Promise<GenerationSelection | null>;
-  execute(request: { model: string; prompt: string; signal: AbortSignal }): Promise<RunOutcome>;
   /** 測試用：重試等待；預設 setTimeout（可被取消） */
   sleep?(ms: number, signal: AbortSignal): Promise<void>;
 }
@@ -151,7 +155,7 @@ export function createGeneration(deps: GenerationDeps) {
     const runner = createGenerationRunner(plan, initial, {
       provider: selection.provider,
       model: selection.model,
-      execute: ({ prompt, signal }) => engine.execute({ model: selection.model, prompt, signal }),
+      execute: ({ prompt, signal }) => selection.execute({ prompt, signal }),
       cancellation: {
         signal: controller.signal,
         abort: () => controller.abort(),
@@ -178,10 +182,22 @@ export function createGeneration(deps: GenerationDeps) {
       sleep: (ms, signal) => (engine.sleep ?? abortableSleep)(ms, signal),
     });
 
+    /** 沒跑完就結束（blocked、not_sent、例外）：改為已暫停，等使用者續跑（D21）。 */
+    const pauseIfRunning = (job: WorkJob) => {
+      if (job.status !== 'running') return;
+      try {
+        repos.workJobs.save(restoreWorkRun(job).job);
+      } catch {
+        // 寫不進去：helper 下次啟動時 pauseInterruptedJobs 會再處理
+      }
+    };
     running.add(jobSnapshotId);
     void runner
       .run()
-      .catch(() => undefined) // 寫入失敗等：工作留在資料庫，重開後還原為已暫停（D21）
+      .then(
+        (report) => pauseIfRunning(report.job),
+        () => pauseIfRunning(runner.current().job),
+      )
       .finally(() => {
         running.delete(jobSnapshotId);
         deps.onSettled?.(jobSnapshotId);

@@ -59,7 +59,7 @@
 | `providers.list_candidates` | 該服務實際可用的模型候選（id 由 helper 配發＋顯示名稱） |
 | `providers.select_candidate` | 選定候選並短驗證；只接受 helper 列過的候選 id，請求字串不會直接成為 CLI 參數 |
 | `providers.start_login` | 開啟該服務的官方登入流程；不代為輸入、不擷取憑證（D3） |
-| `export.create` | 以履歷版本匯出 PDF、建立不可變匯出版本（R3）；R1 未過回 not_ready（P1-T040） |
+| `export.create` | 以履歷版本匯出 PDF、建立不可變匯出版本（R3）；R1 未過，或有段落阻擋（與 `resume.check_export` 的 blockers 同一套規則：未接受、已退回、缺段落歸屬、對不到經歷）回 not_ready，不呼叫匯出器（P1-T040、P1-T025） |
 | `export.list_versions`／`export.get_version` | 匯出版本清單／單一版本內容 |
 | `export.read_pdf` | 分塊讀匯出 PDF（見下「分塊」） |
 | `claims.list_projects`／`claims.list`／`claims.get` | 專案清單／某專案的事實項／單一事實項（P1-T023） |
@@ -67,12 +67,12 @@
 | `claims.update` | 修改事實項內容；內容有變時既有使用者確認失效、舊來源不再替新文字背書：複核狀態改待複核（來源已移除維持），完成狀態退回未知，要重新確認 |
 | `claims.reject` | 否決事實項，之後不得用於生成：先移除各專案的引用，再依 D19 刪除素材；事實項已不存在時仍清引用並回成功（可重試） |
 | `resume.generate` | 針對已確認的職缺快照產生客製履歷，回工作 id（R9）（P1-T025） |
-| `resume.list`／`resume.get` | 某職缺的履歷版本清單／版本與段落 |
-| `resume.accept_section`／`reject_section` | 接受（只接受措辭，不確認事實項）／退回修改稿 |
-| `resume.edit_section` | 自行編輯段落；引用只能增加，生成段落的引用不能移除（R1），違反回 `invalid_request` |
+| `resume.list`／`resume.get` | 某職缺的履歷版本清單／版本與段落；`get` 另回 `originals`：工作經歷段落對到的 Profile 經歷描述（原文對照用，其他段落沒有原文） |
+| `resume.accept_section`／`reject_section` | 接受（只接受措辭，不確認事實項）／退回修改稿；退回後可直接重新接受（等於撤回退回） |
+| `resume.edit_section` | 自行編輯段落；引用只能增加，生成段落的引用不能移除（R1），新增引用必須是存在的事實項，違反回 `invalid_request`。既有引用的宣稱完成程度被調低（含拿掉標示）時，請求必須帶 `completionDowngradeAcknowledged: true`（使用者已重看措辭），否則回 `invalid_request`。任何變動都清掉逐段確認、段落回到待接受 |
 | `resume.delete_section` | 刪除整段（去掉引用的唯一方式） |
 | `resume.confirm_section` | 逐段確認：請求帶該段目前全文，helper 記錄時間與全文；檢查 2 不通過的段落不能用它放行 |
-| `resume.check_export` | R1 匯出前檢查：可否匯出與逐條問題（哪段、哪條、能否逐段確認） |
+| `resume.check_export` | 匯出前檢查：R1 逐條問題（哪段、哪條、能否逐段確認）＋ `blockers`（非空白段落未接受、已退回、缺段落歸屬、對不到 Profile 經歷）；`ready`＝R1 通過且沒有 blocker |
 | `messages.list`／`messages.get` | 訊息與草稿清單／單一則（P1-T029） |
 | `messages.update_draft` | 儲存使用者編輯的草稿；沒有任何送出操作（D7） |
 

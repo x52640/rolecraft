@@ -72,7 +72,7 @@ export const jobSnapshot = (): JobSnapshot => ({
 
 const CITATION = { claimId: CLAIM_ID, statedCompletion: 'completed' } as const;
 
-/** 生成段落：引用使用者確認完成的事實項，掛在 Profile 的那段經歷下。 */
+/** 生成段落：引用使用者確認完成的事實項，掛在 Profile 的那段經歷下；已逐段接受（P1-T025）。 */
 export const citedSection = (over: Partial<ResumeSection> = {}): ResumeSection => ({
   id: 's-cited',
   origin: 'generated',
@@ -82,6 +82,7 @@ export const citedSection = (over: Partial<ResumeSection> = {}): ResumeSection =
   sectionConfirmation: null,
   placement: { group: 'experience', ...EXPERIENCE },
   itemKind: 'bullet',
+  decision: 'accepted',
   ...over,
 });
 
@@ -103,6 +104,7 @@ export const summarySection = (text = '重視可觀測性與文件。'): ResumeS
   citations: [],
   sectionConfirmation: { confirmedAt: T, text },
   placement: { group: 'summary' },
+  decision: 'accepted',
 });
 
 export const resumeVersion = (sections?: ResumeSection[]): ResumeVersion => ({

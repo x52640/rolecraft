@@ -11,6 +11,8 @@ import { createClaudeService, type RunDeps } from '@rolecraft/providers';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { INVALID, JOB, openResumeDb, snapshot, type ResumeDb } from './__fixtures__/resume-db.ts';
+import type { ProvidersService } from '../providers/service.ts';
+import { pauseInterruptedJobs } from './assemble.ts';
 import { createClaudeGenerationEngine } from './claude-engine.ts';
 import type { GenerationEngine } from './generation.ts';
 
@@ -60,7 +62,7 @@ const GOOD = JSON.stringify({
   ],
 });
 
-function fakeClaude(run: string) {
+function fakeClaude(run: string, auth = fixture('auth-subscription.json')) {
   const calls: { args: readonly string[]; env: Record<string, string>; stdin: string }[] = [];
   const spawn: SpawnFn = (_file, args, options) => {
     const call = { args, env: { ...(options.env as Record<string, string>) }, stdin: '' };
@@ -72,11 +74,7 @@ function fakeClaude(run: string) {
     let killed = false;
     Object.assign(child, { stdout, stderr: new PassThrough(), stdin, kill: () => (killed = true) });
     const out =
-      args[0] === '--version'
-        ? '2.1.296 (Claude Code)\n'
-        : args[0] === 'auth'
-          ? fixture('auth-subscription.json')
-          : run;
+      args[0] === '--version' ? '2.1.296 (Claude Code)\n' : args[0] === 'auth' ? auth : run;
     const lines = out.split(/(?<=\n)/);
     const step = (i: number) => {
       const line = lines[i];
@@ -104,8 +102,27 @@ const BUDGET: InputBudget = {
 let t: ResumeDb | null = null;
 afterEach(() => t?.cleanup());
 
-function setup(run: string, model: string | null = 'haiku') {
-  const fake = fakeClaude(run);
+/** 假 providers 服務：Claude 可用且選定唯一候選（對應 candidates ['haiku']）；model 為 null 表示沒選定。 */
+function providers(model: string | null): ProvidersService {
+  return {
+    status: () =>
+      Promise.resolve([
+        {
+          service: 'claude',
+          state: 'available',
+          login: 'passed',
+          eligibility: 'passed',
+          subscriptionOnly: 'passed',
+          checkedAt: '2026-10-10T00:00:00.000Z',
+          selectedCandidateId: model === null ? null : 'cand-1',
+        },
+      ]),
+    listCandidates: () => Promise.resolve([{ candidateId: 'cand-1', label: 'Claude Haiku' }]),
+  };
+}
+
+function setup(run: string, model: string | null = 'haiku', auth?: string) {
+  const fake = fakeClaude(run, auth);
   let settle: () => void = () => undefined;
   const settled = new Promise<void>((resolve) => (settle = resolve));
   const engine = createClaudeGenerationEngine({
@@ -113,7 +130,8 @@ function setup(run: string, model: string | null = 'haiku') {
       locate: () => Promise.resolve('/fake/claude'),
       findManagedSettings: () => Promise.resolve([]),
     }),
-    selectModel: () => Promise.resolve(model),
+    providers: providers(model),
+    candidates: ['haiku'],
     budget: BUDGET,
     runDeps: {
       spawn: fake.spawn,
@@ -205,21 +223,73 @@ describe('resume.generate（假 spawn）', () => {
     expect(db.repos.resumeVersions.listByJobSnapshot(JOB)).toEqual([]);
   });
 
-  it('同一職缺已有生成在跑：第二次回 invalid_request', async () => {
+  it('R6 不成立（未登入訂閱）：不送出，工作改為已暫停而不是停在 running', async () => {
+    const { fake, settled, db } = setup(
+      runWithResult(GOOD),
+      'haiku',
+      fixture('auth-logged-out.json'),
+    );
+    const res = (await generate(db)) as { ok: true; workJobId: string };
+    await settled;
+    expect(fake.modelCalls()).toHaveLength(0);
+    expect(db.repos.workJobs.get(res.workJobId)).toMatchObject({
+      status: 'paused',
+      pauseReason: 'interrupted',
+    });
+    expect(db.repos.resumeVersions.listByJobSnapshot(JOB)).toEqual([]);
+  });
+
+  it('同一職缺已有生成在跑：第二次回 invalid_request；執行丟出例外後工作改為已暫停', async () => {
     let release: () => void = () => undefined;
     const engine: GenerationEngine = {
-      select: () => Promise.resolve({ provider: 'claude', model: 'haiku', budget: BUDGET }),
-      execute: () =>
-        new Promise((_resolve, reject) => {
-          release = () => reject(new Error('stop'));
+      select: () =>
+        Promise.resolve({
+          provider: 'claude',
+          model: 'haiku',
+          budget: BUDGET,
+          execute: () =>
+            new Promise((_resolve, reject) => {
+              release = () => reject(new Error('stop'));
+            }),
         }),
     };
     let settle: () => void = () => undefined;
     const settled = new Promise<void>((resolve) => (settle = resolve));
     t = openResumeDb({ withVersion: false, generation: engine, onGenerationSettled: settle });
-    expect(await generate(t)).toMatchObject({ ok: true });
+    const res = (await generate(t)) as { ok: true; workJobId: string };
+    expect(res.ok).toBe(true);
     expect(await generate(t)).toMatchObject(INVALID);
     release();
     await settled;
+    expect(t.repos.workJobs.get(res.workJobId)).toMatchObject({
+      status: 'paused',
+      pauseReason: 'interrupted',
+    });
+  });
+});
+
+describe('pauseInterruptedJobs（helper 啟動時）', () => {
+  it('上次留下的 running 工作改為已暫停（interrupted），其他狀態不動', () => {
+    t = openResumeDb({ withVersion: false });
+    const unit = {
+      id: 'u-1',
+      status: 'pending',
+      provider: null,
+      model: null,
+      retryCount: 0,
+    } as const;
+    t.repos.workJobs.save({ id: 'w-run', status: 'running', units: [unit], pauseReason: null });
+    t.repos.workJobs.save({
+      id: 'w-paused',
+      status: 'paused',
+      units: [{ ...unit, id: 'u-2' }],
+      pauseReason: 'quota_exhausted',
+    });
+    pauseInterruptedJobs(t.db);
+    expect(t.repos.workJobs.get('w-run')).toMatchObject({
+      status: 'paused',
+      pauseReason: 'interrupted',
+    });
+    expect(t.repos.workJobs.get('w-paused')).toMatchObject({ pauseReason: 'quota_exhausted' });
   });
 });

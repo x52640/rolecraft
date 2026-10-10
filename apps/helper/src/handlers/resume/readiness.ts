@@ -46,12 +46,12 @@ export function experienceOf(profile: Profile | null, section: ResumeSection) {
 
 const BLOCK_MESSAGES: Record<SectionBlockerView['reason'], string> = {
   pending: '修改稿尚未接受：請對照原文後接受（只接受措辭，不確認事實項）、改寫或刪除',
-  rejected: '已退回的段落不能匯出：請改寫後接受，或刪除整段',
+  rejected: '已退回的段落不能匯出：請重新接受、改寫後接受，或刪除整段',
   placement_missing: '段落沒有指定放在履歷哪一區，不能匯出；請刪除整段',
   experience_not_found: '段落對不到個人資料中的工作經歷，不能匯出；請刪除整段或更新個人資料',
 };
 
-function blockersOf(section: ResumeSection, profile: Profile | null): SectionBlockerView[] {
+function blockersOfSection(section: ResumeSection, profile: Profile | null): SectionBlockerView[] {
   const reasons: SectionBlockerView['reason'][] = [];
   const decision = section.decision ?? 'pending';
   if (decision !== 'accepted') reasons.push(decision);
@@ -78,6 +78,17 @@ function issueView(issue: ExportIssue): ExportIssueView {
   };
 }
 
+/**
+ * 段落阻擋（resume.check_export 與 export.create 共用，純函式）：只看非空白段落；
+ * decision 不是 accepted（含缺省）、缺段落歸屬、對不到 Profile 經歷的都不能匯出。
+ */
+export function sectionBlockers(
+  sections: readonly ResumeSection[],
+  profile: Profile | null,
+): SectionBlockerView[] {
+  return sections.filter(isPrintable).flatMap((s) => blockersOfSection(s, profile));
+}
+
 export interface ReadinessInput {
   readonly version: ResumeVersion;
   /** 段落引用的事實項（目前狀態） */
@@ -92,9 +103,7 @@ export function checkReadiness(input: ReadinessInput): CheckExportResult {
     claims: input.claims,
     profile: input.profile,
   });
-  const blockers = input.version.sections
-    .filter(isPrintable)
-    .flatMap((s) => blockersOf(s, input.profile));
+  const blockers = sectionBlockers(input.version.sections, input.profile);
   return {
     ok: true,
     ready: r1.ok && blockers.length === 0,

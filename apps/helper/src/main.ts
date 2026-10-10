@@ -21,7 +21,7 @@ import { createResumeImportService, type PdfFilePicker } from './handlers/import
 import { createJobsService } from './handlers/jobs/storage-service.ts';
 import { createMessagesService } from './handlers/messages/assemble.ts';
 import { createProvidersService } from './handlers/providers/providers-service.ts';
-import { createResumeService } from './handlers/resume/storage-service.ts';
+import { createResumeWithClaude, pauseInterruptedJobs } from './handlers/resume/assemble.ts';
 import type { HelperServices } from './handlers/services.ts';
 import { createSourcesService, type FolderPicker } from './handlers/sources/local-sources.ts';
 import { openHelperRuntime, runtimeConfigFromEnv, type HelperRuntime } from './services/runtime.ts';
@@ -70,7 +70,7 @@ export function createServices(
       }),
     }),
     ...(storage && { claims: createClaimsService(storage) }),
-    ...(storage && { resume: createResumeService({ db: storage.db }) }),
+    ...(storage && { resume: createResumeWithClaude(storage.db, providers) }),
     ...(storage && { messages: createMessagesService(storage.db, providers) }),
     ...(storage && isRuntime(storage) && { pdfExport: createExportService(storage) }),
   };
@@ -91,6 +91,7 @@ export function main(): void {
   try {
     const config = runtimeConfigFromEnv(process.env);
     runtime = config && openHelperRuntime(config);
+    if (runtime) pauseInterruptedJobs(runtime.db);
   } catch {
     logger.log({ event: 'config_invalid' });
     process.exitCode = EXIT_CODES.config;

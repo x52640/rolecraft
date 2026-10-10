@@ -148,7 +148,7 @@ export function useResumeEditor() {
     reject: (sectionId: string) =>
       write(
         () => bridge.send({ op: 'resume.reject_section', payload: ref(sectionId) }),
-        '已退回。這段要改寫後接受或刪除，才能匯出。',
+        '已退回。這段要重新接受、改寫後接受，或刪除整段，才能匯出。',
       ),
     remove: (sectionId: string) =>
       write(
