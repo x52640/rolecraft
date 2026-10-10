@@ -6,7 +6,7 @@ depends_on: ["P1-T022", "P1-T019"]
 specs: ["resume-output.md", "evidence-model.md"]
 track: pipeline
 primary_repo: rolecraft
-write_paths: ["packages/pipeline/src/generation/", "packages/pipeline/src/index.ts"]
+write_paths: ["packages/pipeline/src/generation/", "packages/pipeline/src/index.ts", "packages/contracts/src/entities/resume-version.ts"]
 contract_change: none
 expected_commit: "feat(P1-T024): pipeline：職缺匹配與段落生成"
 ---
