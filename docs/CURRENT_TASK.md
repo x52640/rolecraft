@@ -5,7 +5,7 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T002 domain：事實項狀態與 R1 匯出前檢查（`docs/tasks/P1-T002-domain-evidence.md`）
+- 無
 
 ## ready
 
@@ -42,6 +42,7 @@
 - P1-T014 `75d2b19`、`5f20554`
 - P1-T010 `b44a8d2`、`c1c7725`、`5fc7ee4`
 - P1-T007 `af9e0d9`、`50c8639`
+- P1-T002 `8110afb`、`5b7e7db`
 
 ## 已知殘餘（記錄，不擋上線）
 
@@ -71,6 +72,8 @@
 - providers（P1-T010）：`assertExecutablePath` 擋 sh／bash／zsh／env／node 等直譯器 basename；P1-T011 要確認官方 CLI 的實際執行檔不是經 node 啟動的腳本，否則需調整。defineCommand 以 `as`＋eslint-disable 或別名 import 仍可繞過，靠審查。
 
 - storage（P1-T007）：`sweepStorage(db, fileStore)` 要在 helper 啟動時呼叫一次（尚未接上，下一個動 helper 的 Task 處理）。素材刪除只能經 `deleteMaterial`。
+
+- 數字檢查（P1-T002）：fail-closed；數字後接未知字母（3D、5G、100ms、1080p）一律無法辨識需逐段確認，誤擋偏吵，可改整串字面比對；「一個／一套」等列入排除表（代價：「一個人完成」不檢查）。
 
 ## 治理
 
