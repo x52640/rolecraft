@@ -6,8 +6,8 @@ depends_on: ["P1-T022", "P1-T016"]
 specs: ["evidence-model.md"]
 track: editor
 primary_repo: rolecraft
-write_paths: ["apps/editor/src/pages/claims/", "apps/helper/src/handlers/claims/", "apps/helper/src/main.ts"]
-contract_change: none
+write_paths: ["apps/editor/src/pages/claims/", "apps/helper/src/handlers/claims/", "apps/helper/src/main.ts", "packages/contracts/src/bridge/editor/claims.ts", "docs/specs/bridge.md", "apps/helper/src/bridge/__fixtures__/", "packages/contracts/src/bridge/__fixtures__/"]
+contract_change: breaking
 expected_commit: "feat(P1-T023): editor：事實項檢視與確認"
 ---
 # editor：事實項檢視與確認
