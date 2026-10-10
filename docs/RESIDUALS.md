@@ -28,7 +28,16 @@
 
 - Claude CLI（ADR-0002）：隔離模式仍開本機訊息 socket（`/tmp/cc-socks/<pid>.sock`），無旗標可關；必須用真實 HOME，CLI 每次執行會改寫 `~/.claude.json`（CLI 自身狀態）；CLI 自動更新，P1-T012 要記版本、版本變了重跑 spike。P1-T011 的對抗驗證併入 P1-T012（需真實 CLI 呼叫，避免重複耗額度）。
 
-- 待開「helper 匯出接線」Task：helper 呼叫 `exportResumePdf` → `exports.create()`；從 Profile＋ResumeVersion 組 ResumeDocument 的規則（contracts ResumeSection 缺段落歸屬／項目類型，可能需加欄位）；R1 結果與 document 同一份內容的測試；可順帶接 `sweepStorage` 與 Claude stream guard。字型打包與 OFL.txt 來源固定留 P1-T031。模板禁用 CSS `position`（會打亂 PDF 文字順序，已有測試）。
 
 - Claude 適配器（P1-T012）：要真正強制「init 異常立即終止」需改 core（提供包裝 spawn 的掛點；取消與輸出超量已改為終止整個程序群組，P1-T037）；目前 helper 必須用 `claudeRunDeps` 取得 deps。上下文上限與 CLI 版本經 `executeDetailed` 取得，core 的 `ExecutionResult` 尚未擴充。
-- Claude CLI 更新策略已裁定 D22（自動重跑注入測試），實作見 P1-T039；目前仍為版本嚴格比對（版本變了就停）。
+- Claude CLI 自動重新驗證（P1-T039）已實作，但 helper 尚未注入已驗證版本的保存介面：CLI 一更新就顯示「尚未支援」、不會自動重驗；各群組各建一個 ClaudeService，版本閘門互斥不跨群組。自動重驗不涵蓋使用者層 CLAUDE.md／外掛／hooks 誘餌（靠 init 欄位嚴格檢查）。
+
+- 第二輪（2026-10-10）殘餘：
+  - 授權集合、匯入暫存、供應商狀態／選定模型、RunCheckRecord 只存在 helper 記憶體，重啟即失（P1-T020、T021、T030）。
+  - contracts 沒有工作狀態查詢與續跑操作；編輯器輪詢 `messages.get`／重新整理（P1-T025、T029）。
+  - domain `extractNumbers` 不認倍數詞（翻倍、double），匯出檢查對使用者自寫文字放行；生成端已另擋（P1-T024）。
+  - 沒有任何流程產生 ProjectEvidence，事實項頁的專案清單實際為空（P1-T023）。
+  - 確認事實項只比對複核狀態，不比對來源片段是否重新定位（P1-T023）。
+  - 跨 helper 行程：「刪素材撞上另一行程正在匯出」的競態仍在（啟動清掃已加 15 分鐘寬限期）（P1-T040）。
+  - 預覽與大型 PDF 原文沒有分頁／分塊，超過 1 MB 回固定錯誤或 internal_error（P1-T020、T021）。
+  - 職缺匹配與待補資訊沒有 contracts 型別與存放位置（P1-T024、T025）。
