@@ -72,9 +72,17 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：spike 腳本、11 種組合實測、ADR-0005，待協調者收官
+- 已通過驗證：`node scripts/spikes/pdf/run.mjs` 可重跑；`npm run verify` 綠
+- 下一步：協調者合併、稽核、標 done；擁有者確認 ADR-0005 的瀏覽器依賴代價
 - Blocker：無
 
 ## 完成結果
+
+- 建議：HTML＋CSS 模板交給已安裝的 Chrome 列印（puppeteer-core），字型附 Noto Sans TC 靜態 TTF 400／700（OFL），匯出前用 HarfBuzz（subset-font）依文字裁字型。實測 94 KB、段落 37/37、碼位錯誤 0、423 ms。詳見 `docs/adr/0005-pdf-export.md`。
+- pdf-lib＋fontkit 各種組合都不可用：字形畫錯或碼位錯（文字擷取全對也可能畫錯，需人眼看 PNG）。
+- Chromium 不先裁字型時會把「小」等字寫成康熙部首碼位（27 字），裁字型後消失；CFF／可變字重字型會變 Type3。
+- 缺字時 Chromium 改用系統字型（PingFang、AppleColorEmoji）進 PDF，P1-T027 要擋。
+- Arc 用 puppeteer-core 啟動逾時；Edge 未安裝未測。
+- 新增 devDependencies：pdf-lib、@pdf-lib/fontkit、pdfjs-dist、puppeteer-core、subset-font（只供 spike；正式依賴由 P1-T027 決定）。
+- 字型與樣本不進 repo，腳本執行時下載／產出到暫存區。
