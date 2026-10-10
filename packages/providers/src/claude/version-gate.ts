@@ -56,6 +56,8 @@ const isRecord = (value: unknown): value is ClaudeVersionRecord => {
   );
 };
 
+export const PROVISIONAL_REASON = '重新驗證未完成';
+
 export const REVERIFYING_REASON = 'Claude CLI 版本已變更，正在自動重新驗證；期間不執行任何工作';
 
 export class ClaudeVersionGate {
@@ -89,7 +91,10 @@ export class ClaudeVersionGate {
     try {
       const records: unknown = await this.store.load();
       if (!Array.isArray(records) || !records.every(isRecord)) return false;
-      for (const record of records) this.apply(record);
+      // 同一版本以最後一筆為準（暫定失敗紀錄之後的 verified 會覆蓋它）。
+      const latest = new Map<string, ClaudeVersionRecord>();
+      for (const record of records) latest.set(record.version, record);
+      for (const record of latest.values()) this.apply(record);
       this.storeUsable = true;
       return true;
     } catch {
@@ -138,6 +143,34 @@ export class ClaudeVersionGate {
     if (this.stateValue.kind !== 'ready' || this.inFlight > 0 || !this.storeUsable) return false;
     this.stateValue = { kind: 'reverifying', version };
     return true;
+  }
+
+  /**
+   * 呼叫模型前先保存一筆暫定失敗紀錄：重新驗證中途當掉（程序被殺、斷電）時，
+   * 重啟後讀到的就是失敗 → 維持停用，不會不知不覺再花一次模型呼叫。
+   * 寫不進去 → 直接停用並回 false，呼叫端不得呼叫模型。
+   */
+  async saveProvisional(version: string, at: string): Promise<boolean> {
+    const provisional: ClaudeVersionRecord = {
+      version,
+      outcome: 'failed',
+      verifiedAt: at,
+      cases: [],
+      modelCalls: 0,
+      reason: PROVISIONAL_REASON,
+    };
+    try {
+      if (!this.store) throw new Error('沒有保存介面');
+      await this.store.save(provisional);
+      return true;
+    } catch (error) {
+      const why = error instanceof Error ? error.message : '未知錯誤';
+      this.stateValue = {
+        kind: 'disabled',
+        reason: `Claude CLI ${version} 需要重新驗證，但無法保存驗證狀態（${why}）；未呼叫模型，已停用`,
+      };
+      return false;
+    }
   }
 
   /**

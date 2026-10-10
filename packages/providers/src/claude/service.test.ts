@@ -70,7 +70,14 @@ describe('版本不同', () => {
     expect(record.modelCalls).toBe(2);
     expect(record.modelCalls).toBeLessThanOrEqual(CLAUDE_REVERIFY_MAX_MODEL_CALLS);
     expect(fake.modelCalls().every((c) => c.args.includes('haiku'))).toBe(true);
-    expect(saved).toEqual([record]);
+    expect(saved).toHaveLength(2);
+    expect(saved[0]).toMatchObject({
+      version: NEW,
+      outcome: 'failed',
+      reason: '重新驗證未完成',
+      modelCalls: 0,
+    });
+    expect(saved[1]).toEqual(record);
     // 重新驗證後的一般執行：init 回報新版本也被串流守門接受
     expect(first.outcome.status === 'executed' && first.outcome.result.ok).toBe(true);
     expect(fake.modelCalls()).toHaveLength(3);
@@ -78,7 +85,10 @@ describe('版本不同', () => {
     const second = await svc.run(REQ, runDeps(fake.spawn));
     expect(second.version).toEqual({ status: 'ready', version: NEW });
     expect(fake.modelCalls()).toHaveLength(4);
-    expect(saved).toHaveLength(1);
+    expect(saved).toHaveLength(2);
+    // 重啟：同版本以最後一筆（verified）為準，不重跑
+    const restarted = service({ store: memoryStore([...saved]).store });
+    expect((await restarted.run(REQ, runDeps(fake.spawn))).version.status).toBe('ready');
   });
 
   const toolUse = withVersion(fixture('run-tool-use.jsonl'), NEW);
@@ -115,10 +125,10 @@ describe('版本不同', () => {
     const svc = service({ store });
     const first = await svc.run(REQ, runDeps(fake.spawn));
     expect(first.version.status).toBe('blocked');
-    expect(saved).toHaveLength(1);
-    expect(saved[0]).toMatchObject({ version: NEW, outcome: 'failed' });
-    expect(saved[0]?.cases.find((c) => !c.passed)?.id).toBe(failedCase);
-    expect(saved[0]?.modelCalls).toBeLessThanOrEqual(CLAUDE_REVERIFY_MAX_MODEL_CALLS);
+    expect(saved).toHaveLength(2);
+    expect(saved[1]).toMatchObject({ version: NEW, outcome: 'failed' });
+    expect(saved[1]?.cases.find((c) => !c.passed)?.id).toBe(failedCase);
+    expect(saved[1]?.modelCalls).toBeLessThanOrEqual(CLAUDE_REVERIFY_MAX_MODEL_CALLS);
     expect(svc.adapter.support.state).toBe('cannot_confirm');
     expect(first.outcome.status).toBe('blocked');
     expect(first.outcome.record.executed).toBe(false);
@@ -128,7 +138,7 @@ describe('版本不同', () => {
     const again = await svc.run(REQ, runDeps(fake.spawn));
     expect(again.outcome.status).toBe('blocked');
     expect(fake.modelCalls()).toHaveLength(calls);
-    expect(saved).toHaveLength(1);
+    expect(saved).toHaveLength(2);
   });
 
   it('hook／MCP 留下 marker → 停用', async () => {
@@ -140,7 +150,7 @@ describe('版本不同', () => {
     });
     const svc = service({ store });
     await svc.run(REQ, { ...runDeps(fake.spawn), makeSandbox });
-    expect(saved[0]?.cases.find((c) => !c.passed)?.id).toBe('no-user-settings');
+    expect(saved.at(-1)?.cases.find((c) => !c.passed)?.id).toBe('no-user-settings');
     expect(svc.gate.state.kind).toBe('disabled');
   });
 });

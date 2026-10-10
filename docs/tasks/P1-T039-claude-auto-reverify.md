@@ -73,8 +73,8 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：版本閘門、自動重新驗證、服務入口、單元測試、live 測試檔、ADR-0002 §7
-- 已通過驗證：`npm run verify` 綠（vitest 1162 過／10 略過）；live 測試未執行（等協調者）
+- 最後完成：對抗驗證 2 項修正（使用者設定欄位嚴格檢查、呼叫模型前先寫暫定失敗紀錄）
+- 已通過驗證：`npm run verify` 綠（verify:docs 只剩 index 過期）；live 測試未執行（等協調者）
 - 下一步：協調者跑一次 live（指令見完成結果）、E3 對抗驗證、收官
 - Blocker：無
 
@@ -90,3 +90,12 @@ npm run verify
 - 測試（假 spawn／fixtures）：`service.test.ts`（版本相同不重跑、全過接受且之後不重跑、8 種失敗＋marker 停用且不重試、重新驗證中拒絕一般執行與並行重新驗證、執行中不開始重新驗證）、`reverify.test.ts`（上限常數與 budgetLaunch、版本讀不到、init 版本不符、找不到 CLI、保存介面各種失敗、啟動時已有失敗紀錄）。測試輔助 `reverify-fakes.ts`。
 - live（`RUN_LIVE=1`，本 Task 未執行）：`RUN_LIVE=1 npx vitest run packages/providers/src/claude/reverify-live.test.ts`。把目前版本當未驗證版本跑一次，不寫保存位置；預期模型呼叫 2 次（haiku）、`auth status` 2 次、`--version` 3 次；結果另寫 `$TMPDIR/rolecraft-claude-live-results.jsonl`。
 - ADR-0002：新增 §7，§6 版本建議改指向 §7。
+
+### 對抗驗證修正
+
+| 缺陷 | 修正 | 測試 |
+| --- | --- | --- |
+| （major）`no-user-settings` 對 init 缺欄位寬鬆（缺 plugins／skills／slash_commands 照樣通過） | 只在重新驗證判定加嚴：`mcp_servers`、`plugins`、`skills`、`slash_commands` 必須存在且是陣列（以 2.1.296 實錄為基準，四個都有），外掛全是 builtin、其餘為空；缺欄位或形狀不認得就失敗。一般執行的 `checkInit` 不變 | `reverify-strict.test.ts` |
+| （minor）重新驗證中途當掉，重啟後會再花模型呼叫 | 呼叫模型前先保存暫定失敗紀錄（`重新驗證未完成`），寫不進去就 0 次模型呼叫、停用；通過後保存 verified 覆蓋，讀取時同版本以最後一筆為準 | `reverify-strict.test.ts`：保存一直丟錯（多次重啟仍 0 次）、中途當掉後重啟維持停用、最後一筆為準 |
+
+殘餘：自動重新驗證不涵蓋使用者層（真實 HOME）的 CLAUDE.md／外掛／hooks 誘餌（HOME 必須是真的、不能動使用者設定），只靠 init 欄位嚴格檢查＋專案層誘餌間接涵蓋。

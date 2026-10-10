@@ -107,6 +107,11 @@ export function createClaudeService(options: ClaudeServiceOptions = {}): ClaudeS
           : `Claude CLI ${version} 需要重新驗證，但有其他 Claude 執行進行中；請稍後再試`,
       );
     }
+    // 先寫暫定失敗紀錄；寫不進去就 0 次模型呼叫、直接停用。
+    if (!(await gate.saveProvisional(version, deps.now().toISOString()))) {
+      const now = gate.state;
+      return blocked(now.kind === 'disabled' ? now.reason : '無法保存驗證狀態');
+    }
     let record: ClaudeVersionRecord;
     try {
       record = await runClaudeReverification(

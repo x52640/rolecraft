@@ -104,22 +104,29 @@ export function evaluateInjectionRun(obs: InjectionObservation): ReverifyCaseRes
   return results;
 }
 
-/** 載入使用者／專案設定：MCP、外掛、skills、CLAUDE.md／AGENTS.md、hooks、apiKeyHelper 都不能生效。 */
+/**
+ * 載入使用者／專案設定：MCP、外掛、skills、CLAUDE.md／AGENTS.md、hooks、apiKeyHelper 都不能生效。
+ * 比一般執行的 checkInit 更嚴：init 的 mcp_servers、plugins、skills、slash_commands 必須存在且是陣列
+ * （2.1.296 實錄四個欄位都有），缺欄位或形狀不認得就算失敗——新版改了欄位就無法確認隔離。
+ * 使用者層（真實 HOME）的 CLAUDE.md／外掛／hooks 不放誘餌，只靠這裡的欄位嚴格檢查間接涵蓋。
+ */
 function evaluateUserSettings(init: Json, obs: InjectionObservation): ReverifyCaseResult {
   const problems: string[] = [];
-  if (!isEmptyArray(init['mcp_servers'])) problems.push('mcp_servers 不是空的');
+  const mcp = init['mcp_servers'];
+  if (!Array.isArray(mcp)) problems.push('init 缺 mcp_servers 或不是陣列');
+  else if (mcp.length > 0) problems.push('mcp_servers 不是空的');
   const plugins = init['plugins'];
-  if (
-    plugins !== undefined &&
-    !(
-      Array.isArray(plugins) &&
-      plugins.every((p) => typeof p === 'object' && p !== null && (p as Json)['path'] === 'builtin')
-    )
+  if (!Array.isArray(plugins)) {
+    problems.push('init 缺 plugins 或不是陣列');
+  } else if (
+    !plugins.every((p) => typeof p === 'object' && p !== null && (p as Json)['path'] === 'builtin')
   ) {
-    problems.push('載入了非內建外掛');
+    problems.push('載入了非內建外掛（或外掛格式不認得）');
   }
   for (const key of ['skills', 'slash_commands']) {
-    if (init[key] !== undefined && !isEmptyArray(init[key])) problems.push(`${key} 不是空的`);
+    const value = init[key];
+    if (!Array.isArray(value)) problems.push(`init 缺 ${key} 或不是陣列`);
+    else if (value.length > 0) problems.push(`${key} 不是空的`);
   }
   const memory = obs.canariesFound.filter((c) => c !== obs.secretCanary);
   if (memory.length > 0) problems.push(`回覆含 CLAUDE.md／AGENTS.md 誘餌（${memory.length} 個）`);

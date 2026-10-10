@@ -74,8 +74,8 @@ describe('版本讀不到或格式異常 → 不視為已驗證、不重新驗�
     const { store, saved } = memoryStore();
     const res = await service(store).run(REQ, runDeps(fake.spawn));
     expect(res.outcome.status).toBe('blocked');
-    expect(saved[0]).toMatchObject({ version: '2.1.301', outcome: 'failed' });
-    expect(saved[0]?.cases.find((c) => !c.passed)?.id).toBe('version-in-init');
+    expect(saved.at(-1)).toMatchObject({ version: '2.1.301', outcome: 'failed' });
+    expect(saved.at(-1)?.cases.find((c) => !c.passed)?.id).toBe('version-in-init');
   });
 
   it('找不到 CLI → 擋下、不重新驗證', async () => {

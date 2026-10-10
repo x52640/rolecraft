@@ -113,12 +113,14 @@ CLI 會自動更新，旗標行為可能變。`packages/providers/src/claude/ser
   1. `version-confirm`：再讀一次版本，必須相同。
   2. `auth-subscription`：空工作目錄 `auth status` 必須是訂閱登入、無 `apiKeySource`、無受管設定。
   3. `auth-detects-helper`：在 §2 誘餌工作目錄跑 `auth status`，必須抓到專案 apiKeyHelper（偵測仍有效）。
-  4. 注入執行（模型呼叫 1）：§2 誘餌工作目錄＋注入提示，拆成 `version-in-init`、`api-key-source`、`no-tool-calls`、`no-decoy-read`、`no-web`、`no-user-settings`（MCP、外掛、skills、CLAUDE.md／AGENTS.md 誘餌、hook／apiKeyHelper／MCP marker）、`injection-run`（必須成功且有回覆）。
+  4. 注入執行（模型呼叫 1）：§2 誘餌工作目錄＋注入提示，拆成 `version-in-init`、`api-key-source`、`no-tool-calls`、`no-decoy-read`、`no-web`、`no-user-settings`（init 的 `mcp_servers`、`plugins`、`skills`、`slash_commands` 必須存在且是陣列——2.1.296 實錄四個都有——外掛全是 `builtin`、其餘為空；缺欄位或形狀不認得就失敗。比一般執行的 init 檢查嚴，一般執行不變。另含 CLAUDE.md／AGENTS.md 誘餌、hook／apiKeyHelper／MCP marker）、`injection-run`（必須成功且有回覆）。
   5. `formal-run`（模型呼叫 2）：空工作目錄、極短提示，必須成功。
   6. `version-stable`：結束時版本與 CLI 路徑都沒變。
 - 模型一律 `haiku`；每次重新驗證的模型呼叫上限 `CLAUDE_REVERIFY_MAX_MODEL_CALLS = 3`（實際用 2），超過直接拒絕啟動子程序。
 - 判定：任一案例失敗、或結果不確定（額度、逾時、錯誤、取消、缺 init）→ 記失敗、整個 Claude 服務停用（`support` 變「無法確認」，RunCheckRecord 依據寫原因），不重試、也不自動試別的版本；失敗紀錄也保存，重啟後仍停用。人工重新啟用屬後續 Task。
-- 通過 → 保存紀錄（版本、驗證時間、各案例結果、模型呼叫次數）後才接受；保存失敗視為失敗。
+- 開始呼叫模型前先保存一筆暫定失敗紀錄（`reason: 重新驗證未完成`）；寫不進去就 0 次模型呼叫、直接停用。中途當掉時重啟讀到的是失敗，維持停用。
+- 通過 → 再保存 verified 紀錄（版本、驗證時間、各案例結果、模型呼叫次數）後才接受；讀取時同一版本以最後一筆為準。保存失敗視為失敗。
+- 不涵蓋：使用者層（真實 HOME）的 CLAUDE.md／外掛／hooks 誘餌——HOME 必須是真的（§5），不能動使用者設定；只靠 init 欄位嚴格檢查＋專案層誘餌（同一套 `--safe-mode`／`--setting-sources ""` 機制）間接涵蓋。
 - 互斥：重新驗證中，一般執行（含直接呼叫 `runWithSubscriptionCheck` 的）一律拒絕；有一般執行進行中時不開始重新驗證（該次執行被擋下，稍後再試）；同時只會有一個重新驗證。
 - 保守處理：讀不到版本、找不到 CLI、已驗證版本清單讀不到或格式不合法、沒有注入保存介面 → 不重新驗證、不視為已驗證，該次執行被擋下。
 - 保存位置由呼叫端注入（`ClaudeVersionStore`），helper 接線是後續 Task。
