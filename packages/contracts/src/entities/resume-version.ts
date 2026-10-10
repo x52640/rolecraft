@@ -38,6 +38,11 @@ export const ResumeSection = z.strictObject({
   citations: z.array(ClaimCitation),
   /** 逐段確認：時間＋該段全文（R1） */
   sectionConfirmation: UserConfirmation.nullable(),
+  /**
+   * 生成當下的引用快照（R1 第 2 輪補）。生成段落必填、建立後不得修改；
+   * 匯出前檢查用它確認引用沒被移除。生成段落缺這欄一律不能匯出（domain 檢查）。
+   */
+  generatedCitations: z.array(ClaimCitation).optional(),
 });
 export type ResumeSection = z.infer<typeof ResumeSection>;
 
