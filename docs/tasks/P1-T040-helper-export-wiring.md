@@ -6,7 +6,7 @@ depends_on: ["P1-T041", "P1-T027", "P1-T007"]
 specs: ["resume-output.md", "evidence-model.md"]
 track: helper
 primary_repo: rolecraft
-write_paths: ["apps/helper/src/handlers/export/", "apps/helper/src/services/", "packages/contracts/src/entities/resume-version.ts", "apps/helper/src/main.ts"]
+write_paths: ["apps/helper/src/handlers/export/", "apps/helper/src/services/", "packages/contracts/src/entities/resume-version.ts", "apps/helper/src/main.ts", "packages/storage/src/export/pdf-cleanup.ts", "packages/storage/src/export/pdf-cleanup.test.ts", "packages/storage/src/files/"]
 contract_change: additive
 expected_commit: "feat(P1-T040): helper：匯出接線"
 ---
