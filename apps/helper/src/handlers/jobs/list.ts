@@ -1,5 +1,8 @@
 import type { OpHandler } from '../handler.ts';
 import { notImplemented } from '../services.ts';
 
-/** jobs.list：列出職缺快照摘要。由 P1-T019 實作；接上前回 not_implemented，不偽造成功。 */
-export const jobsList: OpHandler<'jobs.list'> = () => Promise.resolve(notImplemented());
+/** jobs.list：列出職缺快照摘要（不含描述全文）。 */
+export const jobsList: OpHandler<'jobs.list'> = async (_payload, services) => {
+  if (!services.jobs?.list) return notImplemented();
+  return { ok: true, snapshots: await services.jobs.list() };
+};

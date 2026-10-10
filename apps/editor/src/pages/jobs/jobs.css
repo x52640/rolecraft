@@ -1,0 +1,82 @@
+/* 職缺頁（P1-T019）。 */
+.job-fields {
+  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.job-field {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.job-field input,
+.job-field textarea,
+.job-field select {
+  font: inherit;
+}
+
+.job-field-error {
+  margin: 0;
+  color: #c62828;
+}
+
+.job-badge {
+  justify-self: start;
+  font-size: 0.85em;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+/* 兩種空白標示用不同樣式，避免混淆（R10）。 */
+.job-badge-not_captured {
+  border-style: dashed;
+}
+
+.job-badge-not_provided {
+  opacity: 0.75;
+}
+
+.job-unconfirmed {
+  font-weight: 600;
+}
+
+.job-meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+}
+
+.job-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.job-list {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.job-list th,
+.job-list td {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.job-list tr[aria-selected='true'] {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.job-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.job-hint {
+  opacity: 0.8;
+}
