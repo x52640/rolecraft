@@ -1,7 +1,7 @@
 ---
 id: P1-T043
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T020", "P1-T021", "P1-T028", "P1-T040"]
 specs: ["sources-and-authorization.md", "bridge.md", "architecture.md"]
 track: helper
@@ -77,7 +77,7 @@ npm run verify
 ## 中斷／接手紀錄
 
 - 最後完成：sources 選取器（資料夾／PDF）、createServices 接上 sources 選取器、resumeImport、applications，registry 測試改寫
-- 已通過驗證：worktree `npm run verify` 綠
+- 已通過驗證：worktree `npm run verify` 綠；協調者主樹 verify 綠；對抗驗證（E3）2 個角度均無發現
 - 下一步：協調者收官（高風險 R7：對抗驗證）；擁有者手動驗證真實對話框
 - Blocker：無
 

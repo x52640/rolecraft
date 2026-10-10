@@ -49,7 +49,7 @@
 | [P1-T040](P1-T040-helper-export-wiring.md) | helper：匯出接線 | done | 1 | helper | P1-T041、P1-T027、P1-T007 |
 | [P1-T041](P1-T041-bridge-editor-ops.md) | 橋接：編輯器頁面所需操作清單 | done | 1 | bridge | P1-T034 |
 | [P1-T042](P1-T042-readme.md) | README 與開源說明文件 | done | 1 | readme | — |
-| [P1-T043](P1-T043-helper-native-pickers.md) | helper：macOS 原生選取器與服務組裝 | in_progress | 1 | helper | P1-T020、P1-T021、P1-T028、P1-T040 |
+| [P1-T043](P1-T043-helper-native-pickers.md) | helper：macOS 原生選取器與服務組裝 | done | 1 | helper | P1-T020、P1-T021、P1-T028、P1-T040 |
 
 ## 依賴清單
 
