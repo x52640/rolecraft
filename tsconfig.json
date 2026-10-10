@@ -1,0 +1,38 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/contracts"
+    },
+    {
+      "path": "packages/domain"
+    },
+    {
+      "path": "packages/storage"
+    },
+    {
+      "path": "packages/sources"
+    },
+    {
+      "path": "packages/resume-import"
+    },
+    {
+      "path": "packages/providers"
+    },
+    {
+      "path": "packages/pipeline"
+    },
+    {
+      "path": "packages/pdf-export"
+    },
+    {
+      "path": "apps/helper"
+    },
+    {
+      "path": "apps/extension"
+    },
+    {
+      "path": "apps/editor"
+    }
+  ]
+}

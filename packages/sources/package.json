@@ -1,0 +1,13 @@
+{
+  "name": "@rolecraft/sources",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@rolecraft/contracts": "0.0.0",
+    "@rolecraft/domain": "0.0.0"
+  }
+}

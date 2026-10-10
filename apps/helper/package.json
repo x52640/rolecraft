@@ -1,0 +1,19 @@
+{
+  "name": "@rolecraft/helper",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@rolecraft/contracts": "0.0.0",
+    "@rolecraft/domain": "0.0.0",
+    "@rolecraft/storage": "0.0.0",
+    "@rolecraft/sources": "0.0.0",
+    "@rolecraft/resume-import": "0.0.0",
+    "@rolecraft/providers": "0.0.0",
+    "@rolecraft/pipeline": "0.0.0",
+    "@rolecraft/pdf-export": "0.0.0"
+  }
+}

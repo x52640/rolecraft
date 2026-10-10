@@ -1,0 +1,6 @@
+# 文件（含中文表格）不交給 Prettier；文件檢查由 verify:docs（P0-T002）負責。
+*.md
+package-lock.json
+node_modules/
+dist/
+coverage/

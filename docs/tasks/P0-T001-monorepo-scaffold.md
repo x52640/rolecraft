@@ -76,9 +76,17 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：骨架、lint 規則、邊界自我測試全部完成，待協調者收官
+- 已通過驗證：`npm install && npm run verify` 綠（12 檔 23 測試）
+- 下一步：協調者合併、稽核、標 done
 - Blocker：無
 
 ## 完成結果
+
+- 11 個 workspace 套件（`packages/*` 8 個、`apps/*` 3 個），各有 `package.json`（`exports` 指向 `src/index.ts`）、`tsconfig.json`（composite，references 依相依表）、`src/index.ts` 佔位、smoke 測試。zod 只裝在 contracts。
+- 工具版本：TypeScript ~6.0.3（7.x 不被 typescript-eslint 8.71 支援，peer `<6.1.0`）、ESLint 10、typescript-eslint 8.71（recommendedTypeChecked）、Prettier 3.9、Vitest 5、@types/node 26。
+- TS：strict、NodeNext、`verbatimModuleSyntax`、`erasableSyntaxOnly`、相對 import 寫 `.ts`（`rewriteRelativeImportExtensions`）。`types` 預設空；只有 storage、sources、resume-import、providers、pdf-export、helper 開 `node` 型別（domain 不得 I/O，contracts／pipeline／extension／editor 也不給）。
+- ESLint 規則（`eslint.config.js`）：非測試／fixture 檔 `max-lines` 300；每套件 `no-restricted-imports` 白名單（依 architecture.md 表）；`@rolecraft/*/**` deep import 禁止；zod 只限 contracts；本地規則 `rolecraft/no-relative-cross-package` 擋相對路徑跨出套件。
+- 永久 fixture：`apps/helper/src/module-boundaries.test.ts` 用 ESLint API 對虛擬檔驗證 違規 import／deep import／相對跨套件／zod／301 行 會紅、300 行與測試檔不紅（12 個測試）。
+- 實檔紅燈驗證（已刪）：在 `packages/domain/src` 放 301 行檔與 `import '@rolecraft/storage'`，`npm run lint` exit 1，報 `max-lines` 與 `no-restricted-imports` 各 1；刪除後 `npm run verify` exit 0。
+- `verify:docs` 為空殼（印提示），P0-T002 補。`.prettierignore` 排除 `*.md`（不讓 Prettier 改中文文件）。
