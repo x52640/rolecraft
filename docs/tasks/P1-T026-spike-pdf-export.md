@@ -1,7 +1,7 @@
 ---
 id: P1-T026
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P0-T001"]
 specs: ["resume-output.md", "open-verifications.md"]
 track: pdf

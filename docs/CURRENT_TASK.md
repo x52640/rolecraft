@@ -6,12 +6,13 @@
 ## 進行中
 
 - P0-T002 文件閘門腳本（`docs/tasks/P0-T002-docs-tooling.md`）
-
-## ready
-
 - P1-T001 contracts 核心資料物件
 - P1-T013 驗證：橋接通訊方式
 - P1-T026 驗證：中文 PDF 匯出方式
+
+## ready
+
+（無）
 <!-- index:end -->
 
 ## 主樹基準

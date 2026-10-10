@@ -1,7 +1,7 @@
 ---
 id: P1-T001
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P0-T001"]
 specs: ["architecture.md", "evidence-model.md", "bridge.md", "resume-output.md", "jobs-and-messages.md", "runtime-and-budget.md"]
 track: contracts

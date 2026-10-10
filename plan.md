@@ -49,3 +49,4 @@
 - **E2 冷啟動治理（2026-10-10 擁有者裁定）**：採 know_how 方法（權威分層、Task 契約、CURRENT_TASK 入口、一 Task 一 commit）。
 - **E3 驗證分級（2026-10-10 擁有者裁定）**：高風險 Task（P1-T002、T003、T007、T008、T010、T011、T012、T014；碰 R1–R7 核心限制）收官前跑 Workflow 對抗驗證，上限 4 個 agent（2 review＋2 verify）。其餘 Task 用協調者收官閘門。
 - **E4 codex review 延後（2026-10-10 擁有者裁定）**：每個 Task 仍獨立 commit；codex review 因額度不足先延後，待補清單記在 `docs/CURRENT_TASK.md`，額度恢復後逐 commit 補跑。
+- **E5 平行執行（2026-10-10 擁有者裁定）**：write_paths 不重疊、相依已完成的 Task 可平行跑（取代 know_how「一次只飛一個主 Task」）；仍各自獨立 commit，由協調者逐一收官。
