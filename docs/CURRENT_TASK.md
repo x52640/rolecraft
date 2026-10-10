@@ -13,7 +13,7 @@
 - P1-T008 sources：資料夾列舉、授權集合與安全讀檔（`docs/tasks/P1-T008-sources-authorization.md`）
 - P1-T009 resume-import：PDF 文字層擷取（`docs/tasks/P1-T009-resume-import-pdf.md`）
 - P1-T010 providers：適配介面、環境清理與 R6 紀錄（`docs/tasks/P1-T010-providers-core.md`）
-- P1-T013 驗證：橋接通訊方式（Q3）與資料夾選取機制（`docs/tasks/P1-T013-spike-bridge.md`）
+- P1-T015 extension：MV3 骨架與橋接客戶端（`docs/tasks/P1-T015-extension-skeleton.md`）
 - P1-T026 驗證：中文 PDF 匯出方式（`docs/tasks/P1-T026-spike-pdf-export.md`）
 
 ## ready
@@ -27,7 +27,7 @@
 
 ## 待專案擁有者
 
-- P1-T013：在 Arc、Edge 手動跑橋接 echo 測試（到時提供步驟）。
+- P1-T013：在 Arc、Edge 手動跑橋接 echo 測試（步驟見 `docs/adr/0003-bridge-transport.md`；Edge 需先安裝）。Chrome 已自動實測通過；ADR-0003 待此項後轉「採用」。
 - P1-T017：登入 104、開幾個職缺頁協助存 DOM 樣本。
 - P1-T020：提供一份 104 匯出的履歷 PDF（驗證有文字層，D18 前提）。
 - P1-T031：在乾淨 macOS 使用者帳號跑安裝測試。
@@ -38,6 +38,7 @@
 - P0-T001 `182b16a`（已審：1 項，P0-T003 修）
 - P0-T002 `9573b99`（已審：2 項，P0-T003 修）
 - P1-T001 `7b4da39`
+- P1-T013 `3265187`
 
 ## 已知殘餘（記錄，不擋上線）
 
@@ -48,6 +49,8 @@
 
 - verify:docs 只檢查 `[文字](路徑)` 連結；文件中反引號路徑不檢查（許多指向尚未建立的程式檔）。
 - 手動改 Task status 後必須跑 `npm run task:index`，否則 verify:docs 擋（產生物新鮮度檢查）。
+
+- 橋接（ADR-0003）：只由 service worker 持有 Native Messaging 連線，頁面經它轉送（避免多個 host 行程同寫 SQLite）；host→瀏覽器單則 1 MB，大資料要分塊（P1-T014、P1-T027）；編輯器必須是擴充功能頁（P1-T016）。
 
 ## 治理
 

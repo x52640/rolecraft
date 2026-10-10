@@ -1,7 +1,7 @@
 ---
 id: P1-T013
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P0-T001"]
 specs: ["bridge.md", "sources-and-authorization.md", "open-verifications.md"]
 track: bridge

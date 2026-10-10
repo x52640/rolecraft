@@ -19,9 +19,9 @@
 | [P1-T010](P1-T010-providers-core.md) | providers：適配介面、環境清理與 R6 紀錄 | in_progress | 1 | providers | P1-T001 |
 | [P1-T011](P1-T011-spike-claude-cli.md) | 驗證：Claude CLI 隔離與訂閱登入 | blocked | 1 | providers | P1-T010 |
 | [P1-T012](P1-T012-provider-claude.md) | providers：Claude 適配器 | blocked | 1 | providers | P1-T011 |
-| [P1-T013](P1-T013-spike-bridge.md) | 驗證：橋接通訊方式（Q3）與資料夾選取機制 | in_progress | 1 | bridge | P0-T001 |
+| [P1-T013](P1-T013-spike-bridge.md) | 驗證：橋接通訊方式（Q3）與資料夾選取機制 | done | 1 | bridge | P0-T001 |
 | [P1-T014](P1-T014-helper-host.md) | helper：橋接端點與操作清單分派 | blocked | 1 | helper | P1-T013、P1-T006 |
-| [P1-T015](P1-T015-extension-skeleton.md) | extension：MV3 骨架與橋接客戶端 | blocked | 1 | extension | P1-T013、P1-T001 |
+| [P1-T015](P1-T015-extension-skeleton.md) | extension：MV3 骨架與橋接客戶端 | in_progress | 1 | extension | P1-T013、P1-T001 |
 | [P1-T016](P1-T016-editor-skeleton.md) | editor：React 骨架與路由 | blocked | 1 | editor | P1-T015 |
 | [P1-T017](P1-T017-spike-104-job.md) | 驗證：104 職缺頁條款與 DOM 樣本 | blocked | 1 | extension | P1-T015 |
 | [P1-T018](P1-T018-extension-104-extractor.md) | extension：104 職缺頁擷取 | blocked | 1 | extension | P1-T017、P1-T014 |
