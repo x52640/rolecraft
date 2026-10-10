@@ -17,10 +17,12 @@ export function closeBlockers(task) {
     errors.push(`${task.rel}：status 是 ${task.data.status}，只有 in_progress 能收官`);
   }
   const result = sectionOf(task.body, '完成結果');
+  // 行內程式碼（反引號）裡的字是名稱，不是待辦（例如檔名 `TODO`）。
+  const prose = result.replace(/`[^`\n]*`/g, '');
   if (!result) errors.push(`${task.rel}：「完成結果」是空的`);
   else {
     for (const word of FORBIDDEN_IN_RESULT) {
-      if (result.includes(word)) errors.push(`${task.rel}：「完成結果」含有「${word}」`);
+      if (prose.includes(word)) errors.push(`${task.rel}：「完成結果」含有「${word}」`);
     }
   }
   return errors;

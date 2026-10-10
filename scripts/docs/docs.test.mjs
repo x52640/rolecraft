@@ -180,3 +180,22 @@ test('連結目標檔名含 % 不會讓閘門當掉（codex review P0-T002）', 
   assert.equal(errors.length, 1);
   assert.match(errors[0], /50%\.md/);
 });
+
+test('task:close：反引號內的禁用字不算（例如檔名 `TODO`）', () => {
+  task('P0-T002', 'next', {
+    status: 'in_progress',
+    deps: ['P0-T001'],
+    specs: ['a.md'],
+    result: '- 允許檔名 `TODO`、`README`',
+  });
+  writeIndex(root);
+  assert.equal(closeTask(root, 'P0-T002').ok, true);
+  task('P0-T002', 'next', {
+    status: 'in_progress',
+    deps: ['P0-T001'],
+    specs: ['a.md'],
+    result: '- 還有 TODO',
+  });
+  writeIndex(root);
+  assert.equal(closeTask(root, 'P0-T002').ok, false);
+});
