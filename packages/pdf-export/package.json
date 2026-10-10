@@ -6,7 +6,17 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "fonts:fetch": "node scripts/fetch-fonts.mjs",
+    "fonts:fixtures": "node scripts/make-fixture-fonts.mjs",
+    "sample": "node scripts/render-sample.ts"
+  },
   "dependencies": {
-    "@rolecraft/contracts": "0.0.0"
+    "@rolecraft/contracts": "0.0.0",
+    "harfbuzzjs": "^1.6.3",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.4.299",
+    "puppeteer-core": "^25.13.0",
+    "subset-font": "^2.9.0"
   }
 }

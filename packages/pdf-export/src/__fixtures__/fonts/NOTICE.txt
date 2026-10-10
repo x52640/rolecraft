@@ -1,0 +1,13 @@
+測試用字型（只供本套件的自動測試，不隨產品散布）
+
+fixture-regular.ttf、fixture-bold.ttf 是 Noto Sans TC（Google Fonts 靜態 TrueType 400／700，
+來源與 sha256 見 src/fonts/manifest.ts）用 HarfBuzz hb-subset 裁出的子集，
+只含 src/__fixtures__/fixture-text.ts 列出的字（約 370 個碼位，含刻意保留的康熙部首）。
+
+授權：SIL Open Font License 1.1，全文見同資料夾 OFL.txt。
+Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.
+未改字型名稱；子集僅為測試而產生，不作為字型單獨散布。
+
+重新產生：
+  node packages/pdf-export/scripts/fetch-fonts.mjs --out <字型資料夾>
+  node packages/pdf-export/scripts/make-fixture-fonts.mjs --fonts <字型資料夾>
