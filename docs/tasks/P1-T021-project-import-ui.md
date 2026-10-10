@@ -91,6 +91,13 @@ npm run verify
 - 待裁定：
   1. **真實 macOS 選取器沒做**：要 `execFile('/usr/bin/osascript', …)`，但 `apps/helper/src/main.test.ts` 的 R7 靜態掃描禁止 helper 正式原始碼出現 child_process／execFile，該測試不在 write_paths。建議另開小 Task：新增 `handlers/sources/mac-folder-picker.ts`（指令與參數寫死、不經 shell，照 `scripts/spikes/bridge/host/folder-picker.mjs`），在掃描測試加「只有這一個檔可用 execFile」的白名單，並在 createServices 傳入 picker。
   2. `SourcesService` 方法改成選用，是因為 `handlers/registry.test.ts`（write_paths 外）用 `sources: {}` 並要求所有編輯器操作回 not_implemented；若協調者偏好必填方法，需同步改那個測試。
-  3. 預覽回應沒有分頁：候選文件非常多（約數千個以上）時可能超過 host 單則 1 MB 上限而回 internal_error。
+  3. 預覽回應沒有分頁：候選文件非常多（約數千個以上）時改回固定的 invalid_request，提示改選子資料夾（見下「對抗驗證修正」）；要一次預覽超大資料夾需改 contracts 加分頁。
   4. 被篩掉的項目（原始碼、憑證等）contracts 沒有欄位可回，預覽只用一句說明帶過，不逐項列出。
 - 殘餘：授權集合與讀檔紀錄只在 helper 記憶體（helper 行程重啟就要重新選取資料夾），持久化待 storage 接線；分析讀檔（P1-T022）要經 `createSourcesService(...).registry.read(文件 ID)`。
+
+### 對抗驗證修正
+
+- 沒有可見字元的名稱：子資料夾或文件名只有空白（含全形空白 U+3000）時，contracts 名稱驗證不過，整個預覽變 internal_error。改為顯示替代名稱「（未命名）」（`preview-tree.ts` 的 `visibleName`）。
+- 預覽「最近一次」狀態：先以 contracts `SourceEntry` 驗證每一項、確認回應大小在上限內，通過後才替換最近一次預覽的 ID 集合；失敗時保留上一次的（之前已預覽的項目仍可授權，新檔不行）。
+- 預覽過大：回應位元組數（host 單則上限扣 64 KiB 餘裕）超過時回 `invalid_request`＋固定訊息「這個資料夾的文件太多，無法一次預覽；請移除後改選其中的子資料夾」，不再變成 internal_error。未改 contracts。
+- 回歸測試：`preview-limits.test.ts`（子資料夾名 ' ' 與 U+3000、約 5000 個檔、過大時不替換最近一次預覽）。

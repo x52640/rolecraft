@@ -9,6 +9,14 @@ import type { SourceItem } from '@rolecraft/sources';
  */
 const SUGGESTED_MAX_PRIORITY = 5;
 
+/** 沒有可見字元的名稱（例如全是空白或全形空白）在畫面上的替代名稱。 */
+export const UNNAMED_ENTRY = '（未命名）';
+
+/** 顯示用名稱：沒有可見字元就用替代名稱（contracts 的名稱必須有可見字元）。 */
+export function visibleName(name: string): string {
+  return /\S/u.test(name) ? name : UNNAMED_ENTRY;
+}
+
 /** 文件類型：副檔名（不含點、小寫）；沒有副檔名回空字串。 */
 export function formatOf(name: string): string {
   const dot = name.lastIndexOf('.');
@@ -41,7 +49,7 @@ export function buildPreviewEntries(
         containers.set(dir, {
           entryId: id,
           parentEntryId: parentId,
-          name: segments[depth - 1] ?? dir,
+          name: visibleName(segments[depth - 1] ?? dir),
           kind: 'container',
           sizeBytes: null,
           format: '',
@@ -60,7 +68,7 @@ export function buildPreviewEntries(
     documents.push({
       entryId: item.id,
       parentEntryId: containerFor(segments),
-      name,
+      name: visibleName(name),
       kind: 'document',
       sizeBytes: item.size,
       format: formatOf(name),

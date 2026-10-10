@@ -22,3 +22,13 @@ export function folderUnreadable(): BridgeFailure {
     error: { code: 'internal_error', message: '資料夾已無法讀取，請移除後重新選取' },
   };
 }
+
+export function previewTooLarge(): BridgeFailure {
+  return {
+    ok: false,
+    error: {
+      code: 'invalid_request',
+      message: '這個資料夾的文件太多，無法一次預覽；請移除後改選其中的子資料夾',
+    },
+  };
+}

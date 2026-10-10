@@ -14,7 +14,9 @@ export type PreviewResult =
   | { readonly status: 'ok'; readonly entries: SourceEntry[] }
   | { readonly status: 'unknown_root' }
   /** 資料夾已無法列舉（例如被換掉或刪除），請使用者移除後重新選取。 */
-  | { readonly status: 'unreadable' };
+  | { readonly status: 'unreadable' }
+  /** 候選文件太多，回應會超過 host 單則上限；請使用者改選子資料夾。 */
+  | { readonly status: 'too_large' };
 
 export type UpdateAuthorizationResult = 'ok' | 'unknown_root' | 'invalid_entry';
 

@@ -6,9 +6,10 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
-import type { SourceRoot, SourceRootView } from '@rolecraft/contracts';
+import { SourceEntry, type SourceRoot, type SourceRootView } from '@rolecraft/contracts';
 import { createNodeFolderAccess, SourceRegistry, type FolderAccess } from '@rolecraft/sources';
 
+import { MAX_OUTGOING_BYTES } from '../../bridge/framing.ts';
 import { buildPreviewEntries } from './preview-tree.ts';
 import type {
   PickFoldersResult,
@@ -30,6 +31,8 @@ export interface LocalSourcesOptions {
   /** 建立資料夾存取物件；預設為本機 fs 版。 */
   readonly openFolder?: (absolutePath: string) => Promise<FolderAccess>;
   readonly newId?: () => string;
+  /** 只供測試調小。 */
+  readonly maxPreviewBytes?: number;
 }
 
 interface RootState {
@@ -41,6 +44,9 @@ interface RootState {
 }
 
 const UNNAMED = '（未命名資料夾）';
+
+/** 預覽回應的位元組上限：host 單則上限扣掉信封與餘裕。 */
+export const MAX_PREVIEW_BYTES = MAX_OUTGOING_BYTES - 64 * 1024;
 
 function displayName(absolutePath: string): string {
   const base = path.basename(absolutePath);
@@ -74,12 +80,14 @@ class LocalSourcesCore {
   readonly #roots = new Map<string, RootState>();
   readonly #openFolder: (absolutePath: string) => Promise<FolderAccess>;
   readonly #newId: () => string;
+  readonly #maxPreviewBytes: number;
   #picking = false;
 
   constructor(options: LocalSourcesOptions = {}) {
     this.registry = options.registry ?? new SourceRegistry();
     this.#openFolder = options.openFolder ?? ((p) => createNodeFolderAccess(p));
     this.#newId = options.newId ?? randomUUID;
+    this.#maxPreviewBytes = options.maxPreviewBytes ?? MAX_PREVIEW_BYTES;
   }
 
   async pickFolders(picker: FolderPicker): Promise<PickFoldersResult> {
@@ -155,6 +163,12 @@ class LocalSourcesCore {
     if (this.#roots.get(rootId) !== state) return { status: 'unknown_root' };
     const items = this.registry.items(rootId).filter((item) => item.present);
     const entries = buildPreviewEntries(items, state.containerIds, this.#newId);
+    // 先確認回應合法且送得出去，才替換「最近一次預覽」；否則保留上一次的。
+    if (!entries.every((entry) => SourceEntry.safeParse(entry).success)) {
+      return { status: 'unreadable' };
+    }
+    const bytes = Buffer.byteLength(JSON.stringify({ ok: true, entries }), 'utf8');
+    if (bytes > this.#maxPreviewBytes) return { status: 'too_large' };
     state.previewed = new Set(items.map((item) => item.id));
     return { status: 'ok', entries };
   }
