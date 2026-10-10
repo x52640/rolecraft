@@ -1,7 +1,7 @@
 ---
 id: P1-T039
 phase: 1
-status: in_progress
+status: ready
 depends_on: ["P1-T012", "P1-T037"]
 specs: ["providers.md"]
 track: providers
