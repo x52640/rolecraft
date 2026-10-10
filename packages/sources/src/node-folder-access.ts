@@ -113,13 +113,27 @@ class NodeFolderAccess implements FolderAccess {
     this.#hooks = hooks;
   }
 
-  /** 這一層到根是否都還是發現時的那些資料夾（非 symlink、身分相同）。 */
-  #dirIntact(dir: QueuedDir): { ok: true } | { ok: false; symlink: boolean } {
+  /**
+   * 這一層到根是否都還是發現時的那些資料夾（非 symlink、身分相同）。
+   * rootChanged：失敗的是根本身（codex 補審 ca51f0e：掃子層時根被換也要中止整份列舉）。
+   */
+  #dirIntact(dir: QueuedDir): { ok: true } | { ok: false; symlink: boolean; rootChanged: boolean } {
     try {
       const res = lstatDirChain(this.#root, dir.segments, dir.chain);
-      return res.ok ? { ok: true } : res;
+      return res.ok
+        ? { ok: true }
+        : { ok: false, symlink: res.symlink, rootChanged: res.level === 0 };
     } catch {
-      return { ok: false, symlink: false };
+      // lstat 丟錯（例如某層消失）時，另外確認根是否還在原處。
+      return { ok: false, symlink: false, rootChanged: !this.#rootIntact() };
+    }
+  }
+
+  #rootIntact(): boolean {
+    try {
+      return lstatDirChain(this.#root, [], [this.#rootId]).ok;
+    } catch {
+      return false;
     }
   }
 
@@ -131,12 +145,9 @@ class NodeFolderAccess implements FolderAccess {
       if (!dir) break;
       const rel = dir.segments.join('/');
       if (rel !== '') await this.#hooks.beforeReaddir?.(rel);
-      const found = await this.#listDir(dir);
-      if (found === null) {
-        // 根被換掉：整份列舉都不可信。
-        if (rel === '') throw new Error('選取的資料夾已被移動或替換，請重新選取');
-        continue;
-      }
+      const found = await this.#listDir(dir, this.#maxEntries - out.length);
+      // 根被換掉（不論正在掃哪一層）：整份列舉都不可信。
+      if (found === null) throw new Error('選取的資料夾已被移動或替換，請重新選取');
       if ('changed' in found) {
         out.push({ relPath: rel, kind: found.changed, size: 0 });
         continue;
@@ -154,15 +165,19 @@ class NodeFolderAccess implements FolderAccess {
 
   /**
    * 列一層：readdir 與取大小都夾在兩次身分確認之間，任一次不符就整層不採用。
-   * 回傳 null 表示根資料夾不符。
+   * 回傳 null 表示根資料夾不符。budget 是剩餘可回報筆數，收滿就停，不再 lstat 其餘項目
+   * （codex 補審 ca51f0e）。
    */
   async #listDir(
     dir: QueuedDir,
+    budget: number,
   ): Promise<
     { entries: RawEntry[]; subdirs: QueuedDir[] } | { changed: 'symlink' | 'other' } | null
   > {
-    const changed = (r: { symlink: boolean }) =>
-      dir.segments.length === 0 ? null : ({ changed: r.symlink ? 'symlink' : 'other' } as const);
+    const changed = (r: { symlink: boolean; rootChanged: boolean }) =>
+      r.rootChanged || dir.segments.length === 0
+        ? null
+        : ({ changed: r.symlink ? 'symlink' : 'other' } as const);
     const before = this.#dirIntact(dir);
     if (!before.ok) return changed(before);
     const abs = path.join(this.#root, ...dir.segments);
@@ -175,6 +190,7 @@ class NodeFolderAccess implements FolderAccess {
     const entries: RawEntry[] = [];
     const subdirs: QueuedDir[] = [];
     for (const d of dirents) {
+      if (entries.length >= budget) break;
       const rel = [...dir.segments, d.name].join('/');
       const childAbs = path.join(abs, d.name);
       if (d.isSymbolicLink()) {

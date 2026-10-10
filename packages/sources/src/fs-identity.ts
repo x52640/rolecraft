@@ -24,7 +24,8 @@ export const sameIdentity = (a: Identity, b: Identity): boolean =>
 
 export type DirChainResult =
   | { readonly ok: true; readonly dirs: readonly Identity[] }
-  | { readonly ok: false; readonly symlink: boolean };
+  /** level：第幾層不符（0 是根），讓呼叫端分辨「根被換」與「子層被換」。 */
+  | { readonly ok: false; readonly symlink: boolean; readonly level: number };
 
 /**
  * 逐段 lstat 根與 dirSegments 的每一層：都必須是資料夾、不是 symlink，
@@ -41,11 +42,11 @@ export function lstatDirChain(
   for (let i = 0; i <= dirSegments.length; i += 1) {
     if (i > 0) current = path.join(current, dirSegments[i - 1] ?? '');
     const st = lstatSync(current, { bigint: true });
-    if (st.isSymbolicLink()) return { ok: false, symlink: true };
-    if (!st.isDirectory()) return { ok: false, symlink: false };
+    if (st.isSymbolicLink()) return { ok: false, symlink: true, level: i };
+    if (!st.isDirectory()) return { ok: false, symlink: false, level: i };
     const id = identityOf(st);
     const want = expected[i];
-    if (want && !sameIdentity(want, id)) return { ok: false, symlink: false };
+    if (want && !sameIdentity(want, id)) return { ok: false, symlink: false, level: i };
     dirs.push(id);
   }
   return { ok: true, dirs };

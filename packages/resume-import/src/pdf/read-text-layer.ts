@@ -1,6 +1,5 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import {
   getDocument,
@@ -20,11 +19,15 @@ export class PdfReadError extends Error {
   }
 }
 
-/** pdfjs 隨附的 CMap 與標準字型資料夾（本機檔案，不連網）。中文 CID 字型需要 CMap。 */
+/**
+ * pdfjs 隨附的 CMap 與標準字型資料夾（本機檔案，不連網）。中文 CID 字型需要 CMap。
+ * Node 版 pdfjs 用 fs 讀這個位置，必須給檔案系統路徑（結尾加分隔符）；
+ * 給 file:// URL 會讀不到，中文 CID 字型就抽不出字（codex 補審 3c5e934）。
+ */
 function pdfjsAssetDir(sub: 'cmaps' | 'standard_fonts'): string {
   const require = createRequire(import.meta.url);
   const pkgJson = require.resolve('pdfjs-dist/package.json');
-  return pathToFileURL(path.join(path.dirname(pkgJson), sub) + path.sep).href;
+  return path.join(path.dirname(pkgJson), sub) + path.sep;
 }
 
 interface PdfjsTextItem {
@@ -83,19 +86,29 @@ export async function readTextLayer(data: Uint8Array): Promise<RawPage[]> {
     const doc = await openDocument(task);
     const pages: RawPage[] = [];
     for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
-      const page = await doc.getPage(pageNumber);
-      const [x0 = 0, y0 = 0, x1 = 0, y1 = 0] = page.view;
-      const content = await page.getTextContent();
-      const items: readonly unknown[] = content.items;
-      const runs: TextRun[] = [];
-      for (const item of items) {
-        if (isTextItem(item) && item.str.trim() !== '') runs.push(toRun(item));
-      }
-      pages.push({ pageNumber, width: x1 - x0, height: y1 - y0, runs });
-      page.cleanup();
+      pages.push(await readPage(doc, pageNumber));
     }
     return pages;
   } finally {
     await task.destroy();
   }
+}
+
+/** 讀一頁；頁面結構壞掉時 pdfjs 丟的錯誤一律歸類為 invalid_pdf（codex 補審 3c5e934）。 */
+async function readPage(doc: PDFDocumentProxy, pageNumber: number): Promise<RawPage> {
+  let page;
+  let items: readonly unknown[];
+  try {
+    page = await doc.getPage(pageNumber);
+    items = (await page.getTextContent()).items;
+  } catch {
+    throw new PdfReadError('invalid_pdf', `無法讀取 PDF 第 ${pageNumber} 頁，檔案可能損壞。`);
+  }
+  const [x0 = 0, y0 = 0, x1 = 0, y1 = 0] = page.view;
+  const runs: TextRun[] = [];
+  for (const item of items) {
+    if (isTextItem(item) && item.str.trim() !== '') runs.push(toRun(item));
+  }
+  page.cleanup();
+  return { pageNumber, width: x1 - x0, height: y1 - y0, runs };
 }

@@ -119,10 +119,10 @@ export function looksLikeTitle(segment: string): boolean {
   return segment.length <= MAX_TITLE_LENGTH && TITLE_WORDS.test(segment);
 }
 
-/** 技能清單以逗號、頓號、分號、斜線切開。 */
+/** 技能清單以逗號、頓號、分號、斜線、Tab（版面上的欄位間距）切開。 */
 export function splitSkills(text: string): string[] {
   return text
-    .split(/[,，、;；|｜/]/u)
+    .split(/[,，、;；|｜/\t]/u)
     .map((s) => s.trim())
     .filter((s) => s !== '');
 }

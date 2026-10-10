@@ -32,22 +32,27 @@ export function findGutter(runs: readonly TextRun[], pageWidth: number): Gutter 
   const allowed = Math.floor(runs.length * 0.1);
   const lo = Math.floor(pageWidth * GUTTER_RANGE[0]);
   const hi = Math.ceil(pageWidth * GUTTER_RANGE[1]);
+  // 每個候選空白帶先驗左右兩邊段數，再從合格的挑最寬；先挑最寬再驗會把
+  // 「右欄右邊的大片頁邊空白」選中而誤判單欄（codex 補審 3c5e934）。
   let best: Gutter | null = null;
   let runStart = -1;
   for (let i = lo; i <= hi + 1; i += 1) {
     const open = i <= hi && (coverage[i] ?? 0) <= allowed;
     if (open && runStart < 0) runStart = i;
     if (!open && runStart >= 0) {
-      if (!best || i - runStart > best.end - best.start) best = { start: runStart, end: i };
+      const candidate = { start: runStart, end: i };
+      const wider = !best || i - runStart > best.end - best.start;
+      if (wider && i - runStart >= MIN_GUTTER && splitsColumns(runs, candidate)) best = candidate;
       runStart = -1;
     }
   }
-  if (!best || best.end - best.start < MIN_GUTTER) return null;
-  const gutter = best;
+  return best;
+}
+
+function splitsColumns(runs: readonly TextRun[], gutter: Gutter): boolean {
   const left = runs.filter((r) => !crosses(r, gutter) && r.x + r.width <= gutter.start).length;
   const right = runs.filter((r) => !crosses(r, gutter) && r.x >= gutter.end).length;
-  if (left < MIN_RUNS_PER_COLUMN || right < MIN_RUNS_PER_COLUMN) return null;
-  return gutter;
+  return left >= MIN_RUNS_PER_COLUMN && right >= MIN_RUNS_PER_COLUMN;
 }
 
 /** 把同一條基線上的文字段合成一行（由上到下、由左到右）。 */
@@ -68,15 +73,27 @@ export function groupLines(
   return groups.map((group) => toLine(group, pageNumber, column));
 }
 
+/** 同一行兩段文字的間距超過字高的這個倍數，視為不同欄位（輸出 Tab）。 */
+const FIELD_GAP_EM = 1.5;
+
 function toLine(group: TextRun[], pageNumber: number, column: number): TextLine {
   const parts = [...group].sort((p, q) => p.x - q.x);
   let text = '';
   let cursor = -Infinity;
   for (const part of parts) {
     const gap = part.x - cursor;
-    const needsSpace =
-      text !== '' && gap > part.height * 0.2 && !text.endsWith(' ') && !part.text.startsWith(' ');
-    text += (needsSpace ? ' ' : '') + part.text;
+    if (text !== '' && gap > part.height * FIELD_GAP_EM) {
+      // 大間距隔開的是不同欄位（例如頁首一行排姓名、城市、信箱），不可併成一句（codex 補審 3c5e934）
+      text += '\t';
+    } else if (
+      text !== '' &&
+      gap > part.height * 0.2 &&
+      !/\s$/u.test(text) &&
+      !part.text.startsWith(' ')
+    ) {
+      text += ' ';
+    }
+    text += part.text;
     cursor = Math.max(cursor, part.x + part.width);
   }
   const first = parts[0];
@@ -84,7 +101,11 @@ function toLine(group: TextRun[], pageNumber: number, column: number): TextLine 
   return {
     pageNumber,
     column,
-    text: text.replace(/\s+/g, ' ').trim(),
+    // 空白收成一個；Tab 是欄位分隔，保留並去掉兩側空白。
+    text: text
+      .replace(/[^\S\t]+/gu, ' ')
+      .replace(/ *\t\s*/gu, '\t')
+      .trim(),
     x,
     y: first?.y ?? 0,
     width: cursor - x,

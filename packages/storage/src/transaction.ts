@@ -13,6 +13,8 @@ export function transaction<T>(db: DatabaseSync, fn: () => T): T {
     const result = fn();
     // async 函式回傳 Promise 時，後續的失敗無法回滾（codex review P1-T006）
     if (result !== null && typeof (result as { then?: unknown })?.then === 'function') {
+      // 先接住原 Promise 的失敗，否則它變成 unhandled rejection 讓程序崩潰（codex 補審 79ac0cd）
+      (result as PromiseLike<unknown>).then(undefined, () => {});
       throw new TypeError('transaction 不接受 async 函式');
     }
     db.exec(`RELEASE ${name}`);

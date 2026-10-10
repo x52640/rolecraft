@@ -49,6 +49,7 @@ export interface StoredFile {
 }
 
 const HASH_PATTERN = /^[0-9a-f]{64}$/;
+const SHARD_PATTERN = /^[0-9a-f]{2}$/;
 
 /** 本機資料夾實作：`<root>/sha256/<前兩字>/<雜湊>`，寫入先寫暫存檔再改名，避免半個檔。 */
 export function createLocalFileStore(root: string): FileStore {
@@ -70,7 +71,12 @@ export function createLocalFileStore(root: string): FileStore {
           writeFileSync(temp, content, { flag: 'wx' });
           renameSync(temp, target);
         } catch (error) {
-          rmSync(temp, { force: true });
+          // 清理失敗（例如 EACCES）不可蓋掉原錯誤（codex 補審 79ac0cd）
+          try {
+            rmSync(temp, { force: true });
+          } catch {
+            // 忽略：保留原錯誤
+          }
           throw error;
         }
       }
@@ -99,8 +105,10 @@ export function createLocalFileStore(root: string): FileStore {
     listHashes() {
       const base = path.join(root, 'sha256');
       if (!existsSync(base)) return [];
-      return readdirSync(base)
-        .flatMap((dir) => readdirSync(path.join(base, dir)))
+      // 只走兩碼 hex 子目錄；.DS_Store 等雜檔不可讓清掃崩潰（codex 補審 50c8639）
+      return readdirSync(base, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && SHARD_PATTERN.test(entry.name))
+        .flatMap((entry) => readdirSync(path.join(base, entry.name)))
         .filter((name) => HASH_PATTERN.test(name))
         .sort();
     },

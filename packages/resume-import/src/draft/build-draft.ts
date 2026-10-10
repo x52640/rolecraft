@@ -21,8 +21,9 @@ function field(value: string, pageNumber: number, lineIndex: number): DraftField
 
 /** 一行裡的公司與職稱：先看標籤，再看公司字尾與職稱關鍵字。 */
 function companiesAndTitles(text: string): { companies: string[]; titles: string[] } {
-  const labeledCompany = labeledValue(text, COMPANY_LABELS);
-  const labeledTitle = labeledValue(text, TITLE_LABELS);
+  // 標籤後只取第一段：同一行後面可能是 Tab 隔開的其他欄位。
+  const labeledCompany = segments(labeledValue(text, COMPANY_LABELS) ?? '')[0];
+  const labeledTitle = segments(labeledValue(text, TITLE_LABELS) ?? '')[0];
   if (labeledCompany || labeledTitle) {
     return {
       companies: labeledCompany ? [labeledCompany] : [],

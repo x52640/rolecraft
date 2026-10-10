@@ -25,6 +25,7 @@ export interface TextLine {
   pageNumber: number;
   /** 欄位序號：單欄或跨欄行為 0，雙欄的左欄 0、右欄 1 */
   column: number;
+  /** 一行文字；同一行內大間距隔開的欄位以 Tab（\t）分隔 */
   text: string;
   x: number;
   y: number;
