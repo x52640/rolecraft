@@ -1,2 +1,13 @@
-/** 佔位：pipeline 的公開入口，實作由後續 Task 補上。 */
+/** @rolecraft/pipeline 公開入口：分析與生成流程、提示組裝。 */
 export const PACKAGE_NAME = '@rolecraft/pipeline';
+
+export * from './analysis/index.ts';
+export {
+  ANALYSIS_INSTRUCTIONS,
+  MODEL_COMPLETION_STATUSES,
+  buildAnalysisPrompt,
+  chooseBoundary,
+  dataBlock,
+  documentLabelOf,
+  isUsableBoundary,
+} from './prompts/analysis-prompt.ts';
