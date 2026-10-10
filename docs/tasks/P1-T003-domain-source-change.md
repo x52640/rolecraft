@@ -1,7 +1,7 @@
 ---
 id: P1-T003
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T001"]
 specs: ["evidence-model.md"]
 track: domain

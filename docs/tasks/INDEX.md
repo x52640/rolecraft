@@ -9,7 +9,7 @@
 | [P0-T003](P0-T003-codex-review-fixes.md) | 修正 codex review 對 P0-T001、P0-T002 的發現 | done | 0 | infra | P0-T001、P0-T002 |
 | [P1-T001](P1-T001-contracts-core.md) | contracts：核心資料物件與橋接 schema | done | 1 | contracts | P0-T001 |
 | [P1-T002](P1-T002-domain-evidence.md) | domain：事實項狀態與 R1 匯出前檢查 | in_progress | 1 | domain | P1-T001 |
-| [P1-T003](P1-T003-domain-source-change.md) | domain：R2 來源變更判定 | in_progress | 1 | domain | P1-T001 |
+| [P1-T003](P1-T003-domain-source-change.md) | domain：R2 來源變更判定 | done | 1 | domain | P1-T001 |
 | [P1-T004](P1-T004-domain-budget.md) | domain：R8 輸入預算與拆批 | done | 1 | domain | P1-T001 |
 | [P1-T005](P1-T005-domain-work-job.md) | domain：R9 工作單元狀態機 | done | 1 | domain | P1-T001 |
 | [P1-T006](P1-T006-storage-core.md) | storage：SQLite schema 與 repository | done | 1 | storage | P1-T001 |

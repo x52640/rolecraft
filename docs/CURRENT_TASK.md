@@ -6,7 +6,6 @@
 ## 進行中
 
 - P1-T002 domain：事實項狀態與 R1 匯出前檢查（`docs/tasks/P1-T002-domain-evidence.md`）
-- P1-T003 domain：R2 來源變更判定（`docs/tasks/P1-T003-domain-source-change.md`）
 - P1-T007 storage：不可變匯出版本、投遞紀錄與刪除規則（`docs/tasks/P1-T007-storage-export-versions.md`）
 - P1-T008 sources：資料夾列舉、授權集合與安全讀檔（`docs/tasks/P1-T008-sources-authorization.md`）
 - P1-T010 providers：適配介面、環境清理與 R6 紀錄（`docs/tasks/P1-T010-providers-core.md`）
@@ -42,6 +41,7 @@
 - P1-T006 `3eed0e7`
 - P1-T015 `859b505`
 - P1-T026 `9ea7487`
+- P1-T003 `9cd8ec9`、`8c5bb79`（實作＋對抗驗證修正）
 
 ## 已知殘餘（記錄，不擋上線）
 
