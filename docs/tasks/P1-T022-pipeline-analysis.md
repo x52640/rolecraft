@@ -1,7 +1,7 @@
 ---
 id: P1-T022
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T002", "P1-T003", "P1-T004", "P1-T005", "P1-T012", "P1-T008"]
 specs: ["evidence-model.md", "runtime-and-budget.md", "providers.md"]
 track: pipeline
@@ -83,8 +83,8 @@ npm run verify
 ## 中斷／接手紀錄
 
 - 最後完成：E3 對抗驗證 4 項修正（連結完整比對、other 錯誤不重試、摘要送出前重查授權）
-- 已通過驗證：worktree 內 `npm run verify` 綠（Vitest 1188 通過、9 略過；pipeline 8 檔 52 測試）
-- 下一步：協調者合併修正 commit 後收官（status 由協調者維護）
+- 已通過驗證：主樹 `npm run verify` 綠（Vitest 1855 通過）；對抗驗證（E3）屬實 4 項已修（c4aba85）；「事實項文字與原文語意綁定」「完成狀態由模型判讀」判定為設計限制（R1 由使用者 F07 把關），列入保守選擇 (4)
+- 下一步：無（已收官）
 - Blocker：無（相依 P1-T002～T005、T008、T012 皆已 done）
 
 ## 完成結果
