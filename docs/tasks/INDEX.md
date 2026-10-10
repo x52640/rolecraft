@@ -44,7 +44,7 @@
 | [P1-T035](P1-T035-review-fixes-domain.md) | codex 補審修正：domain（預算、來源變更、數字檢查） | done | 1 | domain | — |
 | [P1-T036](P1-T036-review-fixes-data.md) | codex 補審修正：storage、sources、resume-import | in_progress | 1 | data | — |
 | [P1-T037](P1-T037-review-fixes-providers.md) | codex 補審修正：providers 取消終止與 Claude spike 腳本 | in_progress | 1 | providers | — |
-| [P1-T038](P1-T038-review-fixes-output.md) | codex 補審修正：pdf-export、104 擷取提示、task:close | in_progress | 1 | output | — |
+| [P1-T038](P1-T038-review-fixes-output.md) | codex 補審修正：pdf-export、104 擷取提示、task:close | done | 1 | output | — |
 
 ## 依賴清單
 

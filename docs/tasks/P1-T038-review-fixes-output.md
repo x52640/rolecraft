@@ -1,7 +1,7 @@
 ---
 id: P1-T038
 phase: 1
-status: in_progress
+status: done
 depends_on: []
 specs: ["resume-output.md", "jobs-and-messages.md"]
 track: output
