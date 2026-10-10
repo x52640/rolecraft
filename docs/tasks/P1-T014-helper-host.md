@@ -1,7 +1,7 @@
 ---
 id: P1-T014
 phase: 1
-status: blocked
+status: in_progress
 depends_on: ["P1-T013", "P1-T006"]
 specs: ["bridge.md", "architecture.md"]
 track: helper
@@ -78,6 +78,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：讀必讀入口後開工
-- Blocker：等待相依：P1-T013、P1-T006
+- Blocker：無
 
 ## 完成結果

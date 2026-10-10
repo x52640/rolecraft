@@ -7,9 +7,10 @@
 
 - P1-T002 domain：事實項狀態與 R1 匯出前檢查（`docs/tasks/P1-T002-domain-evidence.md`）
 - P1-T003 domain：R2 來源變更判定（`docs/tasks/P1-T003-domain-source-change.md`）
-- P1-T006 storage：SQLite schema 與 repository（`docs/tasks/P1-T006-storage-core.md`）
+- P1-T007 storage：不可變匯出版本、投遞紀錄與刪除規則（`docs/tasks/P1-T007-storage-export-versions.md`）
 - P1-T008 sources：資料夾列舉、授權集合與安全讀檔（`docs/tasks/P1-T008-sources-authorization.md`）
 - P1-T010 providers：適配介面、環境清理與 R6 紀錄（`docs/tasks/P1-T010-providers-core.md`）
+- P1-T014 helper：橋接端點與操作清單分派（`docs/tasks/P1-T014-helper-host.md`）
 - P1-T015 extension：MV3 骨架與橋接客戶端（`docs/tasks/P1-T015-extension-skeleton.md`）
 - P1-T026 驗證：中文 PDF 匯出方式（`docs/tasks/P1-T026-spike-pdf-export.md`）
 
@@ -39,6 +40,7 @@
 - P1-T004 `f569c68`
 - P1-T005 `fb412f7`
 - P1-T009 `3c5e934`
+- P1-T006 `3eed0e7`
 
 ## 已知殘餘（記錄，不擋上線）
 
@@ -55,6 +57,8 @@
 - 來源位置單位：budget（P1-T004）用 UTF-16 索引 [start, end)；P1-T003 定案片段位置格式時要統一。
 
 - resume-import（P1-T009）：無文字層／亂碼／順序異常門檻皆 20%（暫定）；姓名只認有標籤寫法；中文 PDF 未實測，待 P1-T020 用擁有者 104 PDF 調整；欄位草稿是否進 contracts 由 P1-T020 決定。
+
+- storage（P1-T006）：外部傳入時間原樣保存（未轉 UTC），清單依寫入順序；要依時間排序或查區間時，寫入改統一 UTC。ID／雜湊讀取驗證仍寬鬆（新格式只用於自產值）。
 
 ## 治理
 

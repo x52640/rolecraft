@@ -12,15 +12,15 @@
 | [P1-T003](P1-T003-domain-source-change.md) | domain：R2 來源變更判定 | in_progress | 1 | domain | P1-T001 |
 | [P1-T004](P1-T004-domain-budget.md) | domain：R8 輸入預算與拆批 | done | 1 | domain | P1-T001 |
 | [P1-T005](P1-T005-domain-work-job.md) | domain：R9 工作單元狀態機 | done | 1 | domain | P1-T001 |
-| [P1-T006](P1-T006-storage-core.md) | storage：SQLite schema 與 repository | in_progress | 1 | storage | P1-T001 |
-| [P1-T007](P1-T007-storage-export-versions.md) | storage：不可變匯出版本、投遞紀錄與刪除規則 | blocked | 1 | storage | P1-T006 |
+| [P1-T006](P1-T006-storage-core.md) | storage：SQLite schema 與 repository | done | 1 | storage | P1-T001 |
+| [P1-T007](P1-T007-storage-export-versions.md) | storage：不可變匯出版本、投遞紀錄與刪除規則 | in_progress | 1 | storage | P1-T006 |
 | [P1-T008](P1-T008-sources-authorization.md) | sources：資料夾列舉、授權集合與安全讀檔 | in_progress | 1 | sources | P1-T001 |
 | [P1-T009](P1-T009-resume-import-pdf.md) | resume-import：PDF 文字層擷取 | done | 1 | import | P1-T001 |
 | [P1-T010](P1-T010-providers-core.md) | providers：適配介面、環境清理與 R6 紀錄 | in_progress | 1 | providers | P1-T001 |
 | [P1-T011](P1-T011-spike-claude-cli.md) | 驗證：Claude CLI 隔離與訂閱登入 | blocked | 1 | providers | P1-T010 |
 | [P1-T012](P1-T012-provider-claude.md) | providers：Claude 適配器 | blocked | 1 | providers | P1-T011 |
 | [P1-T013](P1-T013-spike-bridge.md) | 驗證：橋接通訊方式（Q3）與資料夾選取機制 | done | 1 | bridge | P0-T001 |
-| [P1-T014](P1-T014-helper-host.md) | helper：橋接端點與操作清單分派 | blocked | 1 | helper | P1-T013、P1-T006 |
+| [P1-T014](P1-T014-helper-host.md) | helper：橋接端點與操作清單分派 | in_progress | 1 | helper | P1-T013、P1-T006 |
 | [P1-T015](P1-T015-extension-skeleton.md) | extension：MV3 骨架與橋接客戶端 | in_progress | 1 | extension | P1-T013、P1-T001 |
 | [P1-T016](P1-T016-editor-skeleton.md) | editor：React 骨架與路由 | blocked | 1 | editor | P1-T015 |
 | [P1-T017](P1-T017-spike-104-job.md) | 驗證：104 職缺頁條款與 DOM 樣本 | blocked | 1 | extension | P1-T015 |

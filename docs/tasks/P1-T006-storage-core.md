@@ -1,13 +1,13 @@
 ---
 id: P1-T006
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T001"]
 specs: ["architecture.md"]
 track: storage
 primary_repo: rolecraft
 write_paths: ["packages/storage/"]
-contract_change: none
+contract_change: additive
 expected_commit: "feat(P1-T006): storage：SQLite schema 與 repository"
 ---
 # storage：SQLite schema 與 repository
