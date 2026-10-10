@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { StorageError } from '../errors.ts';
 import { exportTestbed } from '../export/fixtures.test-support.ts';
+import { fileStoreInternals } from '../files/file-store.ts';
 import { readInterviewInput } from './interview-input.ts';
 import { deleteMaterial } from './material-deletion.ts';
 
@@ -70,7 +71,7 @@ describe('S9-12 interview input stays as applied', () => {
   it('fails loudly when the PDF file is missing', () => {
     const v = t.exportNow();
     const record = t.apply(v);
-    t.files.delete(v.pdfHash);
+    fileStoreInternals(t.files).delete(v.pdfHash); // 模擬檔案遺失
     expect(() => readInterviewInput(t.db, t.files, record.id)).toThrow(StorageError);
     expect(() => readInterviewInput(t.db, t.files, 'missing')).toThrow(StorageError);
   });

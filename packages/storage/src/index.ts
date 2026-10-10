@@ -28,5 +28,6 @@ export {
   type ApplicationRecordRepository,
 } from './application/application-record-repository.ts';
 export { deleteMaterial, type MaterialDeletion } from './application/material-deletion.ts';
+export { sweepStorage, type StorageSweep } from './application/storage-sweep.ts';
 export { type MaterialKind, type MaterialRef } from './application/materials.ts';
 export { readInterviewInput, type InterviewInput } from './application/interview-input.ts';

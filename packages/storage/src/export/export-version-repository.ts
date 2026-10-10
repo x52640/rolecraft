@@ -5,8 +5,10 @@ import { ExportVersion } from '@rolecraft/contracts';
 import { StorageError } from '../errors.ts';
 import type { FileStore } from '../files/file-store.ts';
 import { newId, nowTimestamp } from '../ids.ts';
+import { deletedMaterialsHeldBy } from '../application/materials.ts';
 import { decode, encode } from '../repositories/json-table.ts';
 import { assertImmutabilityGuards } from './guards.ts';
+import { assertNotInTransaction, releasePdfs } from './pdf-cleanup.ts';
 
 /**
  * 不可變的匯出版本（R3）。只有新增與讀取，沒有修改；資料庫觸發器另外擋 UPDATE 與同 ID 重建。
@@ -20,7 +22,11 @@ export type ExportVersionInput = Omit<
 >;
 
 export interface ExportVersionRepository {
-  /** 存 PDF 檔並新增匯出版本；sourceDocumentIds 依匯出當下引用事實項的依據計算 */
+  /**
+   * 存 PDF 檔並新增匯出版本；sourceDocumentIds 依匯出當下引用事實項的依據計算。
+   * 內容含使用者已刪除的素材（D19）時拋 StorageError、不寫檔。不能在外層交易中呼叫
+   * （外層回滾時已寫的 PDF 無法跟著回滾）。
+   */
   create(input: ExportVersionInput, pdf: Uint8Array): ExportVersion;
   get(id: string): ExportVersion | null;
   /** 依匯出時間、ID 排序 */
@@ -65,17 +71,9 @@ export function isExportVersionApplied(db: DatabaseSync, id: string): boolean {
   );
 }
 
-/** PDF 雜湊是否還被任何匯出版本引用（內容定址，多版本可共用同一檔）。 */
-export function isPdfReferenced(db: DatabaseSync, pdfHash: string): boolean {
-  return (
-    db.prepare('SELECT 1 FROM export_versions WHERE pdf_hash = ? LIMIT 1').get(pdfHash) !==
-    undefined
-  );
-}
-
 /**
  * 刪除未投遞的匯出版本（D19）。已投遞拋 StorageError（資料庫觸發器也會擋）。
- * 回傳被刪版本的 PDF 雜湊；檔案要等交易提交後由呼叫端用 `releasePdfs` 清。
+ * 回傳被刪版本的 PDF 雜湊；檔案要等交易提交後由呼叫端用 `releasePdfs`（pdf-cleanup.ts）清。
  */
 export function deleteUnappliedExportVersion(db: DatabaseSync, id: string): string | null {
   const version = readExportVersion(db, id);
@@ -87,23 +85,6 @@ export function deleteUnappliedExportVersion(db: DatabaseSync, id: string): stri
   return version.pdfHash;
 }
 
-/**
- * 會刪 PDF 檔的操作不能放在外層交易裡：檔案刪除無法隨交易回滾。
- * 外層交易若回滾，資料列回來了檔案卻沒了，所以直接拒絕。
- */
-export function assertNotInTransaction(db: DatabaseSync, operation: string): void {
-  if (db.isTransaction) throw new StorageError(`${operation}不能在外層交易中呼叫（會刪檔案）`);
-}
-
-/** 刪掉不再被任何匯出版本引用的 PDF 檔。回傳實際刪除的雜湊。 */
-export function releasePdfs(db: DatabaseSync, fileStore: FileStore, hashes: string[]): string[] {
-  const released: string[] = [];
-  for (const hash of new Set(hashes)) {
-    if (!isPdfReferenced(db, hash) && fileStore.delete(hash)) released.push(hash);
-  }
-  return released;
-}
-
 export function createExportVersionRepository(
   db: DatabaseSync,
   fileStore: FileStore,
@@ -111,16 +92,23 @@ export function createExportVersionRepository(
   assertImmutabilityGuards(db);
   return {
     create(input, pdf) {
+      assertNotInTransaction(db, '建立匯出版本');
+      const sourceDocumentIds = citedSourceDocumentIds(
+        db,
+        input.citedClaims.map((c) => c.claimId),
+      );
+      const deleted = deletedMaterialsHeldBy(db, { ...input, sourceDocumentIds });
+      if (deleted.length > 0) {
+        const list = deleted.map((ref) => `${ref.kind}:${ref.id}`).join('、');
+        throw new StorageError(`匯出內容含使用者已刪除的素材，不能建立匯出版本：${list}`);
+      }
       const stored = fileStore.put(pdf);
       const candidate: ExportVersion = {
         ...input,
         id: newId(),
         exportedAt: nowTimestamp(),
         pdfHash: stored.hash,
-        sourceDocumentIds: citedSourceDocumentIds(
-          db,
-          input.citedClaims.map((c) => c.claimId),
-        ),
+        sourceDocumentIds,
       };
       try {
         const { value, json } = encode(ExportVersion, candidate);

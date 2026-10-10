@@ -16,6 +16,11 @@ export const IMMUTABILITY_TRIGGERS = [
   'application_records_insert_target',
   'application_records_insert_once',
   'application_records_fixed_target',
+  // 0003：素材被刪一律記入 deleted_materials（D19）
+  'claims_record_deleted',
+  'source_documents_record_deleted',
+  'resume_versions_record_deleted',
+  'job_snapshots_record_deleted',
 ] as const;
 
 export function assertImmutabilityGuards(db: DatabaseSync): void {

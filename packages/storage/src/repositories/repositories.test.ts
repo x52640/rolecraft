@@ -87,7 +87,7 @@ describe('ClaimRepository', () => {
     });
     expect(repos.claims.listBySourceDocument(doc.id)).toEqual([]);
 
-    repos.claims.delete(c2.id);
+    t.db.prepare('DELETE FROM claims WHERE id = ?').run(c2.id); // 素材無公開 delete（D19）
     expect(repos.claims.listBySourceDocument(other.id)).toEqual([]);
   });
 
@@ -108,9 +108,11 @@ describe('JobSnapshot / ResumeVersion / MessageDraft', () => {
     repos.resumeVersions.save(rv);
     expect(repos.resumeVersions.get(rv.id)).toEqual(rv);
     expect(repos.resumeVersions.listByJobSnapshot(job.id)).toEqual([rv]);
-    expect(() => repos.jobSnapshots.delete(job.id)).toThrow(/FOREIGN KEY/);
-    repos.resumeVersions.delete(rv.id);
-    expect(repos.jobSnapshots.delete(job.id)).toBe(true);
+    // 素材無公開 delete（D19，只走 deleteMaterial）；這裡直接用 SQL 驗外鍵
+    const deleteJob = () => t.db.prepare('DELETE FROM job_snapshots WHERE id = ?').run(job.id);
+    expect(deleteJob).toThrow(/FOREIGN KEY/);
+    t.db.prepare('DELETE FROM resume_versions WHERE id = ?').run(rv.id);
+    expect(deleteJob().changes).toBe(1);
   });
 
   it('keeps a manual-paste job snapshot with null URL', () => {

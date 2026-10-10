@@ -45,7 +45,11 @@ export interface Repositories {
   workJobs: WorkJobRepository;
 }
 
-/** 組出所有核心物件的 repository（共用同一個資料庫連線）。 */
+/**
+ * 組出所有核心物件的 repository（共用同一個資料庫連線）。
+ * 素材（sourceDocuments、claims、resumeVersions、jobSnapshots）不提供 delete：
+ * 刪除只走 deleteMaterial，才會套用 D19（未投遞匯出版本整份刪除、已投遞保留並明示）。
+ */
 export function createRepositories(db: DatabaseSync): Repositories {
   return {
     profiles: createProfileRepository(db),

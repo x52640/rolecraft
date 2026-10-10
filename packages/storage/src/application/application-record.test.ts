@@ -99,7 +99,9 @@ describe('D19 deleting material', () => {
         resume_version: t.resume.id,
         job_snapshot: t.job.id,
       };
-      if (kind === 'job_snapshot') t.repos.resumeVersions.delete(t.resume.id);
+      if (kind === 'job_snapshot') {
+        t.db.prepare('DELETE FROM resume_versions WHERE id = ?').run(t.resume.id);
+      }
       const result = deleteMaterial(t.db, t.files, { kind, id: ids[kind] });
       expect(result.materialDeleted, kind).toBe(true);
       expect(result.deletedExportVersionIds, kind).toEqual([v.id]);

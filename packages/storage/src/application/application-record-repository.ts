@@ -4,12 +4,11 @@ import { ApplicationRecord } from '@rolecraft/contracts';
 
 import { StorageError } from '../errors.ts';
 import {
-  assertNotInTransaction,
   deleteUnappliedExportVersion,
   isExportVersionApplied,
   readExportVersion,
-  releasePdfs,
 } from '../export/export-version-repository.ts';
+import { assertNotInTransaction, sweepOrphanPdfs } from '../export/pdf-cleanup.ts';
 import { assertImmutabilityGuards } from '../export/guards.ts';
 import type { FileStore } from '../files/file-store.ts';
 import { newId } from '../ids.ts';
@@ -106,7 +105,6 @@ export function createApplicationRecordRepository(
     },
     delete(id) {
       assertNotInTransaction(db, '刪除投遞紀錄');
-      const pdfHashes: string[] = [];
       const result = transaction(db, () => {
         const record = readApplicationRecord(db, id);
         if (!record) return { deleted: false, purgedExportVersionIds: [] };
@@ -117,11 +115,11 @@ export function createApplicationRecordRepository(
           !isExportVersionApplied(db, version.id) &&
           deletedMaterialsHeldBy(db, version).length > 0;
         if (!purge) return { deleted: true, purgedExportVersionIds: [] };
-        const hash = deleteUnappliedExportVersion(db, version.id);
-        if (hash) pdfHashes.push(hash);
+        deleteUnappliedExportVersion(db, version.id);
         return { deleted: true, purgedExportVersionIds: [version.id] };
       });
-      return { ...result, releasedPdfHashes: releasePdfs(db, fileStore, pdfHashes) };
+      // 提交後清掉不再被引用的 PDF（含先前失敗留下的孤兒檔）
+      return { ...result, releasedPdfHashes: sweepOrphanPdfs(db, fileStore) };
     },
   };
 }

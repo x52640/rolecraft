@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { StorageError } from '../errors.ts';
 import { sha256Hex } from '../ids.ts';
-import { createLocalFileStore, type FileStore } from './file-store.ts';
+import { createLocalFileStore, fileStoreInternals, type FileStore } from './file-store.ts';
 
 let root: string;
 let store: FileStore;
@@ -31,13 +31,25 @@ describe('local file store', () => {
   it('returns null / false for missing content', () => {
     const missing = 'f'.repeat(64);
     expect(store.get(missing)).toBeNull();
-    expect(store.delete(missing)).toBe(false);
+    expect(fileStoreInternals(store).delete(missing)).toBe(false);
   });
 
-  it('deletes content', () => {
+  it('has no public delete; internal delete and listing work', () => {
+    expect(Object.keys(store).sort()).toEqual(['get', 'has', 'put']);
     const { hash } = store.put(pdf);
-    expect(store.delete(hash)).toBe(true);
+    expect(fileStoreInternals(store).listHashes()).toEqual([hash]);
+    expect(fileStoreInternals(store).delete(hash)).toBe(true);
     expect(store.has(hash)).toBe(false);
+    expect(fileStoreInternals(store).listHashes()).toEqual([]);
+  });
+
+  it('refuses internals of a store it did not create', () => {
+    const fake: FileStore = {
+      put: (content) => store.put(content),
+      get: (hash) => store.get(hash),
+      has: (hash) => store.has(hash),
+    };
+    expect(() => fileStoreInternals(fake)).toThrow(StorageError);
   });
 
   it('rejects malformed hashes (no path traversal)', () => {

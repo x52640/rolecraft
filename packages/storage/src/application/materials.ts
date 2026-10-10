@@ -13,8 +13,14 @@ export interface MaterialRef {
   id: string;
 }
 
+/** 判斷副本只需要的欄位（匯出版本建立前也能檢查）。 */
+export type MaterialCopies = Pick<
+  ExportVersion,
+  'citedClaims' | 'sections' | 'sourceDocumentIds' | 'resumeVersionId' | 'jobSnapshot'
+>;
+
 /** 匯出版本是否保存了該素材的副本。 */
-export function holdsCopyOf(version: ExportVersion, ref: MaterialRef): boolean {
+export function holdsCopyOf(version: MaterialCopies, ref: MaterialRef): boolean {
   switch (ref.kind) {
     case 'claim':
       return (
@@ -38,7 +44,7 @@ export function recordDeletedMaterial(db: DatabaseSync, ref: MaterialRef, at: st
 }
 
 /** 使用者刪除過、而這個匯出版本仍保存其副本的素材（D19「明示」用）。 */
-export function deletedMaterialsHeldBy(db: DatabaseSync, version: ExportVersion): MaterialRef[] {
+export function deletedMaterialsHeldBy(db: DatabaseSync, version: MaterialCopies): MaterialRef[] {
   return db
     .prepare(
       'SELECT kind, material_id FROM deleted_materials ORDER BY deleted_at, kind, material_id',

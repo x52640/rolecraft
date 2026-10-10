@@ -3,11 +3,10 @@ import type { DatabaseSync } from 'node:sqlite';
 import { ExportVersion } from '@rolecraft/contracts';
 
 import {
-  assertNotInTransaction,
   deleteUnappliedExportVersion,
   isExportVersionApplied,
-  releasePdfs,
 } from '../export/export-version-repository.ts';
+import { assertNotInTransaction, sweepOrphanPdfs } from '../export/pdf-cleanup.ts';
 import { assertImmutabilityGuards } from '../export/guards.ts';
 import type { FileStore } from '../files/file-store.ts';
 import { nowTimestamp } from '../ids.ts';
@@ -23,6 +22,7 @@ export interface MaterialDeletion {
   deletedExportVersionIds: string[];
   /** 已投遞、保留的匯出版本（仍含該素材副本） */
   retainedExportVersionIds: string[];
+  /** 這次實際刪掉的 PDF（含先前失敗留下、這次清掉的孤兒檔） */
   releasedPdfHashes: string[];
 }
 
@@ -46,7 +46,6 @@ export function deleteMaterial(
 ): MaterialDeletion {
   assertImmutabilityGuards(db);
   assertNotInTransaction(db, '刪除素材');
-  const pdfHashes: string[] = [];
   const result = transaction(db, () => {
     const table = MATERIAL_TABLES[ref.kind];
     const materialDeleted = db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(ref.id).changes > 0;
@@ -61,12 +60,12 @@ export function deleteMaterial(
       if (isExportVersionApplied(db, version.id)) {
         retainedExportVersionIds.push(version.id);
       } else {
-        const hash = deleteUnappliedExportVersion(db, version.id);
-        if (hash) pdfHashes.push(hash);
+        deleteUnappliedExportVersion(db, version.id);
         deletedExportVersionIds.push(version.id);
       }
     }
     return { materialDeleted, deletedExportVersionIds, retainedExportVersionIds };
   });
-  return { ...result, releasedPdfHashes: releasePdfs(db, fileStore, pdfHashes) };
+  // 提交後清掉不再被引用的 PDF；連同先前刪檔失敗或中斷留下的孤兒檔一起清
+  return { ...result, releasedPdfHashes: sweepOrphanPdfs(db, fileStore) };
 }

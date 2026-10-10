@@ -4,13 +4,12 @@ import { SourceDocument } from '@rolecraft/contracts';
 
 import { jsonTable } from './json-table.ts';
 
-/** 來源文件（R4）。路徑只在本機輔助程式內部使用。 */
+/** 來源文件（R4）。路徑只在本機輔助程式內部使用。刪除只走 deleteMaterial（D19）。 */
 export interface SourceDocumentRepository {
   save(document: SourceDocument): SourceDocument;
   get(id: string): SourceDocument | null;
   list(): SourceDocument[];
   listByFolder(folderPath: string): SourceDocument[];
-  delete(id: string): boolean;
 }
 
 export function createSourceDocumentRepository(db: DatabaseSync): SourceDocumentRepository {
@@ -31,6 +30,5 @@ export function createSourceDocumentRepository(db: DatabaseSync): SourceDocument
     get: (id) => table.get(id),
     list: () => table.list(),
     listByFolder: (folderPath) => table.list('folder_path = ?', folderPath),
-    delete: (id) => table.delete(id),
   };
 }

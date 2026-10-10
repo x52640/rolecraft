@@ -88,3 +88,15 @@ npm run verify
 - contracts（additive）：`ExportVersion.sourceDocumentIds` 選填；ADR-0006 第 11 列更新。
 - 偏離：改了 write_paths 外的 `packages/storage/src/migrate.test.ts`（原測試寫死只有 migration 1，新增 0002 必壞；改成依實際 migration 數計算，不改測試意圖）。
 
+### 對抗驗證修正
+
+四項發現驗證者皆判定 real=true，全部修正（沒有 real=false 的項目）：
+
+1. （major）素材 repository 的 delete 繞過 D19 → `createRepositories` 的 sourceDocuments／claims／resumeVersions／jobSnapshots 不再提供 `delete`，`deleteMaterial` 是唯一刪除入口（測試鎖住公開 API）。縱深防禦：migration `0003_deleted_material_triggers.sql` 在四張素材表加 AFTER DELETE 觸發器寫 `deleted_materials`（繞過的 SQL 刪除仍會明示、刪投遞紀錄時仍會連帶清除）；觸發器列入 `assertImmutabilityGuards`。
+2. （minor）`FileStore.delete` 可刪已投遞 PDF → 公開 `FileStore` 只剩 put／get／has；刪檔與列舉改由內部 `fileStoreInternals`（不匯出）提供，只經先查引用的 `releasePdfs`／孤兒清掃使用。
+3. （major）素材刪除後 `exports.create()` 仍能複製 → create 先比對 `deleted_materials`（resumeVersionId、jobSnapshot.id、引用的 claimId、計算出的 sourceDocumentIds），命中就拋 StorageError、不寫 PDF。
+4. （minor）commit 後刪 PDF 失敗／中斷、或外層交易回滾留下孤兒 PDF → 新增 `export/pdf-cleanup.ts`：`releasePdfs` 每個雜湊都嘗試、失敗最後一起拋；`sweepOrphanPdfs` 刪掉雜湊不在 export_versions 的檔案，`deleteMaterial` 與投遞紀錄 delete 提交後都會跑；create 拒絕在外層交易中呼叫。公開 `sweepStorage(db, fileStore)`（補刪含已刪素材的未投遞版本＋孤兒 PDF），**呼叫點：本機輔助程式啟動時呼叫一次**（helper 尚未接上，留給 helper 的 Task）。
+
+- 回歸測試：`application/d19-hardening.test.ts`（含四項 PoC 情境）；既有測試改用 SQL／內部介面取代被移除的 delete。
+- `npm run verify` 綠（Vitest 50 檔 691 測試）。
+
