@@ -5,11 +5,10 @@
 <!-- index:start -->
 ## 進行中
 
-- 無
+- P1-T011 驗證：Claude CLI 隔離與訂閱登入（`docs/tasks/P1-T011-spike-claude-cli.md`）
 
 ## ready
 
-- P1-T011 驗證：Claude CLI 隔離與訂閱登入
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本
 - P1-T019 editor：職缺快照確認與手動貼上
 - P1-T020 editor：履歷 PDF 匯入與校正

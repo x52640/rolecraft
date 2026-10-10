@@ -1,7 +1,7 @@
 ---
 id: P1-T011
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T010"]
 specs: ["providers.md", "open-verifications.md"]
 track: providers
