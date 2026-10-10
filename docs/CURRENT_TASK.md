@@ -7,7 +7,6 @@
 
 - P1-T002 domain：事實項狀態與 R1 匯出前檢查（`docs/tasks/P1-T002-domain-evidence.md`）
 - P1-T007 storage：不可變匯出版本、投遞紀錄與刪除規則（`docs/tasks/P1-T007-storage-export-versions.md`）
-- P1-T010 providers：適配介面、環境清理與 R6 紀錄（`docs/tasks/P1-T010-providers-core.md`）
 
 ## ready
 
@@ -42,6 +41,7 @@
 - P1-T016 `e1cbf9e`
 - P1-T008 `55bd7f5`、`ca51f0e`
 - P1-T014 `75d2b19`、`5f20554`
+- P1-T010 `b44a8d2`、`c1c7725`、`5fc7ee4`
 
 ## 已知殘餘（記錄，不擋上線）
 
@@ -67,6 +67,8 @@
 - 待開 Task「橋接 contract 升級」（contract_change）：請求 id（並行、P1-T027 分塊）、錯誤碼（not_implemented／helper_unavailable／timeout）、host 名稱 `com.rolecraft.helper` 與轉送通道 `rolecraft.bridge` 移入 contracts（目前 extension／editor／helper 各寫一份）、`open_editor` 語意；另 vitest 收 `*.test.tsx`。
 
 - sources（P1-T008）：macOS 讀檔與列舉的 symlink 競態只能縮小窗口（Node 無 openat／F_GETPATH），120 秒壓測 239 萬次 0 洩漏；徹底消除需原生模組。
+
+- providers（P1-T010）：`assertExecutablePath` 擋 sh／bash／zsh／env／node 等直譯器 basename；P1-T011 要確認官方 CLI 的實際執行檔不是經 node 啟動的腳本，否則需調整。defineCommand 以 `as`＋eslint-disable 或別名 import 仍可繞過，靠審查。
 
 ## 治理
 
