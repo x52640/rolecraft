@@ -1,15 +1,26 @@
-/* eslint-disable @typescript-eslint/unbound-method -- 斷言 vi.fn 呼叫 */
 import { BRIDGE_SCHEMAS, BridgeOperation } from '@rolecraft/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
-import { SECRET, anyString, recordingLogger, requests } from '../__fixtures__/requests.ts';
+import {
+  SECRET,
+  anyString,
+  recordingLogger,
+  requests as captureRequests,
+} from '../__fixtures__/requests.ts';
 import type { HelperServices } from '../handlers/services.ts';
+import { editorRequests } from './__fixtures__/editor-requests.ts';
 import { dispatch } from './dispatch.ts';
 
-const okServices = (): Required<HelperServices> => ({
-  jobCapture: { submit: vi.fn(() => Promise.resolve({ jobSnapshotId: 'j-1' })) },
-  messageCapture: { submit: vi.fn(() => Promise.resolve({ messageDraftId: 'm-1' })) },
-  draft: { request: vi.fn(() => Promise.resolve({ workJobId: 'w-1' })) },
+/** 每個操作一則合法請求。 */
+const requests = { ...captureRequests, ...editorRequests };
+const CAPTURE_OPS = Object.keys(captureRequests) as (keyof typeof captureRequests)[];
+
+const okServices = () => ({
+  jobs: { submitCapture: vi.fn(() => Promise.resolve({ jobSnapshotId: 'j-1' })) },
+  messages: {
+    submitCapture: vi.fn(() => Promise.resolve({ messageDraftId: 'm-1' })),
+    requestDraft: vi.fn(() => Promise.resolve({ workJobId: 'w-1' })),
+  },
 });
 
 async function run(message: unknown, services: HelperServices = okServices()) {
@@ -18,13 +29,17 @@ async function run(message: unknown, services: HelperServices = okServices()) {
   return { ...result, logger };
 }
 
+const anyNumber: unknown = expect.any(Number);
 const INVALID = { ok: false, error: { code: 'invalid_request', message: anyString } };
 const INTERNAL = { ok: false, error: { code: 'internal_error', message: anyString } };
 
 describe('dispatch：操作清單', () => {
-  it('分派表涵蓋 contracts 的每個操作，且每則合法請求都回合規回應', async () => {
+  it('fixture 涵蓋 contracts 的每個操作', () => {
     expect(Object.keys(requests).sort()).toEqual([...BridgeOperation.options].sort());
-    for (const op of BridgeOperation.options) {
+  });
+
+  it('已接服務的擷取操作：合法請求回合規成功回應', async () => {
+    for (const op of CAPTURE_OPS) {
       const { response } = await run(requests[op]);
       expect(response).toMatchObject({ ok: true });
       expect(BRIDGE_SCHEMAS[op].response.safeParse(response).success).toBe(true);
@@ -69,7 +84,9 @@ describe('dispatch：schema', () => {
     const services = okServices();
     const { response } = await run({ ...requests[op], cwd: '/tmp' }, services);
     expect(response).toEqual(INVALID);
-    expect(services.jobCapture.submit).not.toHaveBeenCalled();
+    expect(services.jobs.submitCapture).not.toHaveBeenCalled();
+    expect(services.messages.submitCapture).not.toHaveBeenCalled();
+    expect(services.messages.requestDraft).not.toHaveBeenCalled();
   });
 
   it.each(BridgeOperation.options)('%s payload 多帶欄位被拒', async (op) => {
@@ -100,17 +117,23 @@ describe('dispatch：內容只當資料', () => {
     await run(requests.submit_job_capture, services);
     await run(requests.submit_message_capture, services);
     await run(requests.request_draft, services);
-    expect(services.jobCapture.submit).toHaveBeenCalledWith(requests.submit_job_capture.payload);
-    expect(services.messageCapture.submit).toHaveBeenCalledWith(
+    expect(services.jobs.submitCapture).toHaveBeenCalledWith(requests.submit_job_capture.payload);
+    expect(services.messages.submitCapture).toHaveBeenCalledWith(
       requests.submit_message_capture.payload,
     );
-    expect(services.draft.request).toHaveBeenCalledWith(requests.request_draft.payload);
+    expect(services.messages.requestDraft).toHaveBeenCalledWith(requests.request_draft.payload);
   });
 });
 
 describe('dispatch：handler 失敗', () => {
   it.each(BridgeOperation.options)('%s 未接服務時回 not_implemented，不偽造成功', async (op) => {
-    const { response } = await run(requests[op], {});
+    const { response, logger } = await run(requests[op], {});
+    expect(logger.entries).toContainEqual({
+      event: 'request_handled',
+      op,
+      ok: false,
+      ms: anyNumber,
+    });
     expect(response).toEqual({
       ok: false,
       error: { code: 'not_implemented', message: anyString },
@@ -120,8 +143,9 @@ describe('dispatch：handler 失敗', () => {
 
   it('handler 拋例外：回 internal_error，回應與日誌都不含例外內容', async () => {
     const services: HelperServices = {
-      messageCapture: {
-        submit: () => {
+      messages: {
+        requestDraft: () => Promise.resolve({ workJobId: 'w-1' }),
+        submitCapture: () => {
           const err = new Error(`寫入失敗：${SECRET}`);
           err.name = SECRET;
           return Promise.reject(err);
@@ -142,8 +166,9 @@ describe('dispatch：handler 失敗', () => {
 
   it('handler 同步拋出非 Error 值也被攔下', async () => {
     const services: HelperServices = {
-      draft: {
-        request: () => {
+      messages: {
+        submitCapture: () => Promise.resolve({ messageDraftId: 'm-1' }),
+        requestDraft: () => {
           throw SECRET as unknown as Error;
         },
       },
@@ -155,7 +180,7 @@ describe('dispatch：handler 失敗', () => {
 
   it('服務回傳不合 schema 的值：回 internal_error，不轉送', async () => {
     const services: HelperServices = {
-      jobCapture: { submit: () => Promise.resolve({ jobSnapshotId: '' }) },
+      jobs: { submitCapture: () => Promise.resolve({ jobSnapshotId: '' }) },
     };
     const { response, logger } = await run(requests.submit_job_capture, services);
     expect(response).toEqual(INTERNAL);

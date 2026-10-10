@@ -7,10 +7,8 @@ import {
   type BridgeFailure,
 } from '@rolecraft/contracts';
 
-import { requestDraft } from '../handlers/request-draft.ts';
+import { HANDLERS } from '../handlers/registry.ts';
 import type { HelperServices } from '../handlers/services.ts';
-import { submitJobCapture } from '../handlers/submit-job-capture.ts';
-import { submitMessageCapture } from '../handlers/submit-message-capture.ts';
 import { safeErrorName, type Logger } from './logger.ts';
 
 /** 分派結果：要回給瀏覽器的回應，以及（若可辨識）它屬於哪個操作。 */
@@ -27,15 +25,13 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** 依 op 查分派表。payload 已由 BridgeRequest 依 op 驗證，所以和該 handler 的參數型別一致。 */
 function runHandler(request: BridgeRequest, services: HelperServices): Promise<unknown> {
-  switch (request.op) {
-    case 'submit_job_capture':
-      return submitJobCapture(request.payload, services);
-    case 'submit_message_capture':
-      return submitMessageCapture(request.payload, services);
-    case 'request_draft':
-      return requestDraft(request.payload, services);
-  }
+  const handler = HANDLERS[request.op] as (
+    payload: BridgeRequest['payload'],
+    services: HelperServices,
+  ) => Promise<unknown>;
+  return handler(request.payload, services);
 }
 
 /**

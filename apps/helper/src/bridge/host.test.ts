@@ -65,8 +65,13 @@ const frame = (id: string, request: unknown = requests.request_draft) =>
 const INVALID = { ok: false, error: { code: 'invalid_request', message: anyString } };
 const INTERNAL = { ok: false, error: { code: 'internal_error', message: anyString } };
 const DRAFT_OK = { ok: true, workJobId: 'w-1' };
+/** 測試不會呼叫到的服務方法。 */
+const unused = () => Promise.reject(new Error('unused'));
 const draftAfter = (ms: number): HelperServices => ({
-  draft: { request: () => delay(ms).then(() => ({ workJobId: 'w-1' })) },
+  messages: {
+    submitCapture: unused,
+    requestDraft: () => delay(ms).then(() => ({ workJobId: 'w-1' })),
+  },
 });
 
 describe('startHost：來源', () => {
@@ -114,9 +119,11 @@ describe('startHost：往返', () => {
       return value;
     };
     const h = host({
-      jobCapture: { submit: () => track(30, { jobSnapshotId: 'j-1' }) },
-      messageCapture: { submit: () => track(1, { messageDraftId: 'm-1' }) },
-      draft: { request: () => track(10, { workJobId: 'w-1' }) },
+      jobs: { submitCapture: () => track(30, { jobSnapshotId: 'j-1' }) },
+      messages: {
+        submitCapture: () => track(1, { messageDraftId: 'm-1' }),
+        requestDraft: () => track(10, { workJobId: 'w-1' }),
+      },
     });
     h.input.end(
       Buffer.concat([
@@ -138,8 +145,10 @@ describe('startHost：往返', () => {
 
   it('handler 拋例外不影響其他請求，日誌不含履歷內容', async () => {
     const h = host({
-      messageCapture: { submit: () => Promise.reject(new Error(SECRET)) },
-      ...draftAfter(0),
+      messages: {
+        submitCapture: () => Promise.reject(new Error(SECRET)),
+        requestDraft: () => Promise.resolve({ workJobId: 'w-1' }),
+      },
     });
     h.input.end(
       Buffer.concat([
@@ -155,8 +164,8 @@ describe('startHost：往返', () => {
 
   it('回應超過 1 MB：以同一 id 改回 internal_error，不送出超大框', async () => {
     const h = host({
-      jobCapture: {
-        submit: () => Promise.resolve({ jobSnapshotId: 'x'.repeat(MAX_OUTGOING_BYTES) }),
+      jobs: {
+        submitCapture: () => Promise.resolve({ jobSnapshotId: 'x'.repeat(MAX_OUTGOING_BYTES) }),
       },
     });
     h.input.end(frame('big', requests.submit_job_capture));
@@ -189,8 +198,9 @@ describe('startHost：請求 id', () => {
   ])('%s：無法歸屬，等在途請求回完，送 id 為 null 的失敗並以 3 結束', async (_name, bad) => {
     let calls = 0;
     const h = host({
-      draft: {
-        request: async () => {
+      messages: {
+        submitCapture: unused,
+        requestDraft: async () => {
           calls += 1;
           await delay(10);
           return { workJobId: 'w-1' };
@@ -237,8 +247,9 @@ describe('startHost：請求 id', () => {
   it('重複 id（仍在處理中）：原請求只回一次，不以該 id 再回，送 null 失敗後以 3 結束', async () => {
     let calls = 0;
     const h = host({
-      draft: {
-        request: async () => {
+      messages: {
+        submitCapture: unused,
+        requestDraft: async () => {
           calls += 1;
           await delay(20);
           return { workJobId: 'w-1' };
@@ -319,8 +330,9 @@ describe('startHost：框錯誤一律斷線', () => {
     const run = async (chunks: Buffer[]) => {
       let handled = 0;
       const services: HelperServices = {
-        draft: {
-          request: () => {
+        messages: {
+          submitCapture: unused,
+          requestDraft: () => {
             handled += 1;
             return Promise.resolve({ workJobId: 'w-1' });
           },

@@ -67,15 +67,34 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：contracts 47 個操作 schema、helper 分派表＋每操作一個 handler 檔、relay sender 規則、bridge.md 操作表與分塊協定、測試
+- 已通過驗證：worktree 內 `npm run verify` 綠（Vitest 1763 通過、9 略過；test:docs 15）
+- 下一步：協調者收官前跑對抗驗證（高風險 R7）
 - Blocker：無
 
 ## 完成結果
+
+範圍說明：除原「包含」六組外，協調者擴充加入 claims（P1-T023）、resume（P1-T025）、messages（P1-T029）三組操作與 handler，因為這些 Task 的 write_paths 不含 contracts 與分派表。
+
+- contracts（`packages/contracts/src/bridge/`）：`BridgeOperation` 由 3 個增為 47 個；編輯器操作以「群組.動作」命名，各群組 schema 在 `editor/<群組>.ts`，`BRIDGE_SCHEMAS` 展開組合、`BridgeRequest` 由它產生。新增 `common.ts`（`OpaqueId`：1–128 個英數／`_`／`-`、開頭英數；`EmptyPayload`、`Ack`、`bridgeOp`）、`chunk.ts`（分塊）、`CONTENT_SCRIPT_OPERATIONS`、型別 `BridgeRequestOf<Op>`／`BridgeResponseOf<Op>`。原三個擷取操作名稱與形狀不變（additive）。
+- R7：請求沒有任何路徑、指令、CLI 參數、模型名稱欄位；指向物件一律 `OpaqueId`；選檔／選資料夾的請求 payload 只能是空物件，由 helper 開系統選取器；確認時間由 helper 決定。既有的禁用鍵名測試涵蓋全部 47 個操作的 request 與 response（所以資料夾用 root／entry、供應商用 service／candidate 命名）。
+- 分塊：應用層逐塊讀（`export.read_pdf`：內容 id＋塊序號 → 第幾塊／共幾塊／整份位元組數／整份 SHA-256／base64），每塊原始 512 KiB、最多 128 塊；每塊是獨立請求，信封協定不變。測試鎖住最大一塊的整則框低於 1 MB。
+- helper：分派表 `src/handlers/registry.ts`（`HandlerTable` 型別擋漏列／多列）一次註冊全部操作；`dispatch.ts` 改查表。每個操作一個 handler 檔，未實作的回 `not_implemented`。每個群組的服務介面在 `handlers/<群組>/service.ts`，`handlers/services.ts` 只組合（鍵：jobs、resumeImport、sources、applications、providers、pdfExport、claims、resume、messages）；原 `jobCapture`／`messageCapture`／`draft` 服務改為 `jobs.submitCapture`、`messages.submitCapture`、`messages.requestDraft`，原三個 handler 移入 jobs／messages 目錄。
+- relay：sender 規則改用 contracts 的 `CONTENT_SCRIPT_OPERATIONS`，其餘操作只限擴充功能頁。
+- 後續 Task 對應的 handler 檔（都在 `apps/helper/src/handlers/`；各群組另有 `service.ts`）：
+  - P1-T019 → `jobs/`：`submit-job-capture.ts`、`list.ts`、`get.ts`、`update.ts`、`confirm.ts`
+  - P1-T020 → `import/`：`pick-pdf.ts`、`get.ts`、`save-corrections.ts`、`confirm.ts`
+  - P1-T021 → `sources/`：`pick-folders.ts`、`list-folders.ts`、`preview.ts`、`update-authorization.ts`、`remove-folder.ts`
+  - P1-T028 → `applications/`：`list.ts`、`create.ts`、`update.ts`、`delete.ts`
+  - P1-T030 → `providers/`：`status.ts`、`recheck.ts`、`list-candidates.ts`、`select-candidate.ts`、`start-login.ts`
+  - P1-T040 → `export/`：`create.ts`、`list-versions.ts`、`get-version.ts`、`read-pdf.ts`
+  - P1-T023 → `claims/`：`list-projects.ts`、`list.ts`、`get.ts`、`confirm.ts`、`update.ts`、`reject.ts`
+  - P1-T025 → `resume/`：`generate.ts`、`list.ts`、`get.ts`、`accept-section.ts`、`reject-section.ts`、`edit-section.ts`、`delete-section.ts`、`confirm-section.ts`、`check-export.ts`
+  - P1-T029 → `messages/`：`submit-message-capture.ts`、`request-draft.ts`、`list.ts`、`get.ts`、`update-draft.ts`
+- 測試：contracts（每操作合法請求、頂層／payload 多帶欄位、ID 欄位拒路徑／旗標／空白、各別規則、分塊邊界與 1 MB）；helper（分派表涵蓋全部操作、每操作恰有一個 handler 檔、未實作回 not_implemented、路徑類 ID 不進 handler 且不入日誌、最大塊可編碼成單框、contracts 鏡像列舉與 domain／resume-import 型別一致）；extension（content script 對每個非擷取操作被拒、擴充功能頁全部允許、合法的事實項確認從職缺頁送出不轉送）。

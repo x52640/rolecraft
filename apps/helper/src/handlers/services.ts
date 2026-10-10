@@ -1,32 +1,42 @@
-// handler 透過這些介面呼叫 storage／sources／pipeline（服務組裝在 helper 啟動時注入）。
-// 介面只收 schema 驗證過的 payload，回傳 ID；不接受也不回傳路徑、指令或模型設定（R7）。
+// handler 透過這些介面呼叫 storage／sources／pipeline 等（服務組裝在 helper 啟動時注入）。
+// 每個群組的服務介面放在自己的目錄（handlers/<群組>/service.ts），由負責該群組的 Task 擴充；
+// 本檔只把它們組起來，後續 Task 不必改這裡。
 // 尚未接上的服務留空，handler 回 not_implemented，不偽造成功。
-import type {
-  BridgeFailure,
-  RequestDraftRequest,
-  SubmitJobCaptureRequest,
-  SubmitMessageCaptureRequest,
-} from '@rolecraft/contracts';
+import type { BridgeFailure } from '@rolecraft/contracts';
 
-export interface JobCaptureService {
-  /** 建立職缺快照（R10），回傳快照 ID。 */
-  submit(payload: SubmitJobCaptureRequest['payload']): Promise<{ jobSnapshotId: string }>;
-}
+import type { ApplicationsService } from './applications/service.ts';
+import type { ClaimsService } from './claims/service.ts';
+import type { ExportService } from './export/service.ts';
+import type { ResumeImportService } from './import/service.ts';
+import type { JobsService } from './jobs/service.ts';
+import type { MessagesService } from './messages/service.ts';
+import type { ProvidersService } from './providers/service.ts';
+import type { ResumeService } from './resume/service.ts';
+import type { SourcesService } from './sources/service.ts';
 
-export interface MessageCaptureService {
-  /** 保存使用者選定的訊息（F08），回傳訊息草稿 ID。 */
-  submit(payload: SubmitMessageCaptureRequest['payload']): Promise<{ messageDraftId: string }>;
-}
+export type {
+  ApplicationsService,
+  ClaimsService,
+  ExportService,
+  JobsService,
+  MessagesService,
+  ProvidersService,
+  ResumeImportService,
+  ResumeService,
+  SourcesService,
+};
 
-export interface DraftService {
-  /** 排入回覆草稿生成工作（R9），回傳工作 ID。服務與模型由 helper 決定。 */
-  request(payload: RequestDraftRequest['payload']): Promise<{ workJobId: string }>;
-}
-
+/** 鍵＝群組（handlers 子目錄）；import、export 是保留字，改名 resumeImport、pdfExport。 */
 export interface HelperServices {
-  jobCapture?: JobCaptureService;
-  messageCapture?: MessageCaptureService;
-  draft?: DraftService;
+  jobs?: JobsService;
+  resumeImport?: ResumeImportService;
+  sources?: SourcesService;
+  applications?: ApplicationsService;
+  providers?: ProvidersService;
+  pdfExport?: ExportService;
+  claims?: ClaimsService;
+  resume?: ResumeService;
+  messages?: MessagesService;
 }
 
 /** 服務尚未接上：回 not_implemented。 */
