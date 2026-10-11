@@ -113,10 +113,11 @@ export function createAnalysisRunner<S>(
     return { status: 'paused', job: run.job, lastFailure };
   };
 
-  /** 回到送出前（嘗試仍是目前這次時；已被取消就保留暫停狀態）。 */
-  const rollback = (attemptId: string, before: WorkRun) => {
-    if (run.active?.attemptId === attemptId) run = before;
-  };
+  /** 去重用的已知事實項：既有的＋本次執行已提交的（同一份文件拆成多單元時不重複）。 */
+  let knownClaims: readonly Claim[] = deps.existingClaims;
+
+  /** 嘗試已不是目前這次（使用者已取消）：保留並保存暫停狀態，丟棄這次結果。 */
+  const superseded = (attemptId: string) => run.active?.attemptId !== attemptId;
 
   /** 處理一次失敗；回傳 null 表示已排重試、繼續迴圈。 */
   const fail = async (attempt: Attempt, failure: UnitFailure): Promise<RunReport | null> => {
@@ -128,7 +129,8 @@ export function createAnalysisRunner<S>(
     }
     if (failure.kind === 'provider' && failure.error.kind === 'other') {
       // 不可重試的錯誤（認證、隔離檢查失敗等）：不重送，比照 R6 不成立。
-      rollback(attemptId, attempt.before);
+      if (superseded(attemptId)) return paused(failure);
+      run = attempt.before;
       return { status: 'blocked', job: run.job, record: attempt.record, failure };
     }
     const quota = failure.kind === 'provider' && failure.error.kind === 'quota_exhausted';
@@ -173,7 +175,8 @@ export function createAnalysisRunner<S>(
     await deps.recordRunCheck(outcome.record);
     if (!sameRoute(outcome.record, deps)) throw new Error('執行紀錄的服務或模型與單元不符');
     if (outcome.status === 'blocked') {
-      rollback(attemptId, before);
+      if (superseded(attemptId)) return paused(null);
+      run = before;
       return { status: 'blocked', job: run.job, record: outcome.record, failure: null };
     }
     const attempt: Attempt = { attemptId, before, record: outcome.record };
@@ -185,7 +188,7 @@ export function createAnalysisRunner<S>(
       unit,
       document: prepared.document,
       normalizedText: prepared.normalizedText,
-      existingClaims: deps.existingClaims,
+      existingClaims: knownClaims,
       newId: deps.newId,
     });
     const result: UnitAnalysisResult = {
@@ -203,6 +206,7 @@ export function createAnalysisRunner<S>(
     // 先寫入成功才採用新狀態；寫入失敗時錯誤往外丟，單元仍是未完成。
     await deps.commitUnit({ job: completed.run.job, written: completed.written });
     run = completed.run;
+    knownClaims = [...knownClaims, ...converted.claims];
     return null;
   };
 

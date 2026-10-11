@@ -123,7 +123,51 @@ describe('planAnalysis（增量、R2、R8）', () => {
 
   it('fails instead of planning when even the fixed prompt exceeds the budget', () => {
     const result = planAnalysis(input({ documents: [doc('d', '內容')], budget: budget(500) }));
-    expect(result).toEqual({ ok: false, reason: 'fixed_exceeds_budget', sourceDocumentId: 'd' });
+    expect(result).toEqual({
+      ok: false,
+      reason: 'fixed_exceeds_budget',
+      sourceDocumentId: 'd',
+      claimUpdates: [],
+    });
+  });
+
+  it('keeps R2 claim updates even when the budget check fails', () => {
+    const v1 = doc('d', '# A\n\n完成匯出。');
+    const v2 = doc('d', '# A\n\n完成匯出（有誤）。', {
+      contentVersion: 2,
+      contentHash: 'hash-d-2',
+    });
+    const gone = doc('gone', '完成搜尋。');
+    const changed = claimFrom('changed', v1, '完成匯出');
+    const removed = claimFrom('removed', gone, '完成搜尋。');
+    const result = planAnalysis(
+      input({
+        documents: [v2],
+        deletedDocumentIds: ['gone'],
+        analyzed: [analyzed(v1), analyzed(gone)],
+        existingClaims: [changed, removed],
+        budget: budget(500),
+      }),
+    );
+    if (result.ok) throw new Error('expected budget failure');
+    const byId = new Map(result.claimUpdates.map((c) => [c.id, c.reviewStatus]));
+    expect(byId.get('changed')).toBe('needs_review');
+    expect(byId.get('removed')).toBe('source_removed');
+  });
+
+  it('does not reanalyze a document already analyzed at its current version (R2)', () => {
+    const v1 = doc('d', '# A\n\n完成匯出。');
+    const v2 = doc('d', '# A\n\n完成匯出（有誤）。', {
+      contentVersion: 2,
+      contentHash: 'hash-d-2',
+    });
+    // 綁 v1 的待複核事實項還在，但 v2 已分析過
+    const stale = { ...claimFrom('stale', v1, '完成匯出'), reviewStatus: 'needs_review' as const };
+    const result = planAnalysis(
+      input({ documents: [v2], analyzed: [analyzed(v2)], existingClaims: [stale] }),
+    );
+    expect(result.ok && result.documentsToAnalyze).toEqual([]);
+    expect(result.ok && result.plan).toBeNull();
   });
 
   it('returns no plan when nothing changed', () => {

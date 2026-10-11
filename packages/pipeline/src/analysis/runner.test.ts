@@ -268,7 +268,8 @@ describe('analysis runner（fake provider 完整流程）', () => {
     expect(h.records[0]?.executed).toBe(false);
   });
 
-  it('discards a result that arrives after the user cancelled', async () => {
+  /** 送出後使用者取消，之後才回來 outcome。 */
+  async function cancelThenRelease(outcome: (record: RunCheckRecord) => RunOutcome) {
     const plan = makePlan();
     let release: (outcome: RunOutcome) => void = () => undefined;
     const pending = new Promise<RunOutcome>((resolve) => (release = resolve));
@@ -284,12 +285,41 @@ describe('analysis runner（fake provider 完整流程）', () => {
     const running = runner.run();
     await sent;
     runner.cancel();
-    const record = { provider: 'claude', model: 'fake-model' } as RunCheckRecord;
-    release({ status: 'executed', record, result: { ok: true, text: OUT_A } });
-    const report = await running;
+    release(outcome({ provider: 'claude', model: 'fake-model' } as RunCheckRecord));
+    return { report: await running, h };
+  }
+
+  it.each<[string, (record: RunCheckRecord) => RunOutcome]>([
+    ['a result', (record) => ({ status: 'executed', record, result: { ok: true, text: OUT_A } })],
+    [
+      'a non-retryable error',
+      (record) => ({
+        status: 'executed',
+        record,
+        result: { ok: false, error: { kind: 'other', message: 'HTTP 401' } },
+      }),
+    ],
+    ['an R6 block', (record) => ({ status: 'blocked', record })],
+  ])('keeps the cancelled state when %s arrives after the user cancelled', async (_n, outcome) => {
+    const { report, h } = await cancelThenRelease(outcome);
     expect(report.status).toBe('paused');
     expect(report.job.pauseReason).toBe('user_cancelled');
+    expect(h.saved.at(-1)?.pauseReason).toBe('user_cancelled');
     expect(h.commits).toHaveLength(0);
+  });
+
+  it('dedupes claims committed by an earlier unit of the same run', async () => {
+    const base = makePlan();
+    const unitA = base.units.find((u) => u.sourceDocumentId === 'a');
+    if (!unitA) throw new Error('no unit for a');
+    // 同一份文件拆成兩個單元、兩邊都抽出同一個事實項
+    const plan: AnalysisPlan = { ...base, units: [unitA, { ...unitA, unitId: 'unit-a-2' }] };
+    const h = harness([{ text: OUT_A }, { text: OUT_A }]);
+    const report = await createAnalysisRunner(plan, newRun(plan), h.deps).run();
+    expect(report.status).toBe('completed');
+    expect(h.commits[0]?.result.claims.map((c) => c.text)).toEqual(['登入功能']);
+    expect(h.commits[1]?.result.claims).toEqual([]);
+    expect(h.commits[1]?.result.dropped).toContainEqual({ index: 0, reason: 'duplicate' });
   });
 
   it('refuses to send when the document changed or lost authorization since planning', async () => {

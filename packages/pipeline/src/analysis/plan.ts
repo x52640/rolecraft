@@ -62,6 +62,8 @@ export type PlanAnalysisResult =
       readonly ok: false;
       readonly reason: 'fixed_exceeds_budget' | 'budget_too_small';
       readonly sourceDocumentId: Id;
+      /** R2 判定仍要保存（來源變更造成的失效不能因預算失敗而遺失） */
+      readonly claimUpdates: readonly Claim[];
     };
 
 function sourceStates(input: PlanAnalysisInput): Map<Id, SourceState> {
@@ -76,10 +78,8 @@ function sourceStates(input: PlanAnalysisInput): Map<Id, SourceState> {
 /** R2：既有事實項重新判定；區塊沒變且仍正常的換到新版本位置。 */
 function reviewExisting(input: PlanAnalysisInput, states: Map<Id, SourceState>) {
   const updates: Claim[] = [];
-  const reanalyze = new Set<Id>();
   for (const claim of input.existingClaims) {
     const evaluation = evaluateClaimSources(claim, states);
-    for (const id of evaluation.documentsToReanalyze) reanalyze.add(id);
     let next: Claim = { ...claim, reviewStatus: evaluation.reviewStatus };
     if (evaluation.reviewStatus === 'normal') {
       const excerpts = evaluation.checks.map((c) => c.rebased ?? c.excerpt);
@@ -87,22 +87,19 @@ function reviewExisting(input: PlanAnalysisInput, states: Map<Id, SourceState>) 
     }
     if (JSON.stringify(next) !== JSON.stringify(claim)) updates.push(next);
   }
-  return { updates, reanalyze };
+  return updates;
 }
 
-function needsAnalysis(
-  doc: AnalysisDocument,
-  analyzed: ReadonlyMap<Id, AnalyzedVersion>,
-  reanalyze: ReadonlySet<Id>,
-): boolean {
+function needsAnalysis(doc: AnalysisDocument, analyzed: ReadonlyMap<Id, AnalyzedVersion>): boolean {
   if (doc.document.authorizationStatus !== 'authorized') return false;
   const last = analyzed.get(doc.document.id);
   if (!last) return true;
-  return (
-    reanalyze.has(doc.document.id) ||
-    last.contentVersion !== doc.document.contentVersion ||
-    last.contentHash !== doc.document.contentHash
-  );
+  // R2 要重新分析的文件（片段綁的版本與現況不同）都會落在「沒有對應目前版本的分析紀錄」；
+  // 目前版本＋雜湊已分析過時，綁舊版本的待複核事實項不再觸發重新分析（否則每次都重跑）。
+  const current =
+    last.contentVersion === doc.document.contentVersion &&
+    last.contentHash === doc.document.contentHash;
+  return !current;
 }
 
 type UnitsResult =
@@ -169,7 +166,7 @@ function planDocumentUnits(
 /** 建立分析計畫（純函式；ID 由呼叫端注入）。 */
 export function planAnalysis(input: PlanAnalysisInput): PlanAnalysisResult {
   const states = sourceStates(input);
-  const { updates, reanalyze } = reviewExisting(input, states);
+  const updates = reviewExisting(input, states);
   const analyzed = new Map(input.analyzed.map((a) => [a.sourceDocumentId, a]));
 
   const units: AnalysisUnitSpec[] = [];
@@ -183,14 +180,16 @@ export function planAnalysis(input: PlanAnalysisInput): PlanAnalysisResult {
   const globalSummary = input.globalSummary.filter((e) => authorized.has(e.sourceDocumentId));
   const summaryTokens = globalSummaryTokenBound(globalSummary);
   for (const doc of input.documents) {
-    if (!needsAnalysis(doc, analyzed, reanalyze)) continue;
+    if (!needsAnalysis(doc, analyzed)) continue;
     const { id, contentVersion, contentHash } = doc.document;
     if (!/\S/u.test(doc.text)) {
       emptyDocuments.push({ sourceDocumentId: id, contentVersion, contentHash });
       continue;
     }
     const planned = planDocumentUnits(doc, summaryTokens, input.budget, input.newId);
-    if (!planned.ok) return { ok: false, reason: planned.reason, sourceDocumentId: id };
+    if (!planned.ok) {
+      return { ok: false, reason: planned.reason, sourceDocumentId: id, claimUpdates: updates };
+    }
     documentsToAnalyze.push(id);
     units.push(...planned.units);
   }
