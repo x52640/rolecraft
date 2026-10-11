@@ -45,3 +45,8 @@
   - `deleteMaterial` 先提交再刪孤兒 PDF：15 分鐘內匯出的 PDF 刪檔失敗、helper 又在寬限期內重啟時，啟動清掃會跳過它；使用者重試刪除會立即刪掉（P1-T044）。
   - 分析流程的 `commitUnit` 接進 helper 時，必須在同一交易寫入 `claimUpdates`（矛盾升級），否則來源矛盾會遺失（P1-T046）。
   - 選取器解析餘裕固定 60 秒；大 PDF 實測若超過要調整（P1-T045）。
+- 擁有者裁定實作（2026-10-11）殘餘：
+  - 「正在另一個瀏覽器使用中」字串在 helper（`services/data-dir.ts`）與編輯器（`bridge/helper-busy.ts`）各一份，改措辭要兩邊一起改，否則退回一般「連不到」文字（P1-T052、T054）。
+  - 舊 helper 斷線後仍在跑背景工作時會持有鎖，同一瀏覽器新開的 helper 暫時顯示占用；資料區放網路磁碟不支援（P1-T052）。
+  - `claims.reject` 對從未存在的 ID 回 `invalid_request`，只有曾刪過的才回成功；`applications.delete` 重試對已不存在的紀錄回 `application_not_found`（P1-T052）。
+  - 重新授權恢復流程（`planAnalysis`）尚未接進 helper（P1-T053）。
