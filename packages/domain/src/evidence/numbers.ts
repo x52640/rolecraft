@@ -37,6 +37,8 @@ const CN_UNITS_AFTER = new RegExp(`\\s*(${CN_UNIT_CLASS}+)`, 'uy');
 /** 1萬5、3千5百：單位後又接數字，口語省略的寫法不猜。 */
 const DIGIT_AFTER_UNIT = new RegExp(`(?:\\d|${CN_NUMERAL_CLASS})+`, 'uy');
 const CHENG = /\s*成(\d(?!\d))?/uy;
+/** 「百分之」後面接的數字開頭（阿拉伯數字、中文數字、英文字母）。 */
+const NUMBER_AFTER_PERCENT_OF = new RegExp(`\\s*(?:\\d|${CN_NUMERAL_CLASS}|[a-z])`, 'iuy');
 const LATIN_MULTIPLIER = /\s?(bn|mn|k|m|b|w)(?![A-Za-z0-9])/iuy;
 const SCALE_WORD = /[\s-]*(dozen|hundred|thousand|million|billion|trillion)(s?)(?![A-Za-z])/iuy;
 const TIMES = /\s?[x×](?![A-Za-z0-9])/iuy;
@@ -166,10 +168,8 @@ function markerAt(text: string, i: number): Hit | null {
   const ch = text[i];
   if (ch === MARK_HUNDRED_PERCENT) return { token: makeToken(ch, '%', 100), end: i + 1 };
   if (ch === MARK_PERCENT_OF) {
-    const next = text.slice(i + 1).trimStart()[0] ?? '';
-    if (/\d/u.test(next) || new RegExp(CN_NUMERAL_CLASS, 'u').test(next) || /[a-z]/iu.test(next)) {
-      return { token: null, end: i + 1 };
-    }
+    // 在完整文字上判斷（「參」要看前後文，只取下一個字元會判錯：百分之參十）
+    if (stickyAt(NUMBER_AFTER_PERCENT_OF, text, i + 1)) return { token: null, end: i + 1 };
     return { token: unparseable(ch), end: i + 1 };
   }
   if (ch === MARK_POINTS) return { token: unparseable(ch), end: i + 1 };

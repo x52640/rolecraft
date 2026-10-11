@@ -50,9 +50,16 @@ export function normalizeLooseDots(text: string): string {
 const FULLWIDTH_IPV6 =
   /\uFF3B([0-9a-f.\uFF10-\uFF19\uFF21-\uFF26\uFF41-\uFF46\uFF0E]*[:\uFF1A][0-9a-f:.\uFF10-\uFF19\uFF21-\uFF26\uFF41-\uFF46\uFF0E\uFF1A]*)\uFF3D/giu;
 
+/** 查詢字串（「?」後到此都是 ASCII 可見字元）裡的全形方括號（?a=［1］）：換成半形保留在網址裡。 */
+const FULLWIDTH_QUERY_BRACKETS = /(?<=\?[!-~\uFF3B\uFF3D]*)\uFF3B([!-Z^-~]*)\uFF3D/gu;
+
 /** 把全形／CJK 標點換成空白（在 NFKC 之前做，否則會變成半形黏進網址）。 */
 function separateUrls(text: string): string {
-  return text.replace(FULLWIDTH_IPV6, '[$1]').replace(URL_SEPARATORS, ' ');
+  return text
+    .replace(INVISIBLE, '')
+    .replace(FULLWIDTH_IPV6, '[$1]')
+    .replace(FULLWIDTH_QUERY_BRACKETS, '[$1]')
+    .replace(URL_SEPARATORS, ' ');
 }
 
 /** 完整網址抽取：先把全形／CJK 標點換成空白，再正規化。段落與訊息草稿共用。 */
@@ -73,10 +80,9 @@ const FILE_EXTENSIONS = new Set(
 const HOST = String.raw`(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,24})`;
 /** 路徑結束：空白、引號、角括號、方括號（Markdown 連結）、反引號、CJK 標點與漢字。 */
 const PATH_STOP = String.raw`\s<>"'\x60\[\]\u3000-\u303F\u3400-\u4DBF\u4E00-\u9FFF`;
-const LOOSE_URL = new RegExp(
-  String.raw`(?<![a-z0-9_.-])${HOST}(?![a-z0-9-])(\/[^${PATH_STOP}]*)?`,
-  'giu',
-);
+/** 路徑與查詢字串：「?」之後容許成對的方括號（`?filter[user]=owner`），與 extractUrls 同規則。 */
+const PATH = String.raw`(?:\/[^${PATH_STOP}?]*)?(?:\?(?:[^${PATH_STOP}]|\[[^${PATH_STOP}]*\])*)?`;
+const LOOSE_URL = new RegExp(String.raw`(?<![a-z0-9_.-])${HOST}(?![a-z0-9-])(${PATH})?`, 'giu');
 const TRAILING_PUNCTUATION = /[.,;:!?)\]}]+$/u;
 /** 「[.]」「（．）」「［dot］」等含全形括號的點寫法：要在全形標點換成空白之前先轉成「.」。 */
 const RAW_BRACKET_DOT =
@@ -88,7 +94,8 @@ const RAW_BRACKET_DOT =
  */
 export function extractLooseUrls(text: string): string[] {
   const tokens: string[] = [];
-  const separated = separateUrls(text.replace(RAW_BRACKET_DOT, '.'));
+  // 先去隱形字元再認方括號點，否則「evil［\u200B.］com」漏抓
+  const separated = separateUrls(text.replace(INVISIBLE, '').replace(RAW_BRACKET_DOT, '.'));
   for (const match of normalizeLooseDots(separated).matchAll(LOOSE_URL)) {
     const tld = (match[1] ?? '').toLowerCase();
     if (FILE_EXTENSIONS.has(tld)) continue;

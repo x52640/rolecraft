@@ -52,3 +52,30 @@ describe('extractUrls IPv6（P1-T047 對抗驗證）', () => {
     ]);
   });
 });
+
+describe('extractUrls 查詢參數方括號（P1-T056）', () => {
+  it('keeps brackets inside the query string', () => {
+    expect(extractUrls('見 https://a.example.com/list?filter[role]=admin&x[]=1。')).toEqual([
+      'https://a.example.com/list?filter[role]=admin&x[]=1',
+    ]);
+    expect(extractUrls('www.b.example.org/?a[b][c]=d')).toEqual(['www.b.example.org/?a[b][c]=d']);
+    expect(extractUrls('http://[abcd::ef]/q?f[k]=v')).toEqual(['http://[abcd::ef]/q?f[k]=v']);
+  });
+
+  it('distinguishes URLs that differ only inside query brackets', () => {
+    const [made] = extractUrls('https://a.example.com/?filter[role]=admin');
+    const [source] = extractUrls('https://a.example.com/?filter[role]=user');
+    expect(made).not.toBe(source);
+  });
+
+  it('still splits Markdown links whose URL has a query', () => {
+    expect(extractUrls('[https://a.example.com/?f[k]=v](https://a.example.com/?f[k]=v)')).toEqual([
+      'https://a.example.com/?f[k]=v',
+      'https://a.example.com/?f[k]=v',
+    ]);
+    expect(extractUrls('[https://a.example.com/?y=1](https://a.example.com/?y=1)')).toEqual([
+      'https://a.example.com/?y=1',
+      'https://a.example.com/?y=1',
+    ]);
+  });
+});

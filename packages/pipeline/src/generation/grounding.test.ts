@@ -183,3 +183,43 @@ describe('groundingProblem（P1-T047 對抗驗證）', () => {
     ).toBeNull();
   });
 });
+
+describe('groundingProblem（P1-T056）', () => {
+  const job = { company: 'LINE', title: 'Backend Engineer' };
+  const cite = (text: string) => [claim('c1', { type: 'link', text, completionStatus: null })];
+
+  it('網址查詢參數的方括號不截斷：捏造的參數值會被擋', () => {
+    const source = cite('後台 https://a.com/x?filter[role]=user');
+    expect(groundingProblem('後台 https://a.com/x?filter[role]=admin', source, job)).toBe(
+      'link_not_in_claims',
+    );
+    expect(groundingProblem('後台 https://a.com/x?filter[role]=user', source, job)).toBeNull();
+    for (const text of [
+      '後台 https://a.com/x?filter［role］=admin',
+      '後台 https://a.com/x?filter［role］=user［2］',
+      '後台 https://a.com/x?filter\u200B[role]=admin',
+    ]) {
+      expect(groundingProblem(text, source, job)).toBe('link_not_in_claims');
+    }
+    expect(groundingProblem('後台 https://a.com/x?filter［role］=user。', source, job)).toBeNull();
+  });
+
+  it('寬鬆網址查詢參數的方括號不截斷', () => {
+    expect(extractLooseUrls('a.com/x?filter[user]=attacker')).toEqual([
+      'a.com/x?filter[user]=attacker',
+    ]);
+    const source = cite('見 a.com/x?filter[user]=owner');
+    expect(groundingProblem('見 a.com/x?filter[user]=attacker', source, job)).toBe(
+      'link_not_in_claims',
+    );
+    expect(groundingProblem('見 a.com/x?filter[user]=owner', source, job)).toBeNull();
+    const plain = cite('https://a.com/x?f=1');
+    expect(groundingProblem('[a.com/x?f=1](https://a.com/x?f=1)', plain, job)).toBeNull();
+  });
+
+  it('方括號點中間夾零寬字元仍算網域', () => {
+    for (const text of ['請看 evil［​.］com', '請看 evil[​.⁠]com', '請看 evil（．​）com']) {
+      expect(extractLooseUrls(text)).toEqual(['evil.com']);
+    }
+  });
+});

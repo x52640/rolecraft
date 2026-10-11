@@ -63,19 +63,28 @@ const ALL_CN = [
 
 /**
  * 「參」也是常用字（參考、參與、參加、參觀）：只有緊鄰其他數字字元、阿拉伯數字、「點」「第」，
- * 或後面接單位／量詞（參萬、參佰、參個、參年）時才算 3。其他數字字元一律算。
+ * 或後面接單位／量詞（參萬、參佰、參個、參年、參批）、百分比後綴（參%、參‰、參百分點、參 percent）
+ * 或約數字尾（參多）時才算 3；寧可多抽。其他數字字元一律算。
  */
 const CAN_BE_WORD = '參';
 const NUMERAL_NEIGHBOURS = `${ALL_CN}點点\\d`;
 const MEASURE_WORDS =
-  '個个人名位家項项台次件筆笔元塊块倍成%年月週周天日時时分秒歲岁場场套款支條条張张份頁页篇本';
+  '個个人名位家項项台次件筆笔元塊块倍成年月週周天日時时分秒歲岁場场套款支條条張张份頁页篇本' +
+  '批組组輪轮隊队班群間间座輛辆顆颗隻只雙双種种類类樣样屆届季期版層层級级段章節节題题' +
+  '門门堂封則则句字行列片部集號号樓楼戶户箱包袋杯瓶斤磅尺米度遍趟回處处';
+/** 解析器認得的百分比／百分點後綴（%、‰、‱、百分點標記 U+E000）與約數字尾（參多、參餘）。 */
+const PERCENT_AND_APPROX = '%‰‱\\uE000餘余多';
+/** 英文百分比後綴（參 percent，不分大小寫；CN_NUMERAL_CLASS 會被嵌進沒有 i 旗標的 regex）。 */
+const anyCase = (word: string): string =>
+  word.replace(/[a-z]/gu, (c) => `[${c}${c.toUpperCase()}]`);
+const PERCENT_WORDS = `${anyCase('percent')}\\b|${anyCase('per')}\\s+${anyCase('cent')}\\b|${anyCase('pct')}\\b`;
 const ALWAYS_CN = ALL_CN.replace(CAN_BE_WORD, '');
 
 /** 中文數字字元（含大寫、簡體、廿卅卌）的 regex 片段（單一字元；「參」看前後文）。 */
 export const CN_NUMERAL_CLASS =
   `(?:[${ALWAYS_CN}]` +
   `|(?<=[${NUMERAL_NEIGHBOURS}第])${CAN_BE_WORD}` +
-  `|${CAN_BE_WORD}(?=\\s*[${NUMERAL_NEIGHBOURS}${MEASURE_WORDS}]))`;
+  `|${CAN_BE_WORD}(?=\\s*(?:[${NUMERAL_NEIGHBOURS}${MEASURE_WORDS}${PERCENT_AND_APPROX}]|${PERCENT_WORDS})))`;
 
 /** 中文單位字元，接在阿拉伯數字後面時要相乘（例如 3萬、1.5億）。 */
 export const CN_UNIT_CLASS = `[${Object.keys(CN_SMALL_UNITS).join('')}${Object.keys(CN_BIG_UNITS).join('')}]`;
