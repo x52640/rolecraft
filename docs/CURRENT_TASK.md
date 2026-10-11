@@ -5,7 +5,7 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T047 pipeline 事實檢查：句號正規化、網址邊界、職缺名稱比對、訊息草稿的完成度上限（`docs/tasks/P1-T047-grounding-review-fixes.md`）
+- 無
 
 ## ready
 

@@ -1,7 +1,7 @@
 ---
 id: P1-T047
 phase: 1
-status: in_progress
+status: done
 depends_on: []
 specs: ["evidence-model.md"]
 track: review
