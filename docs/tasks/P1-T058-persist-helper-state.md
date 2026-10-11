@@ -1,7 +1,7 @@
 ---
 id: P1-T058
 phase: 1
-status: in_progress
+status: done
 depends_on: []
 specs: ["sources-and-authorization.md", "providers.md", "architecture.md"]
 track: helper
@@ -87,7 +87,7 @@ npm run verify
 ## 中斷／接手紀錄
 
 - 最後完成：對抗驗證五項修正（資料夾身分、撤銷／移除先落地、占用接手接上資料區、選定與 R6 紀錄不吞錯）＋回歸測試
-- 已通過驗證：worktree 內 `npm run verify` 綠；新增 9 個回歸測試在修正前全數失敗
+- 已通過驗證：worktree 內 `npm run verify` 綠；新增 9 個回歸測試在修正前全數失敗；協調者對抗驗證（2 個角度）屬實 5 項已在 d51e59f 修正
 - 下一步：協調者收官
 - Blocker：無
 
