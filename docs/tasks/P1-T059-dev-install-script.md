@@ -75,16 +75,23 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：
-- 已通過驗證：
-- 下一步：
-- Blocker：
+- 最後完成：開發安裝腳本、測試、README 開發段、bridge.md 補充（工作者）
+- 已通過驗證：`npm run verify`（含新的 `test:scripts` 8 案）
+- 下一步：協調者收官；擁有者在自己的 Mac 依 README 執行並確認接上
+- Blocker：無
 
 ## 完成結果
 
+- `scripts/dev/install-helper.mjs`：`npm run dev:install`／`dev:uninstall`。參數 `--browser chrome|edge|arc`、`--extension-id`（必填，32 個 a–p）、`--data-dir`（必須絕對路徑、不可含控制字元；預設 `~/Library/Application Support/RoleCraft-dev`）、`--yes`；未知參數與多餘位置參數一律拒絕。沒有 `--yes` 只印出會做的事，不建目錄、不寫檔、不下載。
+- 包裝檔 `com.rolecraft.helper.sh` 與 manifest `com.rolecraft.helper.json` 放在瀏覽器的 NativeMessagingHosts 目錄（ADR-0003）；包裝檔寫死 node 與 `apps/helper/src/main.ts` 絕對路徑（Node 直接跑 .ts），設 `ROLECRAFT_ALLOWED_ORIGINS`、`ROLECRAFT_DATA_DIR`、`ROLECRAFT_FONTS_DIR`（資料區下 `fonts/`），值一律 shell 引號包住。
+- 字型：資料區 `fonts/` 缺任何一個隨附字型檔才呼叫 `fetch-fonts.mjs --out`（雜湊由它驗）；下載步驟可注入。
+- 安全邊界：manifest 的 description＋path、包裝檔第二行標記用來認「自己寫的檔」；目錄已有不是開發安裝寫的同名檔（例如將來的正式安裝）時，安裝拒絕覆寫、移除拒絕刪除。`--uninstall` 只刪這兩個檔，不刪資料區。
+- 測試 `scripts/dev/install-helper.test.mjs`（node:test，接進 `verify` 的 `test:scripts`）：家目錄、helper 進入點、字型下載全部注入暫存目錄與假函式；含乾跑不寫檔、`--yes` 內容與實際執行包裝檔檢查三個環境變數（含空白與單引號路徑）、字型已存在不下載、Edge 目錄、移除只刪自己的檔、外來檔拒絕、各種參數錯誤拒絕且不寫檔。
+- README 開發段補完整步驟與如何確認接上（編輯器「設定」頁能取得服務狀態）；bridge.md R7 補一句開發安裝與正式安裝（P1-T031）的差別。
+- 手動驗證（在擁有者的 Mac 實際安裝並確認接上）需擁有者，本 Task 沒有對真實路徑執行安裝。

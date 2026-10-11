@@ -21,7 +21,10 @@
     "verify:docs": "node scripts/docs/cli.mjs verify",
     "task:index": "node scripts/docs/cli.mjs index",
     "task:close": "node scripts/docs/cli.mjs close",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run test:docs && npm run verify:docs"
+    "test:scripts": "node --test \"scripts/dev/*.test.mjs\"",
+    "dev:install": "node scripts/dev/install-helper.mjs",
+    "dev:uninstall": "node scripts/dev/install-helper.mjs --uninstall",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run test:docs && npm run test:scripts && npm run verify:docs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

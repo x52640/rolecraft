@@ -81,6 +81,27 @@ npm run build      # 建置擴充功能（含編輯器頁）到 apps/extension/d
 
 `npm run build` 的輸出可在 Chrome「載入未封裝項目」載入。
 
+### 開發用：把本機輔助程式接上瀏覽器
+
+正式安裝包（P1-T031）完成前，用開發腳本把 repo 裡的本機輔助程式（helper）註冊給瀏覽器。
+它是給開發者自己的 Mac 用的：包裝檔寫死目前 `node` 與 repo 的絕對路徑，換 Node 版本或搬動 repo 後要重跑。
+
+1. `npm install`
+2. `npm run build`
+3. 開 `chrome://extensions`（Edge：`edge://extensions`；Arc：`arc://extensions`），打開「開發人員模式」，「載入未封裝項目」選 `apps/extension/dist/unpacked/`。
+4. 複製擴充功能卡片上的 ID（32 個英文小寫字母）。
+5. 先看會做什麼（乾跑，不寫任何檔）：
+   `npm run dev:install -- --extension-id <ID>`
+   可加 `--browser edge` 或 `--browser arc`（預設 chrome）、`--data-dir <絕對路徑>`（預設 `~/Library/Application Support/RoleCraft-dev`）。
+6. 確認後加 `--yes` 實際執行：`npm run dev:install -- --extension-id <ID> --yes`。
+   會建立資料區、缺字型時下載 Noto Sans TC（約 14 MB，比對 sha256），並在瀏覽器的 NativeMessagingHosts 目錄寫入 `com.rolecraft.helper.json` 與 `com.rolecraft.helper.sh`。
+7. 完全關閉瀏覽器（Cmd+Q）再重開。
+
+確認接上：點工具列的 RoleCraft 圖示開編輯器 →「設定」頁。看到 AI 服務狀態清單就是接上了；顯示「無法取得服務狀態」就是沒接上（常見原因：ID 打錯、從不同資料夾載入擴充功能導致 ID 變了、沒重開瀏覽器）。
+
+移除：`npm run dev:uninstall -- --browser <同上> --yes`。只刪上面兩個檔，資料區保留；要清資料請自己刪資料區資料夾。
+若目錄裡已有不是開發腳本寫的同名檔（例如正式安裝），腳本會拒絕覆寫或刪除。
+
 預設跳過、需要環境變數才跑的實測：
 
 | 環境變數 | 測試 | 需要 |
