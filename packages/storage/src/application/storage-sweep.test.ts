@@ -1,6 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { StorageError } from '../errors.ts';
 import { exportTestbed } from '../export/fixtures.test-support.ts';
+import { fileStoreInternals } from '../files/file-store.ts';
 import { deleteMaterial } from './material-deletion.ts';
 import { ORPHAN_PDF_GRACE_MS, sweepStorage } from './storage-sweep.ts';
 
@@ -56,5 +58,32 @@ describe('sweepStorage 啟動清掃（orphanGrace）', () => {
     const result = deleteMaterial(t.db, t.files, { kind: 'claim', id: t.fact.id });
     expect(result.releasedPdfHashes).toEqual([version.pdfHash]);
     expect(t.files.has(version.pdfHash)).toBe(false);
+  });
+});
+
+describe('sweepStorage 刪檔失敗', () => {
+  it('補刪版本的 PDF 刪除失敗 → 孤兒清掃照跑，最後拋合併的 StorageError', () => {
+    const unapplied = t.exportNow();
+    t.db.prepare('DELETE FROM claims WHERE id = ?').run(t.fact.id);
+    const orphan = t.files.put(t.pdf('orphan'));
+    const internals = fileStoreInternals(t.files);
+    const original = internals.delete.bind(internals);
+    vi.spyOn(internals, 'delete').mockImplementation((hash) => {
+      if (hash === unapplied.pdfHash) throw new Error('EBUSY');
+      return original(hash);
+    });
+    let thrown: unknown;
+    try {
+      sweepStorage(t.db, t.files);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(StorageError);
+    expect((thrown as StorageError).cause).toBeInstanceOf(AggregateError);
+    expect(t.files.has(orphan.hash)).toBe(false);
+    expect(t.files.has(unapplied.pdfHash)).toBe(true);
+    expect(t.db.prepare('SELECT 1 FROM export_versions WHERE id = ?').get(unapplied.id)).toBe(
+      undefined,
+    );
   });
 });

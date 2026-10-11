@@ -65,16 +65,24 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：
-- 已通過驗證：
-- 下一步：
+- 最後完成：四項修正與各自的回歸測試（每項先確認未修時測試失敗）
+- 已通過驗證：worktree 內 `npm run verify` 全綠
+- 下一步：協調者收官（範圍稽核、主環境重跑 verify、E3 對抗驗證）
 - Blocker：無
 
 ## 完成結果
 
+1. **取消不再觸發重新驗證**（`claude/service.ts`）：`run()` 一開始若 `request.signal` 已取消，就不讀版本、不重新驗證，直接交給 `runWithSubscriptionCheck` 回 `cancelled`（不啟動子程序）；`version` 回 `blocked`，原因為 `CANCELLED_BEFORE_VERSION`。使用者的 signal 仍刻意不傳進重新驗證。修正前，已取消的請求仍會跑完整的重新驗證。
+2. **重新驗證每次啟動有執行逾時**（`claude/reverify.ts`、`claude/constants.ts`）：新增 `CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS = 120_000` 與 `timeoutLaunch`，每次 launch 各自一個 AbortController；逾時由 launcher 對行程群組送 SIGTERM、寬限期後 SIGKILL，並拋 `ReverifyTimeoutError`，該次重新驗證記為失敗、服務停用，不會卡在「重新驗證中」。測試用永不結束、忽略 SIGTERM 的假子程序加假計時器。
+3. **清掃刪檔失敗不中斷**（`storage/application/storage-sweep.ts`）：補刪版本的 PDF 刪除失敗時，孤兒清掃照跑；兩段都跑完才拋一個 `StorageError`（cause 為 `AggregateError`）。
+4. **額度狀態不被蓋掉**（`helper/handlers/providers/providers-service.ts`）：Claude 同一時間只允許一個短驗證；同一候選的並行請求仍合併成一次，不同候選在進行中回 `not_available`（handler 對應 `invalid_request`），不呼叫模型。
+
+保守選擇：
+- 重新驗證前的版本讀取（`service.ts` 的 `readVersion`）沒有加逾時，仍沿用原行為；該處卡住只會讓該次執行等待，不會把閘門卡在「重新驗證中」。
+- 逾時常數取 120 秒（版本、auth 指令與 haiku 極短提示都遠低於此）。

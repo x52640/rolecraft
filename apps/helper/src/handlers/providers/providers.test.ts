@@ -254,6 +254,36 @@ describe('對抗驗證修正：被擋後更新狀態、合併重複驗證', () =
     for (const r of results) expect(r).toEqual({ ok: true, verification: 'passed' });
   });
 
+  it('A 驗證進行中選 B → not_available、不呼叫模型；A 設的 quota_exhausted 不被 B 的重新檢查蓋掉', async () => {
+    const { probe, providers, services } = setup();
+    await providers.recheck('claude');
+    const list = await providersListCandidates({ service: 'claude' }, services);
+    if (!list.ok || !list.candidates[1]) throw new Error('缺候選');
+    const [a, b] = list.candidates.map((c) => c.candidateId);
+    let finishA!: (value: ClaudeModelCheck) => void;
+    probe.verifyModel.mockImplementationOnce(() => new Promise((r) => (finishA = r)));
+    probe.verifyModel.mockResolvedValue({
+      verification: 'unknown',
+      quotaExhausted: false,
+      blocked: true,
+      record: null,
+    });
+    const pendingA = providers.selectCandidate('claude', a ?? '');
+    const sameA = providers.selectCandidate('claude', a ?? '');
+    expect(await providers.selectCandidate('claude', b ?? '')).toEqual({ kind: 'not_available' });
+    const viaHandler = await providersSelectCandidate(
+      { service: 'claude', candidateId: b ?? '' },
+      services,
+    );
+    expect(viaHandler).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
+    expect(probe.verifyModel).toHaveBeenCalledTimes(1);
+    finishA({ verification: 'failed', quotaExhausted: true, blocked: false, record: null });
+    expect(await pendingA).toEqual({ kind: 'verified', verification: 'failed' });
+    expect(await sameA).toEqual({ kind: 'verified', verification: 'failed' });
+    expect((await providers.status())[0]?.state).toBe('quota_exhausted');
+    expect(probe.check).toHaveBeenCalledTimes(1);
+  });
+
   it.each(['quota_exhausted', 'not_checked'] as const)(
     '狀態不是 available（%s）時 select → invalid_request，0 次模型呼叫',
     async (which) => {

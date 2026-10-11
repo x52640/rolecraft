@@ -6,6 +6,7 @@ import { cliConfigItem, parseAuthStatus, parseVersion, subscriptionLoginItem } f
 import {
   CLAUDE_AUTH_STATUS_COMMAND,
   CLAUDE_ENVIRONMENT,
+  CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS,
   CLAUDE_RUN_COMMAND,
   CLAUDE_VERSION_COMMAND,
 } from './constants.ts';
@@ -25,6 +26,7 @@ import type { ClaudeVersionRecord, ReverifyCaseResult } from './version-gate.ts'
  * 命令列、環境、串流守門與正式執行完全相同（ADR-0002 隔離旗標，不加任何旗標）。
  * 任一案例失敗就停止（不跑後面的、不重試）；結果不確定（額度、逾時、錯誤、取消）也是失敗。
  * 模型呼叫有硬上限 CLAUDE_REVERIFY_MAX_MODEL_CALLS，超過直接拒絕啟動子程序。
+ * 每次啟動有執行逾時 CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS，逾時終止行程群組並記為失敗。
  */
 
 /** 每次重新驗證最多呼叫模型幾次（D22：約 3–5 次；本流程實際用 2 次）。 */
@@ -74,6 +76,30 @@ export function budgetLaunch(
   };
 }
 
+export class ReverifyTimeoutError extends Error {
+  override readonly name = 'ReverifyTimeoutError';
+}
+
+/** 包住 launch：每次啟動各自一個逾時；逾時就中止（launcher 終止整個行程群組）並拋錯。 */
+export function timeoutLaunch(
+  launch: Launch,
+  ms: number = CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS,
+): Launch {
+  return async (request) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    try {
+      const output = await launch({ ...request, signal: controller.signal });
+      if (controller.signal.aborted) {
+        throw new ReverifyTimeoutError(`單次執行超過 ${ms} 毫秒未結束，已終止`);
+      }
+      return output;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
 class CaseFailed extends Error {}
 
 export async function runClaudeReverification(
@@ -105,7 +131,7 @@ export async function runClaudeReverification(
       acceptVersion: (v) => v === target.version,
     });
     const launcherAt = (cwd: string) =>
-      budgetLaunch(createLauncher({ provider: 'claude', env, cwd, spawn }), counter);
+      budgetLaunch(timeoutLaunch(createLauncher({ provider: 'claude', env, cwd, spawn })), counter);
     const call = (launch: Launch, command: CommandSpec, stdin?: string) =>
       launch({
         executablePath: target.executablePath,

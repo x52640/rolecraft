@@ -57,6 +57,8 @@ export interface ClaudeService {
   run(request: RunRequest, deps: ServiceDeps): Promise<ClaudeRunResult>;
 }
 
+export const CANCELLED_BEFORE_VERSION = '使用者已取消，未檢查 Claude CLI 版本';
+
 const blocked = (reason: string, record: ClaudeVersionRecord | null = null) =>
   ({ status: 'blocked', reason, record }) as const;
 
@@ -140,13 +142,16 @@ export function createClaudeService(options: ClaudeServiceOptions = {}): ClaudeS
     gate,
     ensureVersion,
     async run(request, deps) {
+      const runDeps = claudeRunDeps(deps, { acceptVersion: gate.isAccepted });
+      // 已取消就不讀版本、不觸發重新驗證；交給 runWithSubscriptionCheck 回 cancelled（不啟動子程序）。
+      // 使用者的 signal 刻意不傳進重新驗證：取消會被記成驗證失敗而永久停用該服務。
+      if (request.signal?.aborted) {
+        const outcome = await runWithSubscriptionCheck(adapter, request, runDeps);
+        return { outcome, version: blocked(CANCELLED_BEFORE_VERSION) };
+      }
       const version = await ensureVersion(deps);
       // 版本被擋時照樣走 runWithSubscriptionCheck：適配器自己的版本判定與閘門會擋下，並留下紀錄。
-      const outcome = await runWithSubscriptionCheck(
-        adapter,
-        request,
-        claudeRunDeps(deps, { acceptVersion: gate.isAccepted }),
-      );
+      const outcome = await runWithSubscriptionCheck(adapter, request, runDeps);
       return { outcome, version };
     },
   };

@@ -142,3 +142,9 @@ export const CLAUDE_MANAGED_SETTINGS_PATHS: readonly string[] = [
 
 /** 執行中 rate_limit_event.status 視為「仍可用」的值；其他一律視為額度用完（R9，不重試）。 */
 export const CLAUDE_RATE_LIMIT_OK: readonly string[] = ['allowed', 'allowed_warning'];
+
+/**
+ * 自動重新驗證（D22）每次啟動 CLI 的執行逾時。逾時就中止並終止整個行程群組，
+ * 該次重新驗證記為失敗，避免卡在「重新驗證中」。
+ */
+export const CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS = 120_000;

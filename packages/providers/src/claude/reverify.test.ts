@@ -1,7 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import type { ChildProcess } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 
-import type { Launch } from '../core/process.ts';
-import { CLAUDE_RUN_COMMAND, CLAUDE_VERSION_COMMAND } from './constants.ts';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { Launch, SpawnFn } from '../core/process.ts';
+import {
+  CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS,
+  CLAUDE_RUN_COMMAND,
+  CLAUDE_VERSION_COMMAND,
+} from './constants.ts';
 import {
   budgetLaunch,
   CLAUDE_REVERIFY_MAX_MODEL_CALLS,
@@ -144,5 +152,63 @@ describe('保存介面', () => {
     expect(res.outcome.status).toBe('blocked');
     expect(res.outcome.record.items.cliConfig.basis).toContain('不自動重試');
     expect(fake.modelCalls()).toHaveLength(0);
+  });
+});
+
+/** 假子程序：永遠不結束、忽略 SIGTERM，只有 SIGKILL 才以 exitCode null 結束。 */
+function hangingChild(signals: string[]): ChildProcess {
+  const child = new EventEmitter() as ChildProcess & EventEmitter;
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  Object.assign(child, {
+    stdout,
+    stderr,
+    stdin: new PassThrough(),
+    kill: (signal: string) => {
+      signals.push(signal);
+      if (signal === 'SIGKILL') {
+        stdout.end();
+        stderr.end();
+        process.nextTick(() => child.emit('close', null));
+      }
+      return true;
+    },
+  });
+  return child;
+}
+
+describe('重新驗證執行逾時', () => {
+  it('子程序不結束 → 逾時終止行程群組、記為失敗並停用，不卡在重新驗證中', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const fake = versionedFake({ version: NEW });
+      const signals: string[] = [];
+      let hung!: () => void;
+      const started = new Promise<void>((r) => (hung = r));
+      let spawned = 0;
+      // 第 1 次是重新驗證前的版本讀取（正常回應），之後重新驗證的 launch 一律卡住。
+      const spawn: SpawnFn = (file, args, options) => {
+        spawned += 1;
+        if (spawned === 1) return fake.spawn(file, args, options);
+        hung();
+        return hangingChild(signals);
+      };
+      const { store, saved } = memoryStore();
+      const svc = service(store);
+      const pending = svc.run(REQ, runDeps(spawn));
+      await started;
+      expect(svc.gate.state.kind).toBe('reverifying');
+      await vi.advanceTimersByTimeAsync(CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS + 2000);
+      const res = await pending;
+      expect(signals).toEqual(['SIGTERM', 'SIGKILL']);
+      expect(res.version).toMatchObject({ status: 'blocked' });
+      expect(res.outcome.status).toBe('blocked');
+      expect(saved.at(-1)).toMatchObject({ version: NEW, outcome: 'failed', modelCalls: 0 });
+      expect(saved.at(-1)?.reason).toContain('ReverifyTimeoutError');
+      expect(svc.gate.state.kind).toBe('disabled');
+      expect(spawned).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

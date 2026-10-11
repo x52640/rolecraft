@@ -5,7 +5,11 @@ import { fixture } from './fake-spawn.ts';
 import { makeInjectionSandbox } from './injection-sandbox.ts';
 import { CLAUDE_REVERIFY_MAX_MODEL_CALLS } from './reverify.ts';
 import { memoryStore, runDeps, versionedFake, withVersion } from './reverify-fakes.ts';
-import { type ClaudeServiceOptions, createClaudeService } from './service.ts';
+import {
+  CANCELLED_BEFORE_VERSION,
+  type ClaudeServiceOptions,
+  createClaudeService,
+} from './service.ts';
 import type { ClaudeVersionRecord } from './version-gate.ts';
 
 /** P1-T039：版本變更時自動重新驗證（假 spawn，不呼叫真實 CLI）。 */
@@ -152,6 +156,26 @@ describe('版本不同', () => {
     await svc.run(REQ, { ...runDeps(fake.spawn), makeSandbox });
     expect(saved.at(-1)?.cases.find((c) => !c.passed)?.id).toBe('no-user-settings');
     expect(svc.gate.state.kind).toBe('disabled');
+  });
+});
+
+describe('已取消', () => {
+  it('開始前已取消 → 回 cancelled，不讀版本、不重新驗證、不停用', async () => {
+    const fake = versionedFake({ version: NEW });
+    const { store, saved } = memoryStore();
+    const svc = service({ store });
+    const controller = new AbortController();
+    controller.abort();
+    const res = await svc.run({ ...REQ, signal: controller.signal }, runDeps(fake.spawn));
+    expect(res.outcome.status).toBe('cancelled');
+    expect(res.version).toEqual({
+      status: 'blocked',
+      reason: CANCELLED_BEFORE_VERSION,
+      record: null,
+    });
+    expect(fake.calls()).toHaveLength(0);
+    expect(saved).toEqual([]);
+    expect(svc.gate.state.kind).not.toBe('disabled');
   });
 });
 

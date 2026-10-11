@@ -6,6 +6,7 @@ import {
   deleteUnappliedExportVersion,
   isExportVersionApplied,
 } from '../export/export-version-repository.ts';
+import { StorageError } from '../errors.ts';
 import { assertImmutabilityGuards } from '../export/guards.ts';
 import { assertNotInTransaction, releasePdfs, sweepOrphanPdfs } from '../export/pdf-cleanup.ts';
 import type { FileStore } from '../files/file-store.ts';
@@ -38,6 +39,7 @@ export interface StorageSweepOptions {
  * 1. 未投遞、卻保存了已刪素材副本的匯出版本整份刪除（素材若被繞過 deleteMaterial 刪掉，
  *    0003 觸發器仍會記入 deleted_materials，這裡補做 D19）。
  * 2. 清掉孤兒 PDF（刪檔失敗、程序中斷留下的檔案）。
+ * 第 1 步補刪版本的 PDF 刪除失敗時，第 2 步仍照跑；兩步都跑完才拋合併的 StorageError。
  * deleteMaterial 與投遞紀錄 delete 結束時也會做第 2 步。不能在外層交易中呼叫。
  */
 export function sweepStorage(
@@ -60,11 +62,28 @@ export function sweepStorage(
   });
   // 補刪版本的 PDF 含已刪素材：不套寬限期，提交後立即刪（仍被其他版本共用的不刪）
   const purgedHashes = purged.flatMap((p) => (p.pdfHash === null ? [] : [p.pdfHash]));
-  const released = releasePdfs(db, fileStore, purgedHashes);
-  const orphans = sweepOrphanPdfs(db, fileStore, {
-    graceMs: options.orphanGrace === true ? ORPHAN_PDF_GRACE_MS : 0,
-    ...(options.now === undefined ? {} : { now: options.now }),
-  });
+  // 兩段都要跑：補刪版本的 PDF 刪失敗時，孤兒清掃仍要繼續；最後再一起拋。
+  const failures: unknown[] = [];
+  const attempt = (stage: () => string[]): string[] => {
+    try {
+      return stage();
+    } catch (error) {
+      failures.push(error);
+      return [];
+    }
+  };
+  const released = attempt(() => releasePdfs(db, fileStore, purgedHashes));
+  const orphans = attempt(() =>
+    sweepOrphanPdfs(db, fileStore, {
+      graceMs: options.orphanGrace === true ? ORPHAN_PDF_GRACE_MS : 0,
+      ...(options.now === undefined ? {} : { now: options.now }),
+    }),
+  );
+  if (failures.length > 0) {
+    throw new StorageError('清掃儲存區時有 PDF 檔刪除失敗；下次清掃會再試', {
+      cause: new AggregateError(failures),
+    });
+  }
   return {
     purgedExportVersionIds: purged.map((p) => p.id),
     releasedPdfHashes: [...new Set([...released, ...orphans])].sort(),

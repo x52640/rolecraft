@@ -74,7 +74,10 @@ export function createProvidersService(
     });
   };
 
-  const inFlight = new Map<string, Promise<SelectResult>>();
+  // Claude 同一時間只跑一個短驗證：被擋時的自動重新檢查會覆寫狀態，
+  // 兩個候選並行時可能蓋掉另一個剛設的 quota_exhausted（P1-T044）。
+  let inFlight: { readonly candidateId: string; readonly task: Promise<SelectResult> } | null =
+    null;
 
   const verify = async (entry: CandidateEntry): Promise<SelectResult> => {
     const result = await probe.verifyModel(entry.model);
@@ -116,15 +119,20 @@ export function createProvidersService(
     selectCandidate(service, candidateId): Promise<SelectResult> {
       const entry = candidatesOf(service).find((e) => e.candidate.candidateId === candidateId);
       if (!entry) return Promise.resolve({ kind: 'unknown_candidate' });
-      // 同一候選進行中的驗證合併成一次（不重複花模型呼叫）。
-      const running = inFlight.get(entry.candidate.candidateId);
-      if (running) return running;
+      // 同一候選進行中的驗證合併成一次（不重複花模型呼叫）；其他候選在進行中一律 not_available。
+      if (inFlight) {
+        return inFlight.candidateId === entry.candidate.candidateId
+          ? inFlight.task
+          : Promise.resolve({ kind: 'not_available' });
+      }
       // 不是「可用」就不呼叫模型（未檢查、被擋、額度不足等）。
       if (current('claude').state !== 'available') {
         return Promise.resolve({ kind: 'not_available' });
       }
-      const task = verify(entry).finally(() => inFlight.delete(entry.candidate.candidateId));
-      inFlight.set(entry.candidate.candidateId, task);
+      const task = verify(entry).finally(() => {
+        inFlight = null;
+      });
+      inFlight = { candidateId: entry.candidate.candidateId, task };
       return task;
     },
   };
