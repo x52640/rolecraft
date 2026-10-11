@@ -80,7 +80,11 @@ export function createAnalysis(deps: AnalysisDeps): Required<AnalysisService> {
   ) => {
     for (const doc of changed) repos.sourceDocuments.save(doc);
     for (const claim of claimUpdates) repos.claims.save(claim);
-    for (const row of empty) repos.analysisState.saveAnalyzed(row);
+    for (const row of empty) {
+      // 內容只剩空白：記為已分析這個版本，同時清掉舊版本的摘要（codex review）
+      repos.analysisState.saveAnalyzed(row);
+      repos.analysisState.deleteSummary(row.sourceDocumentId);
+    }
   };
 
   const launch = (plan: AnalysisPlan, run: WorkRun, s: AnalysisSelection) => {
@@ -120,12 +124,20 @@ export function createAnalysis(deps: AnalysisDeps): Required<AnalysisService> {
       now,
     });
     if (!synced.ok) return fail(synced.reason);
+    const blank = new Set(
+      synced.documents
+        .filter((d) => d.document.authorizationStatus === 'authorized' && !/\S/u.test(d.text))
+        .map((d) => d.document.id),
+    );
     const planned = planAnalysis({
       documents: synced.documents,
       deletedDocumentIds: synced.deletedDocumentIds,
       analyzed: repos.analysisState.listAnalyzed(),
       existingClaims: repos.claims.list(),
-      globalSummary: repos.analysisState.listSummaries().filter((s) => s.text.length > 0),
+      // 內容只剩空白的文件：舊摘要不再代表它，不帶進計畫（下方交易一併刪除，codex review）
+      globalSummary: repos.analysisState
+        .listSummaries()
+        .filter((s) => s.text.length > 0 && !blank.has(s.sourceDocumentId)),
       budget: selection.budget,
       newId: storageId,
     });

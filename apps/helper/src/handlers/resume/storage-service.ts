@@ -6,6 +6,7 @@ import type { Claim, Profile, ResumeSection, ResumeVersion } from '@rolecraft/co
 import { confirmSection } from '@rolecraft/domain';
 import { createRepositories, nowTimestamp, transaction } from '@rolecraft/storage';
 
+import type { ClaimGate } from '../sources/claim-gate.ts';
 import { createGeneration, type GenerationEngine } from './generation.ts';
 import { checkReadiness, hasUnconfirmableIssue, originalsOf } from './readiness.ts';
 import { applyEdit, withDecision } from './section-rules.ts';
@@ -19,6 +20,8 @@ export interface ResumeServiceOptions {
   generation?: GenerationEngine;
   /** 測試用：背景生成工作結束時通知 */
   onGenerationSettled?: (jobSnapshotId: string) => void;
+  /** 生成讀事實項時的來源關卡（P1-T060） */
+  claimGate?: ClaimGate | null;
 }
 
 const OK: ResumeResult = { ok: true };
@@ -72,6 +75,7 @@ export function createResumeService(options: ResumeServiceOptions): ResumeServic
         db,
         repos,
         engine: options.generation,
+        gate: options.claimGate ?? null,
         ...(options.onGenerationSettled && { onSettled: options.onGenerationSettled }),
       }),
     }),

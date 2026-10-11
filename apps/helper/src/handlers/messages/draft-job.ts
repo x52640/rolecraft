@@ -6,6 +6,7 @@ import { createDraftRunner, type DraftPlan, type DraftReport } from '@rolecraft/
 import { transaction, type Repositories } from '@rolecraft/storage';
 import type { DatabaseSync } from 'node:sqlite';
 
+import type { ClaimGate } from '../sources/claim-gate.ts';
 import type { DraftEngine } from './claude-engine.ts';
 
 export interface DraftJobDeps {
@@ -15,6 +16,8 @@ export interface DraftJobDeps {
   readonly newId: () => string;
   readonly now: () => number;
   readonly sleep: (ms: number, signal: AbortSignal) => Promise<void>;
+  /** 引用來源已撤銷或不在授權集合的事實項當來源已移除（P1-T060）；沒給就不套 */
+  readonly gate?: ClaimGate | null;
 }
 
 /** 可被取消的等待（重試間隔）。 */
@@ -51,12 +54,15 @@ export function startDraftJob(plan: DraftPlan, deps: DraftJobDeps): Promise<Draf
       abort: () => controller.abort(),
       aborted: () => controller.signal.aborted,
     },
-    loadInputs: () =>
-      Promise.resolve({
+    loadInputs: async () => {
+      await deps.gate?.refresh();
+      const claims = repos.claims.list();
+      return {
         message: repos.messageDrafts.get(plan.messageDraftId),
         jobSnapshot: plan.jobSnapshotId ? repos.jobSnapshots.get(plan.jobSnapshotId) : null,
-        claims: repos.claims.list(),
-      }),
+        claims: deps.gate ? deps.gate.apply(claims) : claims,
+      };
+    },
     commitUnit: ({ job, written }) => {
       transaction(db, () => {
         repos.workJobs.save(job);

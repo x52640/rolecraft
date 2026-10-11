@@ -36,6 +36,7 @@ expected_commit: "feat(P1-T060): helper：分析授權資料夾產生事實項�
 - 對抗驗證（2026-10-11）屬實項：
   - 撤銷授權、移除資料夾、檔案被刪後，只靠該來源的事實項要等下次按「分析資料夾」才失效，期間履歷生成與訊息草稿照樣送進模型（R2、R4）→ 撤銷、移除時在同一交易對受影響事實項套 R2 判定（含 revocationHold）並標 `source_documents` 撤銷，不需模型；生成與草稿讀取事實項時再擋一道：引用的來源不是已授權（或已不在授權集合）就當來源已移除（使用者確認過的除外）
   - commitUnit 用啟動時的事實項舊快照整筆覆寫：分析期間使用者否決（刪除）的事實項被復活、確認與修改被蓋掉 → 交易內逐筆重讀現況，已刪除（含 deleted_materials）就略過；存在就以現況為底只套審查狀態升級與矛盾標記；runner 的既有事實項也改用現況
+  - （codex）已分析過的文件改成只剩空白：新版本記為已分析，但舊 `document_summaries` 留著，之後的分析一直帶入過期摘要 → 記錄空白版本的同一交易刪除該文件摘要，規劃時也不帶入
 
 ### 不包含
 
@@ -91,9 +92,9 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：bridge.md、contracts（`analysis.start`／`analysis.status`）、helper `handlers/analysis/`、資料區 0006、專案頁按鈕與事實項頁重新整理（工作者單一 commit，基準 f0540c9）
+- 最後完成：對抗驗證屬實項 2 則＋codex 1 則修正（基準 a941488）
 - 已通過驗證：worktree 內 `npm run verify` 綠
-- 下一步：協調者收官（範圍稽核含下方範圍外檔案）、對抗驗證（高風險）
+- 下一步：協調者收官
 - Blocker：無
 
 ## 完成結果
@@ -106,4 +107,10 @@ npm run verify
 - 測試：helper 端到端 10 則（暫存資料區＋假資料夾＋假 provider：完成、無模型、R6 被擋、額度暫停→重開→手動續跑、續跑前 R6 不通過、暫停期間文件變更、撤銷與恢復、刪檔、commitUnit 回滾、重複按下），storage 4 則，編輯器 6 則，main 組裝 1 則。
 - 範圍外但必要的檔案：`packages/storage/src/migrations/0006_analysis_state.sql`（分析計畫、已分析版本、全域摘要無處可存，續跑與增量判斷需要）、`packages/storage/src/migrate.test.ts`（新 migration 必須更新資料表清單）、`apps/helper/src/bridge/__fixtures__/editor-requests.ts`（dispatch 測試要求涵蓋每個操作）。
 - 保守選擇／待裁定：分析出的事實項沒有歸入任何專案（ProjectEvidence 產生來源不在範圍），事實項頁的專案清單仍看不到它們；有資料夾無法列舉就整個不分析（不把暫時讀不到當刪除）；已授權檔讀不到（刪除、變符號連結、過大等）視同刪除，不保存恢復依據；移除資料夾視同撤銷授權；續跑前 R6 用 `providers.recheck`（安裝、登入、版本閘門、R6），通過才續跑；`deleteMaterial` 刪來源文件時不清 `analyzed_documents`／`document_summaries`（摘要只取已授權文件，不影響輸出）。
+- 對抗驗證修正：
+  - 撤銷授權、移除資料夾在寫入授權狀態的同一交易標 `source_documents` 已撤銷，並對「所有引用來源都已非授權」的事實項套 R2（`evaluateClaimSources`，含撤銷恢復依據），不需模型（`handlers/sources/revocation.ts`）。
+  - 生成與草稿讀事實項前先重新列舉資料夾（只列不讀），引用來源不是已授權、已不在授權集合或資料夾列舉失敗就當來源已移除，交給既有可用判定（使用者確認過的仍可用）（`handlers/sources/claim-gate.ts`，resume、messages 經 main.ts 接上）。
+  - `commitUnit` 對既有事實項的更新在交易內逐筆重讀現況：已刪除（含 deleted_materials）略過不復活；存在就以現況為底只套複核狀態升級，計數只算實際更新的。
+  - （codex）文件改成只剩空白時，同一交易刪除舊摘要，規劃時也不帶入。
+  - 回歸測試 6 則（`handlers/analysis/adversarial.test.ts`），修正前除來源關卡外皆失敗（關卡是新元件）。
 - 手動驗證需擁有者（自己的資料夾跑一次，併 P1-T032），本次未做。

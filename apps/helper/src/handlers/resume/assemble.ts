@@ -5,6 +5,8 @@ import { restoreWorkRun } from '@rolecraft/domain';
 import { createRepositories, transaction } from '@rolecraft/storage';
 
 import type { ProvidersService } from '../providers/service.ts';
+import { claimGateOf } from '../sources/claim-gate.ts';
+import type { SourcesService } from '../sources/service.ts';
 import { createClaudeGenerationEngine } from './claude-engine.ts';
 import type { ResumeService } from './service.ts';
 import { createResumeService } from './storage-service.ts';
@@ -12,8 +14,13 @@ import { createResumeService } from './storage-service.ts';
 export function createResumeWithClaude(
   db: DatabaseSync,
   providers: ProvidersService,
+  sources?: SourcesService,
 ): ResumeService {
-  return createResumeService({ db, generation: createClaudeGenerationEngine({ providers }) });
+  return createResumeService({
+    db,
+    generation: createClaudeGenerationEngine({ providers }),
+    claimGate: claimGateOf(sources),
+  });
 }
 
 /**

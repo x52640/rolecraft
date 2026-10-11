@@ -2,6 +2,8 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { ProvidersService } from '../providers/service.ts';
+import { claimGateOf } from '../sources/claim-gate.ts';
+import type { SourcesService } from '../sources/service.ts';
 import { createClaudeDraftEngine } from './claude-engine.ts';
 import type { MessagesService } from './service.ts';
 import { createMessagesService as createStorageMessagesService } from './storage-service.ts';
@@ -9,9 +11,11 @@ import { createMessagesService as createStorageMessagesService } from './storage
 export function createMessagesService(
   db: DatabaseSync,
   providers: ProvidersService,
+  sources?: SourcesService,
 ): Required<MessagesService> {
   return createStorageMessagesService({
     db,
     resolveEngine: createClaudeDraftEngine({ providers }),
+    claimGate: claimGateOf(sources),
   });
 }

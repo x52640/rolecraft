@@ -3,20 +3,42 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { Claim, WorkJob } from '@rolecraft/contracts';
-import type { WrittenOutput } from '@rolecraft/domain';
+import { escalateReviewStatus, type WrittenOutput } from '@rolecraft/domain';
 import {
   DOCUMENT_SUMMARY_MAX_CHARS,
   documentLabelOf,
   type AnalysisPlan,
   type UnitAnalysisResult,
 } from '@rolecraft/pipeline';
-import { transaction, type Repositories } from '@rolecraft/storage';
+import { isMaterialDeleted, transaction, type Repositories } from '@rolecraft/storage';
 
 const TRUNCATED = '…（摘要已截斷）';
 
 function clip(text: string): string {
   if (text.length <= DOCUMENT_SUMMARY_MAX_CHARS) return text;
   return text.slice(0, DOCUMENT_SUMMARY_MAX_CHARS - TRUNCATED.length) + TRUNCATED;
+}
+
+/**
+ * 既有事實項的更新以「交易內的現況」為底（P1-T060 對抗驗證修正）：runner 的 claimUpdates 是用啟動時的
+ * 快照算的，分析期間使用者可能已確認、修改或否決。已刪除（含 deleted_materials）就略過、不復活；
+ * 存在就只套複核狀態升級（只升不降），其餘欄位保留現況。回傳實際更新數。
+ */
+function applyUpdates(db: DatabaseSync, repos: Repositories, updates: readonly Claim[]): number {
+  let changed = 0;
+  for (const update of updates) {
+    if (isMaterialDeleted(db, { kind: 'claim', id: update.id })) continue;
+    const current = repos.claims.get(update.id);
+    if (current === null) continue;
+    const reviewStatus = escalateReviewStatus(current.reviewStatus, update.reviewStatus);
+    if (reviewStatus === current.reviewStatus) continue;
+    const next: Claim = { ...current, reviewStatus };
+    // 狀態變了，撤銷恢復依據不再對應（只有來源已移除才帶）
+    delete next.revocationHold;
+    repos.claims.save(next);
+    changed += 1;
+  }
+  return changed;
 }
 
 export interface UnitCommit {
@@ -36,9 +58,9 @@ export function createUnitCommitter(db: DatabaseSync, repos: Repositories, plan:
     const docUnits = plan.units.filter((u) => u.sourceDocumentId === docId).map((u) => u.unitId);
     transaction(db, () => {
       for (const claim of result.claims) repos.claims.save(claim);
-      for (const claim of claimUpdates) repos.claims.save(claim);
+      const updated = applyUpdates(db, repos, claimUpdates);
       repos.workJobs.save(job);
-      repos.analysisState.addCounts(job.id, result.claims.length, claimUpdates.length);
+      repos.analysisState.addCounts(job.id, result.claims.length, updated);
 
       const summary = result.summary.trim();
       const first = docUnits[0] === result.unitId;

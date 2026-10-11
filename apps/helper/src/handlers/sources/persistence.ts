@@ -16,6 +16,8 @@ import {
   type StoredFolderItem,
 } from '@rolecraft/storage';
 
+import { revokeDocuments } from './revocation.ts';
+
 export interface SourcesStore {
   load(): readonly StoredFolder[];
   addFolder(folder: Omit<StoredFolder, 'items'>): void;
@@ -28,12 +30,30 @@ export interface SourcesStore {
 }
 
 export function createSourcesStore(db: DatabaseSync): SourcesStore {
-  const { authorizedFolders: folders, sourceReadLog: reads } = createRepositories(db);
+  const repos = createRepositories(db);
+  const { authorizedFolders: folders, sourceReadLog: reads } = repos;
   return {
     load: () => folders.list(),
     addFolder: (folder) => folders.add(folder),
-    removeFolder: (id) => void folders.remove(id),
-    saveItems: (folderId, items) => folders.saveItems(folderId, items),
+    // 移除資料夾＝其下文件撤銷授權：同一交易標已撤銷並對事實項套 R2（P1-T060）
+    removeFolder: (id) =>
+      transaction(db, () => {
+        const items = folders.list().find((f) => f.id === id)?.items ?? [];
+        revokeDocuments(
+          repos,
+          items.map((item) => item.id),
+        );
+        folders.remove(id);
+      }),
+    // 撤銷授權：同一交易標已撤銷並對事實項套 R2，不等下次分析（P1-T060）
+    saveItems: (folderId, items) =>
+      transaction(db, () => {
+        folders.saveItems(folderId, items);
+        revokeDocuments(
+          repos,
+          items.filter((item) => item.status === 'revoked').map((item) => item.id),
+        );
+      }),
     clearItems: (folderId) => folders.clearItems(folderId),
     appendRead: (entry) => reads.append(entry),
     transaction: (fn) => transaction(db, fn),

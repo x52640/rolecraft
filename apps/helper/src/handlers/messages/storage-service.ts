@@ -6,6 +6,7 @@ import { planDraft, type DraftPlanFailure, type DraftReport } from '@rolecraft/p
 import { createRepositories, newId } from '@rolecraft/storage';
 import type { DatabaseSync } from 'node:sqlite';
 
+import type { ClaimGate } from '../sources/claim-gate.ts';
 import type { ResolveDraftEngine } from './claude-engine.ts';
 import { abortableSleep, startDraftJob } from './draft-job.ts';
 import type { DraftRefusal, MessagesService } from './service.ts';
@@ -21,6 +22,8 @@ export interface MessagesServiceOptions {
   readonly budget?: InputBudget;
   /** 測試用：工作停下時通知 */
   readonly onSettled?: (report: DraftReport) => void;
+  /** 草稿讀事實項時的來源關卡（P1-T060） */
+  readonly claimGate?: ClaimGate | null;
 }
 
 /**
@@ -125,6 +128,7 @@ export function createMessagesService(options: MessagesServiceOptions): Required
           newId: makeId,
           now,
           sleep: options.sleep ?? abortableSleep,
+          gate: options.claimGate ?? null,
         });
         void job
           .then((report) => options.onSettled?.(report))

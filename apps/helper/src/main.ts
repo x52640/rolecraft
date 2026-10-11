@@ -80,8 +80,8 @@ export function createServices(
       }),
     }),
     ...(storage && { claims: createClaimsService(storage) }),
-    ...(storage && { resume: createResumeWithClaude(storage.db, providers) }),
-    ...(storage && { messages: createMessagesService(storage.db, providers) }),
+    ...(storage && { resume: createResumeWithClaude(storage.db, providers, sources) }),
+    ...(storage && { messages: createMessagesService(storage.db, providers, sources) }),
     ...(storage && { analysis: createAnalysisWithClaude(storage.db, providers, sources) }),
     ...(storage && isRuntime(storage) && { pdfExport: createExportService(storage) }),
   };

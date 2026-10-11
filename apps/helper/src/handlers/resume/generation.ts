@@ -28,6 +28,7 @@ import {
 import type { RunOutcome } from '@rolecraft/providers';
 import { newId as storageId, transaction, type Repositories } from '@rolecraft/storage';
 
+import type { ClaimGate } from '../sources/claim-gate.ts';
 import type { ResumeFailure, ResumeFailureReason } from './service.ts';
 
 /**
@@ -54,6 +55,8 @@ export interface GenerationDeps {
   readonly engine: GenerationEngine;
   /** 測試用：背景工作結束時通知 */
   readonly onSettled?: (jobSnapshotId: string) => void;
+  /** 引用來源已撤銷或不在授權集合的事實項當來源已移除（P1-T060）；沒給就不套 */
+  readonly gate?: ClaimGate | null;
 }
 
 const PREPARE_REASONS: Record<GenerationPrepareFailure, ResumeFailureReason> = {
@@ -124,7 +127,8 @@ export function createGeneration(deps: GenerationDeps) {
     const profiles = repos.profiles.list();
     const profile: Profile | null = profiles.length === 1 ? (profiles[0] ?? null) : null;
     const jobSnapshot: JobSnapshot | null = repos.jobSnapshots.get(jobSnapshotId);
-    return { profile, jobSnapshot, claims: repos.claims.list() };
+    const claims = repos.claims.list();
+    return { profile, jobSnapshot, claims: deps.gate ? deps.gate.apply(claims) : claims };
   };
 
   const failure = (reason: ResumeFailureReason): ResumeFailure => ({ ok: false, reason });
@@ -137,6 +141,7 @@ export function createGeneration(deps: GenerationDeps) {
     if (running.has(jobSnapshotId)) return failure('already_running');
     const selection = await engine.select();
     if (selection === null) return failure('no_model');
+    await deps.gate?.refresh();
     const planned = planGeneration({
       jobSnapshot: snapshot,
       budget: selection.budget,
@@ -161,7 +166,10 @@ export function createGeneration(deps: GenerationDeps) {
         abort: () => controller.abort(),
         aborted: () => controller.signal.aborted,
       },
-      loadInputs: () => Promise.resolve(loadInputs(jobSnapshotId)),
+      loadInputs: async () => {
+        await deps.gate?.refresh();
+        return loadInputs(jobSnapshotId);
+      },
       commitUnit: ({ job, written }) => {
         transaction(db, () => {
           repos.resumeVersions.save(toStoredVersion(written.output));
