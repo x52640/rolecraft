@@ -5,7 +5,8 @@
 <!-- index:start -->
 ## 進行中
 
-- 無
+- P1-T058 helper：授權資料夾、選定模型、已驗證 Claude 版本存進資料區（`docs/tasks/P1-T058-persist-helper-state.md`）
+- P1-T059 開發用安裝腳本：註冊 helper、準備資料區與字型（`docs/tasks/P1-T059-dev-install-script.md`）
 
 ## ready
 
@@ -16,9 +17,10 @@
 
 1. 第二輪 14 個 Task 已跑 codex review（見 REVIEW_QUEUE「第二輪補審」）；仍成立的 29 項由 P1-T044～T050 修完並收官，T044～T047 另跑對抗驗證、屬實項已修。
 2. 第三輪：P1-T044～T054 的 17 個程式 commit 已跑 codex review，仍成立項由 P1-T055～T057 修正並收官（T055、T056 另跑對抗驗證，T056 屬實 7 項已修）；T055～T057 本身未再跑 codex review。
-3. 剩下全部需擁有者：P1-T017 → 解鎖 T018；T031 等 T018；T032 驗收。下方「待擁有者裁定」先看前 5 項；#12～#16 已裁定並實作。
-4. 建議下一批 Task（尚未建立，需擁有者同意範圍）：工作進度查詢與手動續跑操作（D21）；授權集合／匯入暫存／供應商狀態／Claude 已驗證版本的持久化；ProjectEvidence 產生來源；分析流程接進 helper（commitUnit 要在同一交易寫 claimUpdates）。
-5. 只有擁有者說「推」才 push；本機 `refs/original` 待擁有者同意後清除。
+3. 第四批（擁有者 2026-10-11 同意）：P1-T058 持久化、P1-T059 開發安裝腳本、P1-T060 分析流程接進 helper（等 T058）；做完直接跑 codex review（擁有者已授權）。
+4. 剩下全部需擁有者：P1-T017 → 解鎖 T018；T031 等 T018；T032 驗收。下方「待擁有者裁定」先看前 5 項；#12～#16 已裁定並實作。
+5. 其餘建議（尚未建立）：匯入暫存持久化；ProjectEvidence 產生來源。
+6. 只有擁有者說「推」才 push；本機 `refs/original` 待擁有者同意後清除。
 
 ## 主樹基準
 
