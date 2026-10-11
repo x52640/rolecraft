@@ -15,14 +15,14 @@
 ## 下一步（2026-10-11 codex 補審後）
 
 1. 第二輪 14 個 Task 已跑 codex review（見 REVIEW_QUEUE「第二輪補審」）；仍成立的 29 項由 P1-T044～T050 修完並收官，T044～T047 另跑對抗驗證、屬實項已修。
-2. 第三輪：P1-T044～T054 的 17 個程式 commit 已跑 codex review，仍成立項由 P1-T055～T057 修正（進行中）。
+2. 第三輪：P1-T044～T054 的 17 個程式 commit 已跑 codex review，仍成立項由 P1-T055～T057 修正並收官（T055、T056 另跑對抗驗證，T056 屬實 7 項已修）；T055～T057 本身未再跑 codex review。
 3. 剩下全部需擁有者：P1-T017 → 解鎖 T018；T031 等 T018；T032 驗收。下方「待擁有者裁定」先看前 5 項；#12～#16 已裁定並實作。
 4. 建議下一批 Task（尚未建立，需擁有者同意範圍）：工作進度查詢與手動續跑操作（D21）；授權集合／匯入暫存／供應商狀態／Claude 已驗證版本的持久化；ProjectEvidence 產生來源；分析流程接進 helper（commitUnit 要在同一交易寫 claimUpdates）。
 5. 只有擁有者說「推」才 push；本機 `refs/original` 待擁有者同意後清除。
 
 ## 主樹基準
 
-- `npm run verify` 綠；Vitest 2762 通過、13 略過（live／Chrome／race／選取器對話框，需環境變數）；test:docs 15（2026-10-11 P1-T052 收官後）。
+- `npm run verify` 綠；Vitest 2828 通過、13 略過（live／Chrome／race／選取器對話框，需環境變數）；test:docs 15（2026-10-11 P1-T056 收官後）。
 - P1-T039 live 測試 2026-10-10 以 Claude CLI 2.1.296 跑一次：12 案例全過，模型呼叫 2 次（haiku）。
 
 ## 待專案擁有者
