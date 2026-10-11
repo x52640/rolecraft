@@ -14,10 +14,13 @@ export interface ClaimGate {
 
 export function createClaimGate(registry: SourceRegistry): ClaimGate {
   let unreadable = new Set<string>();
-  const usable = (id: string): boolean => {
-    const item = registry.items().find((candidate) => candidate.id === id);
-    return item?.status === 'authorized' && item.present && !unreadable.has(item.folderId);
-  };
+  // 每次 apply 只建一次索引：逐筆引用都呼叫 items() 會反覆複製、排序整個清單（codex review）
+  const usableIn =
+    (byId: ReadonlyMap<string, ReturnType<SourceRegistry['items']>[number]>) =>
+    (id: string): boolean => {
+      const item = byId.get(id);
+      return item?.status === 'authorized' && item.present && !unreadable.has(item.folderId);
+    };
   return {
     async refresh() {
       const failed = new Set<string>();
@@ -31,6 +34,7 @@ export function createClaimGate(registry: SourceRegistry): ClaimGate {
       unreadable = failed;
     },
     apply(claims) {
+      const usable = usableIn(new Map(registry.items().map((item) => [item.id, item])));
       return claims.map((claim) => {
         if (claim.reviewStatus !== 'normal') return claim; // 已是不可用或來源已移除，不必再降
         const cited = claim.basis.sourceExcerpts.map((e) => e.sourceDocumentId);
