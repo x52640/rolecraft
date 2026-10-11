@@ -6,7 +6,7 @@ depends_on: []
 specs: ["evidence-model.md"]
 track: review
 primary_repo: rolecraft
-write_paths: ["packages/pipeline/src/generation/grounding.ts", "packages/pipeline/src/generation/grounding.test.ts", "packages/pipeline/src/generation/sections.test.ts", "packages/pipeline/src/analysis/urls.ts", "packages/pipeline/src/analysis/urls.test.ts", "packages/pipeline/src/analysis/drafts.test.ts", "packages/pipeline/src/messages/prompt.ts", "packages/pipeline/src/messages/prepare.test.ts", "packages/pipeline/src/messages/runner.test.ts", "packages/pipeline/src/messages/check.test.ts", "packages/pipeline/src/messages/commitments.ts"]
+write_paths: ["packages/pipeline/src/generation/grounding.ts", "packages/pipeline/src/generation/grounding.test.ts", "packages/pipeline/src/generation/sections.test.ts", "packages/pipeline/src/analysis/urls.ts", "packages/pipeline/src/analysis/urls.test.ts", "packages/pipeline/src/analysis/drafts.test.ts", "packages/pipeline/src/messages/prompt.ts", "packages/pipeline/src/messages/prepare.test.ts", "packages/pipeline/src/messages/runner.test.ts", "packages/pipeline/src/messages/check.test.ts", "packages/pipeline/src/messages/commitments.ts", "packages/pipeline/src/messages/check.ts", "packages/domain/src/evidence/numerals.ts", "packages/domain/src/evidence/numerals.test.ts"]
 contract_change: none
 expected_commit: "fix(P1-T047): pipeline 事實檢查：句號正規化、網址邊界、職缺名稱比對、訊息草稿的完成度上限"
 ---
