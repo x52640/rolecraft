@@ -1,6 +1,14 @@
 import type { DatabaseSync } from 'node:sqlite';
 
+import {
+  createAuthorizedFolderRepository,
+  type AuthorizedFolderRepository,
+} from './authorized-folder-repository.ts';
 import { createClaimRepository, type ClaimRepository } from './claim-repository.ts';
+import {
+  createClaudeVersionRecordRepository,
+  type ClaudeVersionRecordRepository,
+} from './claude-version-record-repository.ts';
 import {
   createJobSnapshotRepository,
   type JobSnapshotRepository,
@@ -9,6 +17,10 @@ import {
   createMessageDraftRepository,
   type MessageDraftRepository,
 } from './message-draft-repository.ts';
+import {
+  createProviderSelectionRepository,
+  type ProviderSelectionRepository,
+} from './provider-selection-repository.ts';
 import { createProfileRepository, type ProfileRepository } from './profile-repository.ts';
 import {
   createProjectEvidenceRepository,
@@ -30,6 +42,10 @@ import {
   createSourceDocumentRepository,
   type SourceDocumentRepository,
 } from './source-document-repository.ts';
+import {
+  createSourceReadLogRepository,
+  type SourceReadLogRepository,
+} from './source-read-log-repository.ts';
 import { createWorkJobRepository, type WorkJobRepository } from './work-job-repository.ts';
 
 export interface Repositories {
@@ -43,6 +59,10 @@ export interface Repositories {
   providerConnections: ProviderConnectionRepository;
   runCheckRecords: RunCheckRecordRepository;
   workJobs: WorkJobRepository;
+  authorizedFolders: AuthorizedFolderRepository;
+  sourceReadLog: SourceReadLogRepository;
+  providerSelections: ProviderSelectionRepository;
+  claudeVersionRecords: ClaudeVersionRecordRepository;
 }
 
 /**
@@ -62,18 +82,32 @@ export function createRepositories(db: DatabaseSync): Repositories {
     providerConnections: createProviderConnectionRepository(db),
     runCheckRecords: createRunCheckRecordRepository(db),
     workJobs: createWorkJobRepository(db),
+    authorizedFolders: createAuthorizedFolderRepository(db),
+    sourceReadLog: createSourceReadLogRepository(db),
+    providerSelections: createProviderSelectionRepository(db),
+    claudeVersionRecords: createClaudeVersionRecordRepository(db),
   };
 }
 
 export type {
+  AuthorizedFolderRepository,
   ClaimRepository,
+  ClaudeVersionRecordRepository,
   JobSnapshotRepository,
   MessageDraftRepository,
   ProfileRepository,
   ProjectEvidenceRepository,
   ProviderConnectionRepository,
+  ProviderSelectionRepository,
   ResumeVersionRepository,
   RunCheckRecordRepository,
   SourceDocumentRepository,
+  SourceReadLogRepository,
   WorkJobRepository,
 };
+export type {
+  StoredFolder,
+  StoredFolderItem,
+  StoredItemStatus,
+} from './authorized-folder-repository.ts';
+export type { SourceReadLogEntry } from './source-read-log-repository.ts';

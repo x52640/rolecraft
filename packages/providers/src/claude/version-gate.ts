@@ -32,10 +32,32 @@ export interface ClaudeVersionRecord {
   readonly reason?: string;
 }
 
-/** 已驗證版本清單的保存介面；儲存位置由呼叫端決定（本 Task 不接 storage）。 */
+/** 已驗證版本清單的保存介面；儲存位置由呼叫端決定（helper 接資料區，P1-T058）。 */
 export interface ClaudeVersionStore {
   load(): Promise<readonly ClaudeVersionRecord[]>;
   save(record: ClaudeVersionRecord): Promise<void>;
+}
+
+/** 依新增順序保存 JSON 字串的後端（例如 storage 的 claude_version_records）。 */
+export interface ClaudeVersionRows {
+  list(): readonly string[];
+  append(json: string, recordedAt: string): void;
+}
+
+/**
+ * 以 JSON 列實作 ClaudeVersionStore（P1-T058）。原樣保存閘門交來的每一筆（含暫定失敗紀錄），
+ * 版本是否接受仍由閘門決定：只有 outcome=verified 的版本會被接受。
+ * 任一列不是合法 JSON → load 拋錯，閘門視為讀取失敗（只接受 ADR-0002 版本、不自動重新驗證）。
+ */
+export function jsonClaudeVersionStore(rows: ClaudeVersionRows): ClaudeVersionStore {
+  return {
+    load: () =>
+      Promise.resolve().then(() =>
+        rows.list().map((json) => JSON.parse(json) as ClaudeVersionRecord),
+      ),
+    save: (record) =>
+      Promise.resolve().then(() => rows.append(JSON.stringify(record), new Date().toISOString())),
+  };
 }
 
 export type GateState =

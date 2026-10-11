@@ -189,3 +189,57 @@ describe('SourceRegistry 授權集合', () => {
     ]);
   });
 });
+
+describe('SourceRegistry 重啟還原（P1-T058）', () => {
+  it('沿用資料夾與項目 ID、授權狀態；已授權可直接讀，撤銷的不可讀；之後列舉照常增量更新', async () => {
+    const folder = new FakeFolder();
+    folder.put('README.md', '說明');
+    folder.put('notes.md', '筆記');
+    let n = 0;
+    const registry = new SourceRegistry({ clock: fixedClock, newId: () => `new-${++n}` });
+    const summary = registry.restoreFolder({
+      id: 'f-saved',
+      label: '專案A',
+      access: folder,
+      items: [
+        { id: 'i-readme', relPath: 'README.md', size: 6, status: 'authorized' },
+        { id: 'i-notes', relPath: 'notes.md', size: 6, status: 'revoked' },
+      ],
+    });
+    expect(summary.id).toBe('f-saved');
+    expect(folder.reads).toEqual([]);
+    expect(registry.items('f-saved').map((i) => [i.id, i.status, i.present])).toEqual([
+      ['i-readme', 'authorized', true],
+      ['i-notes', 'revoked', true],
+    ]);
+    expect(await registry.read('i-readme')).toMatchObject({ ok: true, text: '說明' });
+    expect(await registry.read('i-notes')).toEqual({ ok: false, reason: 'not_authorized' });
+
+    folder.put('plan.md', '計畫');
+    await registry.refreshFolder('f-saved');
+    const after = registry.items('f-saved');
+    expect(after.find((i) => i.relPath === 'README.md')?.id).toBe('i-readme');
+    expect(after.find((i) => i.relPath === 'plan.md')).toMatchObject({ status: 'pending' });
+  });
+
+  it('篩選不接受的路徑、重複 ID／路徑一律略過；同 ID 資料夾不能還原兩次', () => {
+    const registry = new SourceRegistry();
+    const folder = new FakeFolder();
+    registry.restoreFolder({
+      id: 'f1',
+      label: 'A',
+      access: folder,
+      items: [
+        { id: 'a', relPath: 'ok.md', size: 1, status: 'authorized' },
+        { id: 'b', relPath: '../escape.md', size: 1, status: 'authorized' },
+        { id: 'c', relPath: '.env', size: 1, status: 'authorized' },
+        { id: 'd', relPath: 'src/main.ts', size: 1, status: 'authorized' },
+        { id: 'a', relPath: 'other.md', size: 1, status: 'authorized' },
+        { id: 'e', relPath: 'ok.md', size: 1, status: 'authorized' },
+      ],
+    });
+    expect(registry.items().map((i) => i.id)).toEqual(['a']);
+    const again = () => registry.restoreFolder({ id: 'f1', label: 'A', access: folder, items: [] });
+    expect(again).toThrow();
+  });
+});

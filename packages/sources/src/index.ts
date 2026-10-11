@@ -8,7 +8,7 @@ export {
   DEFAULT_MAX_FILE_BYTES,
   type FilterOptions,
 } from './filter.ts';
-export { SourceRegistry, type RegistryOptions } from './registry.ts';
+export { type RegistryOptions, type RestoredFolder, SourceRegistry } from './registry.ts';
 export { createNodeFolderAccess, type NodeFolderAccessOptions } from './node-folder-access.ts';
 export {
   createMacFolderPicker,

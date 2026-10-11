@@ -85,9 +85,11 @@ export {
 } from './claude/service.ts';
 export {
   type ClaudeVersionRecord,
+  type ClaudeVersionRows,
   type ClaudeVersionStore,
   ClaudeVersionGate,
   type GateState,
+  jsonClaudeVersionStore,
   type ReverifyCaseResult,
 } from './claude/version-gate.ts';
 export type { AcceptVersion, StreamViolation } from './claude/stream.ts';

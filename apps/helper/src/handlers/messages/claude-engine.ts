@@ -14,6 +14,7 @@ import {
 } from '@rolecraft/providers';
 
 import { helperClaudeDeps } from '../../services/claude-deps.ts';
+import { claudeServiceOf } from '../providers/providers-service.ts';
 import type { ProvidersService } from '../providers/service.ts';
 
 export interface DraftEngine {
@@ -27,7 +28,7 @@ export type ResolveDraftEngine = () => Promise<DraftEngine | null>;
 
 export interface ClaudeDraftEngineOptions {
   readonly providers: ProvidersService;
-  /** 預設自己建一個（不接保存介面：只接受已驗證版本、不自動重新驗證） */
+  /** 預設用 providers 服務的 Claude 服務（claudeServiceOf）；取不到才自己建一個（不接保存介面） */
   readonly service?: ClaudeService;
   /** 測試用：覆寫執行 deps（環境、時鐘、子程序啟動函式）；一律再經 helperClaudeDeps */
   readonly runDeps?: Partial<RunDeps>;
@@ -50,7 +51,8 @@ async function selectedClaudeModel(
 }
 
 export function createClaudeDraftEngine(options: ClaudeDraftEngineOptions): ResolveDraftEngine {
-  const service = options.service ?? createClaudeService();
+  // 預設與 providers 服務共用同一個 Claude 服務（同一版本閘門；有資料區時已接已驗證版本保存）。
+  const service = options.service ?? claudeServiceOf(options.providers) ?? createClaudeService();
   const candidates = options.candidates ?? CLAUDE_MODEL_CANDIDATES;
   const base = (): RunDeps => ({
     parentEnv: process.env,

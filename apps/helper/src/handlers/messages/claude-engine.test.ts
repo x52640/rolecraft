@@ -5,9 +5,17 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 
-import { createClaudeService, type RunDeps } from '@rolecraft/providers';
-import { describe, expect, it } from 'vitest';
+import {
+  ClaudeVersionGate,
+  createClaudeService,
+  type ClaudeService,
+  type RunDeps,
+  type RunOutcome,
+} from '@rolecraft/providers';
+import { describe, expect, it, vi } from 'vitest';
 
+import type { ClaudeProbe } from '../providers/claude-probe.ts';
+import { claudeServiceOf, createProvidersService } from '../providers/providers-service.ts';
 import type { ProvidersService, ServiceStatus } from '../providers/service.ts';
 import { createClaudeDraftEngine } from './claude-engine.ts';
 
@@ -149,5 +157,47 @@ describe('createClaudeDraftEngine（假 spawn）', () => {
     const { resolve, fake } = engineWith(status);
     expect(await resolve()).toBeNull();
     expect(fake.calls).toHaveLength(0);
+  });
+});
+
+describe('與 providers 服務共用 Claude 服務（P1-T058）', () => {
+  it('沒指定 service 時用 providers 的 Claude 服務（同一版本閘門與已驗證版本保存）', async () => {
+    const outcome = { status: 'blocked' } as unknown as RunOutcome;
+    const run = vi.fn<ClaudeService['run']>(() =>
+      Promise.resolve({ outcome, version: { status: 'ready', version: '2.1.296' } }),
+    );
+    const shared = { gate: new ClaudeVersionGate(), run } as unknown as ClaudeService;
+    const probe: ClaudeProbe = {
+      candidates: CANDIDATES,
+      check: () =>
+        Promise.resolve({
+          installed: 'passed',
+          login: 'passed',
+          eligibility: 'passed',
+          subscriptionOnly: 'passed',
+          isolation: 'passed',
+          checkedAt: '2026-10-10T00:00:00.000Z',
+        }),
+      verifyModel: () =>
+        Promise.resolve({
+          verification: 'passed',
+          quotaExhausted: false,
+          blocked: false,
+          record: null,
+        }),
+    };
+    const providersImpl = createProvidersService({ claudeProbe: probe, service: shared });
+    expect(claudeServiceOf(providersImpl)).toBe(shared);
+    expect(claudeServiceOf(createProvidersService({ claudeProbe: probe }))).toBeUndefined();
+    await providersImpl.recheck('claude');
+    const [, sonnet] = await providersImpl.listCandidates('claude');
+    await providersImpl.selectCandidate('claude', sonnet?.candidateId ?? '');
+
+    const engine = await createClaudeDraftEngine({ providers: providersImpl })();
+    expect(engine?.model).toBe('sonnet');
+    const signal = new AbortController().signal;
+    expect(await engine?.execute({ prompt: '提示', signal })).toBe(outcome);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run.mock.calls[0]?.[0]).toMatchObject({ model: 'sonnet', prompt: '提示' });
   });
 });

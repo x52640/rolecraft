@@ -20,10 +20,12 @@ import { createExportService } from './handlers/export/export-service.ts';
 import { createResumeImportService, type PdfFilePicker } from './handlers/import/import-service.ts';
 import { createJobsService } from './handlers/jobs/storage-service.ts';
 import { createMessagesService } from './handlers/messages/assemble.ts';
+import { persistedProvidersOptions } from './handlers/providers/persistence.ts';
 import { createProvidersService } from './handlers/providers/providers-service.ts';
 import { createResumeWithClaude, pauseInterruptedJobs } from './handlers/resume/assemble.ts';
 import type { HelperServices } from './handlers/services.ts';
 import { createSourcesService, type FolderPicker } from './handlers/sources/local-sources.ts';
+import { createSourcesStore } from './handlers/sources/persistence.ts';
 import { connectDataDir } from './services/data-dir.ts';
 import { writeNotice } from './services/notice.ts';
 import { runtimeConfigFromEnv, type HelperRuntime } from './services/runtime.ts';
@@ -58,10 +60,17 @@ export function createServices(
   const repositories = storage && createRepositories(storage.db);
   const { folder, pdf } = pickers;
   // base：資料區被占用期間已在用的服務；接手後沿用，選定的模型與資料夾不會消失（裁定 #13）
-  const providers = base.providers ?? createProvidersService();
+  // 有資料區時選定模型、授權資料夾、已驗證版本存進資料區（P1-T058）
+  const providers =
+    base.providers ?? createProvidersService(storage ? persistedProvidersOptions(storage.db) : {});
   return {
     providers,
-    sources: base.sources ?? createSourcesService(folder ? { picker: folder } : {}),
+    sources:
+      base.sources ??
+      createSourcesService({
+        ...(folder && { picker: folder }),
+        ...(storage && { store: createSourcesStore(storage.db) }),
+      }),
     ...(repositories && { jobs: createJobsService(repositories.jobSnapshots) }),
     ...(repositories &&
       pdf && {

@@ -7,7 +7,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { createMacFolderPicker, createMacPdfPicker, type ExecFileRunner } from '@rolecraft/sources';
-import { createLocalFileStore, openDatabase } from '@rolecraft/storage';
+import { createLocalFileStore, createRepositories, openDatabase } from '@rolecraft/storage';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -20,6 +20,7 @@ import {
   SECRET,
   requests,
 } from './__fixtures__/requests.ts';
+import { claudeServiceOf } from './handlers/providers/providers-service.ts';
 import { ALLOWED_ORIGINS_ENV, dispatch, FrameDecoder, encodeFrame } from './index.ts';
 import { createServices, nativePickers, type NativePickers } from './main.ts';
 
@@ -205,6 +206,66 @@ describe('服務組裝（createServices，P1-T043）', () => {
     // 失敗後選取視窗狀態已釋放，可以再選
     next = pdfPath;
     expect(await send(services, 'import.pick_pdf')).toMatchObject({ ok: true });
+  });
+
+  it('重啟還原（P1-T058）：同一資料庫開兩次 createServices，授權資料夾、選定模型、已驗證版本都還在', async () => {
+    const dbFile = path.join(dir, 'restart.db');
+    const fileStore = createLocalFileStore(path.join(dir, 'files'));
+    const call = (services: ReturnType<typeof createServices>, op: string, payload: unknown) =>
+      dispatch({ op, payload }, services, recordingLogger()).then((r) => r.response);
+
+    writeFileSync(path.join(project, 'README.md'), '# 專案甲');
+    const first = openDatabase(dbFile).db;
+    const s1 = createServices({ db: first, fileStore }, fakePickers());
+    const picked = await send(s1, 'sources.pick_folders');
+    const rootId = (picked as { selection: { roots: { rootId: string }[] } }).selection.roots[0]
+      ?.rootId;
+    const preview = (await call(s1, 'sources.preview', { rootId })) as {
+      entries: { entryId: string; kind: string }[];
+    };
+    const doc = preview.entries.find((e) => e.kind === 'document')?.entryId;
+    expect(
+      await call(s1, 'sources.update_authorization', { rootId, authorize: [doc], revoke: [] }),
+    ).toEqual({ ok: true });
+    // 選定模型與已驗證版本：直接寫進資料區（短驗證要真的 CLI，這裡不跑）
+    const repos = createRepositories(first);
+    repos.providerSelections.save('claude', 'opus', '2026-10-11T00:00:00.000Z');
+    const verified = { version: '9.9.9', outcome: 'verified', verifiedAt: 'x', cases: [] };
+    repos.claudeVersionRecords.append(
+      JSON.stringify({ ...verified, modelCalls: 3 }),
+      '2026-10-11T00:00:00.000Z',
+    );
+    first.close();
+
+    const second = openDatabase(dbFile).db;
+    const s2 = createServices({ db: second, fileStore }, fakePickers());
+    expect(await send(s2, 'sources.list_folders')).toEqual({
+      ok: true,
+      roots: [{ rootId, name: '專案甲', pendingCount: 0, authorizedCount: 1 }],
+    });
+    const status = (await send(s2, 'providers.status')) as {
+      services: { service: string; state: string; selectedCandidateId: string | null }[];
+    };
+    const candidates = (await call(s2, 'providers.list_candidates', { service: 'claude' })) as {
+      candidates: { candidateId: string; label: string }[];
+    };
+    const opus = candidates.candidates.find((c) => c.label === 'Claude Opus')?.candidateId;
+    expect(status.services[0]).toMatchObject({
+      state: 'eligibility_unknown',
+      selectedCandidateId: opus,
+    });
+    const claude = s2.providers && claudeServiceOf(s2.providers);
+    expect(await claude?.gate.load()).toBe(true);
+    expect(claude?.gate.isAccepted('9.9.9')).toBe(true);
+    second.close();
+  });
+
+  it('沒有 storage：兩次 createServices 互不相干（全在記憶體，行為不變）', async () => {
+    const s1 = createServices(null, fakePickers());
+    expect(await send(s1, 'sources.pick_folders')).toMatchObject({ ok: true });
+    const s2 = createServices(null, fakePickers());
+    expect(await send(s2, 'sources.list_folders')).toEqual({ ok: true, roots: [] });
+    expect(s2.providers && claudeServiceOf(s2.providers)?.gate.canReverify).toBe(false);
   });
 
   it('有 storage 但沒有 PDF 選取器：resumeImport 不接', async () => {

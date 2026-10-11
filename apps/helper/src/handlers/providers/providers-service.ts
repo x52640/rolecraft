@@ -1,16 +1,20 @@
-// providers.* 服務實作（P1-T030）。狀態、候選對照與選定結果目前只存在記憶體（storage 尚未接上）。
+// providers.* 服務實作（P1-T030）。有資料區時選定的模型、連接狀態、R6 確認紀錄寫進資料區（P1-T058）；
+// 重啟後狀態一律「需重新檢查」（不沿用舊的可用），選定的模型以模型別名對回這次配發的候選。
 // 候選 ID 由這裡配發（隨機不透明字串）；選定時只拿 ID 查自己的對照表，
 // 查不到一律 unknown_candidate（handler 回 invalid_request），請求字串永遠不會成為 CLI 參數（R7）。
 import { randomUUID } from 'node:crypto';
 
 import type { Provider, RunCheckRecord } from '@rolecraft/contracts';
+import type { ClaudeService } from '@rolecraft/providers';
 
 import {
   type ClaudeCheck,
   type ClaudeProbe,
   type ClaudeProbeOptions,
   createClaudeProbe,
+  createHelperClaudeService,
 } from './claude-probe.ts';
+import type { ProvidersStore } from './persistence.ts';
 import type { ProvidersService, SelectResult, ServiceCandidate, ServiceStatus } from './service.ts';
 import { ALL_SERVICES, claudeState, initialStatus } from './state.ts';
 
@@ -19,6 +23,25 @@ export interface ProvidersServiceOptions extends ClaudeProbeOptions {
   readonly claudeProbe?: ClaudeProbe;
   /** 測試用：候選 ID 產生器（預設隨機） */
   readonly newCandidateId?: () => string;
+  /** 資料區保存（P1-T058）；省略時全在記憶體（未設資料區） */
+  readonly store?: ProvidersStore;
+}
+
+/** providers 服務用的 Claude 服務，供生成端共用同一個版本閘門（claudeServiceOf）。 */
+const sharedClaude = new WeakMap<ProvidersService, ClaudeService>();
+
+/** 取得 providers 服務檢查與短驗證所用的 Claude 服務；測試替換了 probe 時沒有。 */
+export function claudeServiceOf(providers: ProvidersService): ClaudeService | undefined {
+  return sharedClaude.get(providers);
+}
+
+/** 保存失敗不影響記憶體中的狀態與這次操作的結果（下次寫入再試）。 */
+function persist(write: () => void): void {
+  try {
+    write();
+  } catch {
+    // 資料區寫入失敗：記憶體狀態照常，不讓狀態查詢或選定因此失敗。
+  }
 }
 
 /** 候選顯示名稱；別名本身就是官方 CLI 的模型別名。 */
@@ -43,14 +66,20 @@ interface CandidateEntry {
 }
 
 export interface ProvidersServiceImpl extends Required<ProvidersService> {
-  /** 最近一次模型短驗證的 R6 確認紀錄（S9-2 證據；待接 storage 後改為保存） */
+  /** 最近一次模型短驗證的 R6 確認紀錄（S9-2 證據；有資料區時另寫進 run_check_records） */
   readonly lastRunCheck: RunCheckRecord | null;
 }
 
 export function createProvidersService(
   options: ProvidersServiceOptions = {},
 ): ProvidersServiceImpl {
-  const probe = options.claudeProbe ?? createClaudeProbe(options);
+  const { store } = options;
+  const claudeService = options.claudeProbe
+    ? options.service
+    : (options.service ?? createHelperClaudeService());
+  const probe =
+    options.claudeProbe ??
+    createClaudeProbe({ ...options, ...(claudeService && { service: claudeService }) });
   const newCandidateId = options.newCandidateId ?? (() => `c${randomUUID().replaceAll('-', '')}`);
   const statuses = new Map<Provider, ServiceStatus>(
     ALL_SERVICES.map((service) => [service, initialStatus(service)]),
@@ -64,6 +93,17 @@ export function createProvidersService(
   }));
   const candidatesOf = (service: Provider): readonly CandidateEntry[] =>
     service === 'claude' ? claudeCandidates : [];
+  // 重啟還原：只還原選定的模型（對不上目前候選就不選）；狀態維持初始的「需重新檢查」。
+  const savedModel = store?.loadSelectedModel('claude') ?? null;
+  const restored = claudeCandidates.find((entry) => entry.model === savedModel);
+  if (restored) {
+    statuses.set('claude', {
+      ...initialStatus('claude'),
+      selectedCandidateId: restored.candidate.candidateId,
+    });
+  }
+  /** 這個程序內短驗證通過過的模型（provider_connections.availableModels） */
+  const verifiedModels = new Set<string>();
 
   const current = (service: Provider): ServiceStatus =>
     statuses.get(service) ?? initialStatus(service);
@@ -75,14 +115,34 @@ export function createProvidersService(
   };
 
   // 重新檢查不呼叫模型，無法得知額度；清掉舊的額度不足標記，下次執行再由工具回報。
-  const applyCheck = (check: ClaudeCheck): ServiceStatus =>
-    update('claude', {
+  const saveConnection = (status: ServiceStatus): void => {
+    const { checkedAt } = status;
+    if (!store || checkedAt === null) return;
+    const { service: provider, login, eligibility, subscriptionOnly } = status;
+    const availableModels = [...verifiedModels];
+    persist(() =>
+      store.saveConnection({
+        provider,
+        login,
+        eligibility,
+        subscriptionOnly,
+        availableModels,
+        checkedAt,
+      }),
+    );
+  };
+
+  const applyCheck = (check: ClaudeCheck): ServiceStatus => {
+    const next = update('claude', {
       state: claudeState(check, false),
       login: check.login,
       eligibility: check.eligibility,
       subscriptionOnly: check.subscriptionOnly,
       checkedAt: check.checkedAt,
     });
+    saveConnection(next);
+    return next;
+  };
 
   const refresh = async (): Promise<ServiceStatus> => applyCheck(await probe.check());
 
@@ -95,7 +155,11 @@ export function createProvidersService(
     const result = await probe.verifyModel(entry.model);
     // 槽位已因硬期限釋放：結果過期，不寫任何狀態（避免蓋掉之後其他候選的結果）。
     if (stale()) return { kind: 'verified', verification: 'unknown' };
-    if (result.record) lastRunCheck = result.record;
+    const { record } = result;
+    if (record) {
+      lastRunCheck = record;
+      if (store) persist(() => store.appendRunCheck(record));
+    }
     if (result.quotaExhausted) update('claude', { state: 'quota_exhausted' });
     if (result.blocked) {
       // 執行前被擋：先前的「可用」已不可信。重新檢查更新狀態；檢查仍說可用（例如閘門暫時擋下）也不保留可用。
@@ -110,12 +174,14 @@ export function createProvidersService(
     }
     // 只有短驗證通過才記為選定；失敗或無法確認時保留原本的選定。
     if (result.verification === 'passed') {
-      update('claude', { selectedCandidateId: entry.candidate.candidateId });
+      verifiedModels.add(entry.model);
+      saveConnection(update('claude', { selectedCandidateId: entry.candidate.candidateId }));
+      if (store) persist(() => store.saveSelectedModel('claude', entry.model));
     }
     return { kind: 'verified', verification: result.verification };
   };
 
-  return {
+  const impl: ProvidersServiceImpl = {
     get lastRunCheck() {
       return lastRunCheck;
     },
@@ -165,4 +231,6 @@ export function createProvidersService(
       return task;
     },
   };
+  if (claudeService) sharedClaude.set(impl, claudeService);
+  return impl;
 }

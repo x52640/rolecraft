@@ -32,6 +32,12 @@ const CORE_TABLES = [
   'export_versions',
   // 0004（P1-T052）
   'pending_pdf_deletions',
+  // 0005（P1-T058）
+  'authorized_folder_items',
+  'authorized_folders',
+  'claude_version_records',
+  'provider_selections',
+  'source_read_log',
 ];
 
 /** 正式 migration 的全部版本與下一個可用版本（新增 migration 時測試不必跟著改）。 */

@@ -8,6 +8,7 @@ import {
   checkConnection,
   CLAUDE_MODEL_CANDIDATES,
   type ClaudeService,
+  type ClaudeVersionStore,
   createClaudeService,
   type RunDeps,
   verifyClaudeModel,
@@ -59,6 +60,14 @@ export interface ClaudeProbeOptions {
   readonly runDeps?: Partial<RunDeps>;
   /** 預設 providers 的 CLAUDE_MODEL_CANDIDATES（不在 helper 另寫一份清單） */
   readonly candidates?: readonly string[];
+}
+
+/**
+ * helper 共用的 Claude 服務（providers 檢查、短驗證與生成端共用同一個版本閘門）。執行一律經
+ * helperClaudeDeps（本檔與 messages/claude-engine.ts）。給了 store 才做 D22 自動重新驗證（P1-T058）。
+ */
+export function createHelperClaudeService(store?: ClaudeVersionStore): ClaudeService {
+  return createClaudeService(store ? { store } : {});
 }
 
 export function createClaudeProbe(options: ClaudeProbeOptions = {}): ClaudeProbe {

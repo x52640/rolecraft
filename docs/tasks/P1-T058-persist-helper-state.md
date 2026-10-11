@@ -73,16 +73,24 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：
-- 已通過驗證：
-- 下一步：
-- Blocker：
+- 最後完成：migration 0005＋四個 repository、registry 還原、sources／providers 保存接上、ClaudeVersionStore、main.ts 組裝、spec 補句
+- 已通過驗證：worktree 內 `npm run verify` 綠（vitest 2857 passed／13 skipped）
+- 下一步：協調者收官（範圍稽核、對抗驗證）
+- Blocker：無
 
 ## 完成結果
 
+- storage：`0005_helper_state.sql` 新增 `authorized_folders`、`authorized_folder_items`（只存確認／撤銷過的文件）、`source_read_log`（觸發器擋 UPDATE／DELETE）、`provider_selections`（存模型別名）、`claude_version_records`（擋 UPDATE）；對應 repository 掛進 `createRepositories`。
+- sources：`SourceRegistry.restoreFolder` 沿用資料夾／文件 ID 與授權狀態，不列舉不讀檔；helper `sources/persistence.ts` 以 lazy 開資料夾還原，路徑失效照常列出、預覽回 unreadable、不自動刪。新增資料夾先寫資料區才算加入；授權先寫資料區才生效，撤銷先生效再寫；讀檔紀錄寫不進去該次讀取丟錯、不交出內容。
+- providers：`providers/persistence.ts` 接 `provider_connections`、`run_check_records`、`provider_selections`；重啟時選定模型以別名對回本次候選 ID，狀態維持初始的需重新檢查。寫入失敗不影響記憶體狀態。
+- 已驗證版本：`jsonClaudeVersionStore`（providers 套件）＋`claude_version_records`；helper 建一個接保存的 Claude 服務（`createHelperClaudeService`），probe 與草稿／履歷生成端經 `claudeServiceOf` 共用同一個版本閘門。閘門語意不變：只有 verified 紀錄的版本被接受，ADR-0002 版本永遠接受；暫定失敗與失敗紀錄照 P1-T039 設計一併保存（重啟後仍停用）。
+- 沒有資料區：全在記憶體，行為不變（main.test 驗證兩次 createServices 互不相干）。
+- 範圍外改動：`packages/storage/src/migrate.test.ts` 的資料表清單加入 0005 的五張表（新增 migration 的必然結果，不改會讓 verify 失敗）。
+- 殘餘：資料區被占用後接手時，沿用的 base providers／sources 仍只在記憶體（不寫資料區）；撤銷或移除資料夾寫資料區失敗時記憶體已生效、資料區仍是舊狀態，重啟後會回到舊授權（操作本身回錯誤）；匯入暫存仍只在記憶體（依範圍）。
+- 手動驗證：無（擁有者整體測試時一併確認）。

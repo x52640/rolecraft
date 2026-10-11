@@ -33,6 +33,19 @@ export interface RegistryOptions {
   readonly onRead?: (entry: ReadLogEntry) => void;
 }
 
+/** restoreFolder 的輸入：保存過的資料夾與使用者確認／撤銷過的項目。 */
+export interface RestoredFolder {
+  readonly id: string;
+  readonly label: string;
+  readonly access: FolderAccess;
+  readonly items: readonly {
+    readonly id: string;
+    readonly relPath: string;
+    readonly size: number;
+    readonly status: 'authorized' | 'revoked';
+  }[];
+}
+
 interface FolderState {
   readonly id: string;
   readonly label: string;
@@ -75,6 +88,27 @@ export class SourceRegistry {
     };
     this.#folders.set(folder.id, folder);
     return this.refreshFolder(folder.id);
+  }
+
+  /**
+   * 重啟時還原保存的資料夾（P1-T058）：沿用原本的資料夾與項目 ID 與授權狀態，不列舉、不讀檔。
+   * 項目先視為「仍在」（讀取時 FolderAccess 仍會逐次檢查）；下次 refreshFolder 才更新。
+   * 不合規的路徑、篩選不再接受的項目、重複的 ID 一律略過，不還原成可讀。
+   */
+  restoreFolder(snapshot: RestoredFolder): FolderSummary {
+    if (this.#folders.has(snapshot.id)) throw new Error(`資料夾已存在：${snapshot.id}`);
+    const { id, label, access } = snapshot;
+    const folder: FolderState = { id, label, access, excluded: [], byPath: new Map() };
+    for (const saved of snapshot.items) {
+      if (this.#items.has(saved.id) || folder.byPath.has(saved.relPath)) continue;
+      const verdict = classifyEntry(saved.relPath, 'file', saved.size, this.#filter);
+      if (!verdict.eligible) continue;
+      const { priority } = verdict;
+      this.#items.set(saved.id, { ...saved, folderId: id, priority, present: true });
+      folder.byPath.set(saved.relPath, saved.id);
+    }
+    this.#folders.set(folder.id, folder);
+    return this.#summary(folder);
   }
 
   /** 重新列舉（增量更新）：新出現的候選標待確認；既有項目保留授權狀態。 */
