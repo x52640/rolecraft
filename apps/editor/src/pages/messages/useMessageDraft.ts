@@ -29,12 +29,26 @@ export function useMessageDraft(messageDraftId: string, poll: PollOptions) {
   const [failure, setFailure] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 最新的草稿內容：存檔回來時比對，期間又改過就不清除未存狀態。
+  const latestDraft = useRef('');
+  // 卸載後進行中的讀取不再排程或更新狀態。
+  const disposed = useRef(false);
 
+  const applyDraft = (next: string) => {
+    latestDraft.current = next;
+    setDraft(next);
+  };
   const stopPolling = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
   };
-  useEffect(() => stopPolling, []);
+  useEffect(() => {
+    disposed.current = false;
+    return () => {
+      disposed.current = true;
+      stopPolling();
+    };
+  }, []);
 
   const load = useCallback(async () => {
     const response = await bridge.send({ op: 'messages.get', payload: { messageDraftId } });
@@ -48,8 +62,8 @@ export function useMessageDraft(messageDraftId: string, poll: PollOptions) {
 
   useEffect(() => {
     void load().then((loaded) => {
-      if (!loaded) return;
-      setDraft(loaded.draft);
+      if (!loaded || disposed.current) return;
+      applyDraft(loaded.draft);
       setIntent(knownIntent(loaded.replyIntent));
     });
   }, [load]);
@@ -57,8 +71,9 @@ export function useMessageDraft(messageDraftId: string, poll: PollOptions) {
   const waitForDraft = (previous: string, remaining: number) => {
     timer.current = setTimeout(() => {
       void load().then((loaded) => {
+        if (disposed.current) return;
         if (loaded && loaded.draft !== previous) {
-          setDraft(loaded.draft);
+          applyDraft(loaded.draft);
           setDirty(false);
           setPhase('idle');
           setNotice('已產生草稿。請檢查、修改後再複製。');
@@ -95,16 +110,19 @@ export function useMessageDraft(messageDraftId: string, poll: PollOptions) {
   async function save() {
     setNotice(null);
     setFailure(null);
+    const submitted = draft;
     const response = await bridge.send({
       op: 'messages.update_draft',
-      payload: { messageDraftId, draft },
+      payload: { messageDraftId, draft: submitted },
     });
+    if (disposed.current) return;
     if (!response.ok) {
       setFailure(failureText(response));
       return;
     }
-    setDirty(false);
-    setMessage((current) => (current ? { ...current, draft } : current));
+    // 本機已存的是送出的版本；存檔期間又改過的內容仍算未儲存。
+    if (latestDraft.current === submitted) setDirty(false);
+    setMessage((current) => (current ? { ...current, draft: submitted } : current));
     setNotice('已儲存草稿（只存在本機，不會送出）。');
   }
 
@@ -125,7 +143,7 @@ export function useMessageDraft(messageDraftId: string, poll: PollOptions) {
     setIntent,
     draft,
     setDraft: (next: string) => {
-      setDraft(next);
+      applyDraft(next);
       setDirty(true);
     },
     dirty,

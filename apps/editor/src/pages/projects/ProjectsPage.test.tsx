@@ -159,6 +159,40 @@ describe('<ProjectsPage />', () => {
     expect(notes.checked).toBe(true);
   });
 
+  it('存檔中停用所有勾選，完成後恢復', async () => {
+    const helper = fakeHelper([[folder('a', 'alpha')]]);
+    let release: (() => void) | null = null;
+    const transport: BridgeTransport = {
+      send: async (raw) => {
+        if ((raw as { op: string }).op === 'sources.update_authorization' && !release) {
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        }
+        return helper.transport.send(raw);
+      },
+    };
+    renderPage(transport);
+    fireEvent.click(await screen.findByRole('button', { name: '新增資料夾' }));
+    const preview = await screen.findByRole('region', { name: '預覽：alpha' });
+    const notes = await within(preview).findByRole<HTMLInputElement>('checkbox', {
+      name: 'notes.md',
+    });
+    expect(notes.disabled).toBe(false);
+    fireEvent.click(within(preview).getByRole('button', { name: '確認' }));
+    await waitFor(() => expect(release).not.toBeNull());
+    for (const box of within(preview).getAllByRole<HTMLInputElement>('checkbox')) {
+      expect(box.disabled).toBe(true);
+    }
+    (release as unknown as () => void)();
+    await within(preview).findByText(/已更新授權/);
+    await waitFor(() =>
+      expect(
+        within(preview).getByRole<HTMLInputElement>('checkbox', { name: 'notes.md' }).disabled,
+      ).toBe(false),
+    );
+  });
+
   it('移除資料夾後從清單消失', async () => {
     const helper = fakeHelper([[folder('a', 'alpha')]]);
     renderPage(helper.transport);

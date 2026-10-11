@@ -78,15 +78,19 @@ export function SnapshotDetail({ jobSnapshotId, onChanged, onClose }: SnapshotDe
     setBusy(true);
     setFailure(null);
     setMessage(null);
-    const response = await action();
-    setBusy(false);
-    if (!response.ok) {
-      setFailure(failureText(response));
-      return;
+    try {
+      const response = await action();
+      if (!response.ok) {
+        setFailure(failureText(response));
+        return;
+      }
+      setMessage(done);
+      onChanged();
+      // 重新讀取完成前維持鎖定，否則期間的輸入會被讀回的內容蓋掉。
+      await load();
+    } finally {
+      setBusy(false);
     }
-    setMessage(done);
-    onChanged();
-    await load();
   }
 
   function save() {

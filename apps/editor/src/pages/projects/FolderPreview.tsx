@@ -119,7 +119,13 @@ export function FolderPreview({ rootId, name, onChanged }: FolderPreviewProps) {
       {entries && entries.length > 0 && (
         <ul aria-label="文件">
           {tree.map((node) => (
-            <EntryRow key={node.entry.entryId} node={node} checked={checked} onToggle={toggle} />
+            <EntryRow
+              key={node.entry.entryId}
+              node={node}
+              checked={checked}
+              onToggle={toggle}
+              disabled={busy}
+            />
           ))}
         </ul>
       )}
@@ -131,9 +137,11 @@ interface EntryRowProps {
   node: TreeNode;
   checked: ReadonlySet<string>;
   onToggle: (ids: readonly string[], on: boolean) => void;
+  /** 存檔或重新列舉中：勾選停用。 */
+  disabled: boolean;
 }
 
-function EntryRow({ node, checked, onToggle }: EntryRowProps) {
+function EntryRow({ node, checked, onToggle, disabled }: EntryRowProps) {
   const { entry } = node;
   const ids = documentIds(node);
   const count = ids.filter((id) => checked.has(id)).length;
@@ -149,7 +157,7 @@ function EntryRow({ node, checked, onToggle }: EntryRowProps) {
         <input
           type="checkbox"
           checked={all}
-          disabled={ids.length === 0}
+          disabled={disabled || ids.length === 0}
           ref={(el) => {
             if (el) el.indeterminate = some;
           }}
@@ -172,6 +180,7 @@ function EntryRow({ node, checked, onToggle }: EntryRowProps) {
               node={child}
               checked={checked}
               onToggle={onToggle}
+              disabled={disabled}
             />
           ))}
         </ul>

@@ -154,4 +154,68 @@ describe('回覆草稿', () => {
     fireEvent.click(screen.getByRole('button', { name: '產生草稿' }));
     expect((await screen.findByRole('alert')).textContent).toContain('還沒有拿到新草稿');
   });
+
+  it('儲存期間又改了草稿：仍標為未儲存，不把新內容當成已存', async () => {
+    const fake = fakeBridge([sampleMessage({ draft: '原稿', replyIntent: 'accept' })]);
+    const inner = fake.transport;
+    let release: (() => void) | null = null;
+    fake.transport = {
+      send: async (request) => {
+        if ((request as { op: string }).op === 'messages.update_draft') {
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        }
+        return inner.send(request);
+      },
+    };
+    renderPage(fake);
+    await openFirst();
+    fireEvent.change(draftBox(), { target: { value: '第一版' } });
+    fireEvent.click(screen.getByRole('button', { name: '儲存草稿' }));
+    await waitFor(() => expect(release).not.toBeNull());
+    fireEvent.change(draftBox(), { target: { value: '第二版' } });
+    (release as unknown as () => void)();
+    await screen.findByText(/已儲存草稿/);
+    expect(fake.messages[0]?.draft).toBe('第一版');
+    expect(draftBox().value).toBe('第二版');
+    expect(screen.getByRole('button', { name: '儲存草稿' })).toHaveProperty('disabled', false);
+  });
+
+  it('關閉畫面後，進行中的輪詢不再排程下一次', async () => {
+    const fake = fakeBridge([sampleMessage({ replyIntent: 'accept' })]);
+    fake.draftAfterGets = null;
+    const inner = fake.transport;
+    let release: (() => void) | null = null;
+    let hold = false;
+    fake.transport = {
+      send: async (request) => {
+        const op = (request as { op: string }).op;
+        if (hold && op === 'messages.get' && !release) {
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        }
+        const response = await inner.send(request);
+        if (op === 'request_draft') hold = true;
+        return response;
+      },
+    };
+    const { unmount } = render(
+      createElement(BridgeProvider, {
+        transport: fake.transport,
+        children: createElement(MessagesPage, { poll: { intervalMs: 1, maxPolls: 50 } }),
+      }),
+    );
+    await openFirst();
+    fireEvent.click(screen.getByRole('button', { name: '產生草稿' }));
+    await waitFor(() => expect(release).not.toBeNull());
+    unmount();
+    const gets = () => fake.requests.filter((r) => r.op === 'messages.get').length;
+    const before = gets();
+    (release as unknown as () => void)();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    // 只有被擋住的那一次 messages.get 完成，之後不再輪詢。
+    expect(gets()).toBe(before + 1);
+  });
 });

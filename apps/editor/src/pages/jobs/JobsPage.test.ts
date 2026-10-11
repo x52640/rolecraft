@@ -170,4 +170,35 @@ describe('快照檢視、修改、確認', () => {
     await screen.findByText(/需要重新確認/);
     expect(fake.snapshots[0]?.fields.location).toEqual({ status: 'not_provided' });
   });
+
+  it('儲存後重新讀取完成前維持鎖定，期間不能輸入被蓋掉的內容', async () => {
+    const fake = fakeBridge([sampleSnapshot()]);
+    const inner = fake.transport;
+    let release: (() => void) | null = null;
+    let holdGet = false;
+    fake.transport = {
+      send: async (request) => {
+        const r = request as { op: string };
+        if (holdGet && r.op === 'jobs.get') {
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        }
+        return inner.send(request);
+      },
+    };
+    renderPage(fake);
+    await openFirst();
+    type('職稱（必填）', '資深前端工程師');
+    holdGet = true;
+    fireEvent.click(screen.getByRole('button', { name: '儲存修改' }));
+    await waitFor(() => expect(release).not.toBeNull());
+    expect(screen.getByLabelText('職稱（必填）')).toHaveProperty('disabled', true);
+    holdGet = false;
+    (release as unknown as () => void)();
+    await waitFor(() =>
+      expect(screen.getByLabelText('職稱（必填）')).toHaveProperty('disabled', false),
+    );
+    expect(screen.getByLabelText<HTMLInputElement>('職稱（必填）').value).toBe('資深前端工程師');
+  });
 });

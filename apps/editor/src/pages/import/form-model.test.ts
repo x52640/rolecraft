@@ -33,6 +33,9 @@ describe('splitDateRange', () => {
     ['2019年3月 至 2021年5月', { startDate: '2019年3月', endDate: '2021年5月', current: false }],
     ['2017.06 - 2019.12', { startDate: '2017.06', endDate: '2019.12', current: false }],
     ['2018', { startDate: '2018', endDate: '', current: false }],
+    ['2020-01', { startDate: '2020-01', endDate: '', current: false }],
+    ['2020/01 - 某某公司', { startDate: '2020/01 - 某某公司', endDate: '', current: false }],
+    ['2020-01 - 2021-03', { startDate: '2020-01', endDate: '2021-03', current: false }],
   ])('%s', (value, expected) => {
     expect(splitDateRange(value)).toEqual(expected);
   });
@@ -61,6 +64,28 @@ describe('formFromDraft', () => {
       },
     ]);
     expect(form.skills).toEqual(['TypeScript', 'React']);
+  });
+
+  it('描述延續到下一頁時一併帶入，到下一段公司為止', () => {
+    const draft: ImportDraft = {
+      ...DRAFT,
+      dates: [at('2019/03 ~ 至今', 20), at('2016.07 - 2019.02', 2, 2)],
+      companies: [at('宏碁股份有限公司', 20), at('Globex Corp.', 2, 2)],
+      titles: [at('資深工程師', 20)],
+      experiences: [
+        at('2019/03 ~ 至今 | 宏碁股份有限公司 | 資深工程師', 20),
+        at('負責付款系統', 21),
+        at('帶領三人小組', 0, 2),
+        at('導入監控', 1, 2),
+        at('2016.07 - 2019.02 | Globex Corp.', 2, 2),
+        at('維護報表', 3, 2),
+      ],
+    };
+    const form = formFromDraft(draft);
+    expect(form.experiences.map((e) => e.description)).toEqual([
+      '負責付款系統\n帶領三人小組\n導入監控',
+      '維護報表',
+    ]);
   });
 
   it('找不到的欄位留空，不捏造', () => {

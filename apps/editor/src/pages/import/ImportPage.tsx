@@ -39,14 +39,16 @@ export function ImportPage() {
   async function pick() {
     setError(null);
     setNotice(null);
+    // 取消或失敗時回到原畫面（例如在核對畫面按「改選其他檔案」），不清掉進行中的核對。
+    const previous = phase;
     setPhase({ kind: 'busy', what: '等待選擇檔案…' });
     const picked = await bridge.send({ op: 'import.pick_pdf', payload: {} });
-    if (!picked.ok) return fail(failureText(picked), { kind: 'idle' });
-    if (picked.selection.status === 'cancelled') return setPhase({ kind: 'idle' });
+    if (!picked.ok) return fail(failureText(picked), previous);
+    if (picked.selection.status === 'cancelled') return setPhase(previous);
     const { importId } = picked.selection;
     setPhase({ kind: 'busy', what: '讀取解析結果…' });
     const got = await bridge.send({ op: 'import.get', payload: { importId } });
-    if (!got.ok) return fail(failureText(got), { kind: 'idle' });
+    if (!got.ok) return fail(failureText(got), previous);
     setForm(got.result.status === 'parsed' ? formFromDraft(got.result.draft) : emptyForm());
     setChecked(false);
     setProblems([]);

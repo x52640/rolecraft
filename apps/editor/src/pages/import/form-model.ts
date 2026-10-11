@@ -51,9 +51,14 @@ export const FAILURE_TEXT: Record<ResumeImportFailureReason, string> = {
   reading_order_unreliable: '文字重疊或旋轉，讀取順序不可靠。',
 };
 
-const CURRENT = /^(至今|迄今|現在|present|now|current)$/iu;
 const DATE = String.raw`(?:19|20)\d{2}(?:\s*[./\-年]\s*\d{1,2}\s*月?)?`;
-const RANGE = new RegExp(String.raw`^(${DATE})\s*(?:~|～|-|–|—|至|to)\s*(.+)$`, 'iu');
+const CURRENT_WORD = '至今|迄今|現在|present|now|current';
+const CURRENT = new RegExp(String.raw`^(?:${CURRENT_WORD})$`, 'iu');
+// 區間結尾必須是日期或「至今」，否則「2020-01」這種單一日期會被拆成區間。
+const RANGE = new RegExp(
+  String.raw`^(${DATE})\s*(?:~|～|-|–|—|至|to)\s*(${DATE}|${CURRENT_WORD})$`,
+  'iu',
+);
 
 /** 「2020/01 ~ Present」拆成起訖；認不出區間就整段放起日，讓使用者自己改。 */
 export function splitDateRange(
@@ -69,6 +74,10 @@ export function splitDateRange(
 const sameLine = (a: ImportDraftField, b: ImportDraftField): boolean =>
   a.pageNumber === b.pageNumber && a.lineIndex === b.lineIndex;
 
+/** 依（頁碼、行序）比較先後；描述可能延續到下一頁。 */
+const before = (a: ImportDraftField, b: ImportDraftField): boolean =>
+  a.pageNumber < b.pageNumber || (a.pageNumber === b.pageNumber && a.lineIndex < b.lineIndex);
+
 /**
  * 經歷預填：以「有公司名稱的那一行」為一段，同一行的日期、職稱帶入；
  * 之後到下一段之前、經歷段落中的其他行當描述。不跨行猜測公司與職稱的對應。
@@ -82,9 +91,8 @@ function experiencesFrom(draft: ImportDraft): ExperienceRow[] {
     const description = draft.experiences
       .filter(
         (line) =>
-          line.pageNumber === company.pageNumber &&
-          line.lineIndex > company.lineIndex &&
-          (!next || next.pageNumber !== line.pageNumber || line.lineIndex < next.lineIndex) &&
+          before(company, line) &&
+          (!next || before(line, next)) &&
           !keyLines.some((key) => sameLine(key, line)),
       )
       .map((line) => line.value)

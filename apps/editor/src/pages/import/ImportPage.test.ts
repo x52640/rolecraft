@@ -187,4 +187,25 @@ describe('<ImportPage />（P1-T020）', () => {
     expect((await screen.findByText('找不到這筆匯入')).getAttribute('role')).toBe('alert');
     expect(screen.getByLabelText<HTMLInputElement>('姓名').value).toBe('王小明');
   });
+
+  it('在核對畫面改選檔案後取消或失敗：回到原本的核對畫面，保留已改內容', async () => {
+    const { send, sent } = setup(PARSED);
+    await pickFile();
+    fireEvent.change(screen.getByLabelText('姓名'), { target: { value: '王大明' } });
+    const replies: unknown[] = [
+      { ok: true, selection: { status: 'cancelled' } },
+      { ok: false, error: { code: 'helper_unavailable', message: 'x' } },
+    ];
+    send.mockImplementation(() => Promise.resolve(replies.shift()));
+
+    fireEvent.click(screen.getByRole('button', { name: '改選其他檔案' }));
+    await waitFor(() => expect(sent('import.pick_pdf')).toHaveLength(2));
+    await screen.findByRole('button', { name: '確認並寫入個人資料' });
+    expect(screen.getByLabelText<HTMLInputElement>('姓名').value).toBe('王大明');
+
+    fireEvent.click(screen.getByRole('button', { name: '改選其他檔案' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('連不到本機輔助程式');
+    await screen.findByRole('button', { name: '確認並寫入個人資料' });
+    expect(screen.getByLabelText<HTMLInputElement>('姓名').value).toBe('王大明');
+  });
 });
