@@ -6,7 +6,7 @@ depends_on: ["P1-T058"]
 specs: ["bridge.md", "runtime-and-budget.md", "evidence-model.md", "sources-and-authorization.md", "providers.md"]
 track: helper
 primary_repo: rolecraft
-write_paths: ["docs/specs/bridge.md", "packages/contracts/src/bridge/", "packages/contracts/src/index.ts", "apps/helper/src/handlers/analysis/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "packages/storage/src/repositories/", "packages/storage/src/index.ts", "apps/editor/src/pages/projects/", "apps/editor/src/pages/claims/", "apps/editor/src/bridge/", "docs/adr/0006-contracts-interim-fields.md"]
+write_paths: ["docs/specs/bridge.md", "packages/contracts/src/bridge/", "packages/contracts/src/index.ts", "apps/helper/src/handlers/analysis/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "packages/storage/src/repositories/", "packages/storage/src/index.ts", "packages/storage/src/migrations/", "packages/storage/src/migrate.test.ts", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "apps/editor/src/pages/projects/", "apps/editor/src/pages/claims/", "apps/editor/src/bridge/", "docs/adr/0006-contracts-interim-fields.md"]
 contract_change: additive
 expected_commit: "feat(P1-T060): helper：分析授權資料夾產生事實項、查詢進度與手動續跑"
 ---
