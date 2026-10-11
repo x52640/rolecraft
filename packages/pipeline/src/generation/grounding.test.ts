@@ -108,3 +108,78 @@ describe('groundingProblem（P1-T047 回歸）', () => {
     expect(groundingProblem('擔任資深前端 工程師', cite('登入'), cn)).toBe('mentions_job_identity');
   });
 });
+
+describe('groundingProblem（P1-T047 對抗驗證）', () => {
+  const job = { company: 'LINE', title: 'Backend Engineer' };
+  const cite = (text: string, type: 'link' | 'personal_role' = 'link') => [
+    claim('c1', { type, text, completionStatus: null }),
+  ];
+
+  it('捏造的 IPv6 網址會被擋（含全形方括號）', () => {
+    for (const text of [
+      '入口 http://[abcd::ef]/admin',
+      'https://[::ffff:abcd:ef]',
+      'http://［abcd::ef］/x',
+    ]) {
+      expect(groundingProblem(text, cite('https://github.com/me'), job)).toBe('link_not_in_claims');
+    }
+    expect(
+      groundingProblem('入口 http://[abcd::ef]/admin', cite('http://[abcd::ef]/admin'), job),
+    ).toBeNull();
+  });
+
+  it('職缺名稱的英文字尾、連字號與公司法人字樣都算提到', () => {
+    for (const text of [
+      '身為 Backend Engineers 之一',
+      '曾在 LINEs 團隊',
+      "LINE's 團隊",
+      'Backend Engineering',
+      '擔任 Backend-Engineer',
+      '在 L-I-N-E',
+      '在 L_I_N_E',
+      '在 L.I.N.E',
+    ]) {
+      expect(groundingProblem(text, cite('登入', 'personal_role'), job)).toBe(
+        'mentions_job_identity',
+      );
+    }
+    expect(
+      groundingProblem('建置 pipeline 與 online 服務', cite('登入', 'personal_role'), job),
+    ).toBeNull();
+    const corp = { company: 'Line Corp', title: 'x' };
+    expect(groundingProblem('在 LINE Corporation', cite('登入', 'personal_role'), corp)).toBe(
+      'mentions_job_identity',
+    );
+    expect(
+      groundingProblem('降低 cost', cite('登入', 'personal_role'), {
+        company: 'Costco',
+        title: 'x',
+      }),
+    ).toBeNull();
+  });
+
+  it('寬鬆網域：全形標點當分隔，但全形括號點仍算網域', () => {
+    const source = cite('作品集網址 https://a.com/x');
+    for (const text of [
+      '網站 https://a.com/x（已上線）',
+      '網站 https://a.com/x，Next.js 開發',
+      '網站 https://a.com/x；React',
+      '網站 https://a.com/x［demo］',
+    ]) {
+      expect(groundingProblem(text, source, job)).toBeNull();
+    }
+    for (const text of ['請看 evil［.］com', '請看 evil（．）com', '請看 evil ［dot］ com']) {
+      expect(groundingProblem(text, source, job)).toBe('link_not_in_claims');
+    }
+  });
+
+  it('Markdown 連結的方括號不黏進寬鬆網址', () => {
+    const plain = cite('作品集 https://a.com/x');
+    for (const text of ['[https://a.com/x](https://a.com/x)', '[a.com/x](https://a.com/x)']) {
+      expect(groundingProblem(text, plain, job)).toBeNull();
+    }
+    expect(
+      groundingProblem('作品集 https://a.com/x', cite('[https://a.com/x](https://a.com/x)'), job),
+    ).toBeNull();
+  });
+});

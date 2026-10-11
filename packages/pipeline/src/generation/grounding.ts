@@ -46,9 +46,18 @@ export function normalizeLooseDots(text: string): string {
     .replace(SPACED_DOT, '.');
 }
 
-/** 完整網址抽取：先把全形／CJK 標點換成空白，再正規化。 */
-function fullUrls(text: string): string[] {
-  return extractUrls(normalizeForGrounding(text.replace(URL_SEPARATORS, ' ')));
+/** 全形方括號包住的 IPv6 位址（［abcd::ef］）：先換成半形，避免被當成分隔而抽不到網址。 */
+const FULLWIDTH_IPV6 =
+  /\uFF3B([0-9a-f.\uFF10-\uFF19\uFF21-\uFF26\uFF41-\uFF46\uFF0E]*[:\uFF1A][0-9a-f:.\uFF10-\uFF19\uFF21-\uFF26\uFF41-\uFF46\uFF0E\uFF1A]*)\uFF3D/giu;
+
+/** 把全形／CJK 標點換成空白（在 NFKC 之前做，否則會變成半形黏進網址）。 */
+function separateUrls(text: string): string {
+  return text.replace(FULLWIDTH_IPV6, '[$1]').replace(URL_SEPARATORS, ' ');
+}
+
+/** 完整網址抽取：先把全形／CJK 標點換成空白，再正規化。段落與訊息草稿共用。 */
+export function fullUrls(text: string): string[] {
+  return extractUrls(normalizeForGrounding(separateUrls(text)));
 }
 
 /** 常見檔名副檔名：`README.md`、`Node.js` 之類不當成網域。 */
@@ -62,13 +71,16 @@ const FILE_EXTENSIONS = new Set(
 );
 
 const HOST = String.raw`(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,24})`;
-/** 路徑結束：空白、引號、角括號、反引號、CJK 標點與漢字。 */
-const PATH_STOP = String.raw`\s<>"'\x60\u3000-\u303F\u3400-\u4DBF\u4E00-\u9FFF`;
+/** 路徑結束：空白、引號、角括號、方括號（Markdown 連結）、反引號、CJK 標點與漢字。 */
+const PATH_STOP = String.raw`\s<>"'\x60\[\]\u3000-\u303F\u3400-\u4DBF\u4E00-\u9FFF`;
 const LOOSE_URL = new RegExp(
   String.raw`(?<![a-z0-9_.-])${HOST}(?![a-z0-9-])(\/[^${PATH_STOP}]*)?`,
   'giu',
 );
 const TRAILING_PUNCTUATION = /[.,;:!?)\]}]+$/u;
+/** 「[.]」「（．）」「［dot］」等含全形括號的點寫法：要在全形標點換成空白之前先轉成「.」。 */
+const RAW_BRACKET_DOT =
+  /\s*[[(\uFF08\uFF3B]\s*(?:[.\uFF0E\u3002\uFF61\uFE52]|dot|\uFF44\uFF4F\uFF54)\s*[\])\uFF09\uFF3D]\s*/giu;
 
 /**
  * 寬鬆網址：裸網域（含網址裡的主機）＋其後路徑，主機轉小寫。排除頂層是常見副檔名的
@@ -76,7 +88,8 @@ const TRAILING_PUNCTUATION = /[.,;:!?)\]}]+$/u;
  */
 export function extractLooseUrls(text: string): string[] {
   const tokens: string[] = [];
-  for (const match of normalizeLooseDots(text).matchAll(LOOSE_URL)) {
+  const separated = separateUrls(text.replace(RAW_BRACKET_DOT, '.'));
+  for (const match of normalizeLooseDots(separated).matchAll(LOOSE_URL)) {
     const tld = (match[1] ?? '').toLowerCase();
     if (FILE_EXTENSIONS.has(tld)) continue;
     const path = (match[2] ?? '').replace(TRAILING_PUNCTUATION, '');
@@ -122,16 +135,37 @@ function compact(text: string): string {
 const escapeRegExp = (char: string) => char.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 
 /**
- * 段落是否寫到職缺公司或職稱。純 ASCII 名稱要求前後不是英數字（LINE 不命中 pipeline），
- * 字母之間容許空白（「L I N E」「at LINE now」都命中）；含中文等其他字元的名稱維持去空白後的子字串比對。
+ * 段落是否寫到職缺公司或職稱。純 ASCII 名稱要求前面不是英數字（LINE 不命中 pipeline／online），
+ * 字母之間容許空白、-、_、.（「L I N E」「L-I-N-E」「Backend-Engineer」都命中），
+ * 結尾容許英文字尾 s／es／'s／ing（「LINEs」「Engineers」「Engineering」都命中）；
+ * 含中文等其他字元的名稱維持去空白後的子字串比對。寧可多丟。
  */
 function mentionsName(text: string, name: string): boolean {
   const needle = compact(name);
   if (needle.length === 0) return false;
   if (!/^[\x20-\x7E]+$/u.test(needle)) return compact(text).includes(needle);
-  const body = [...needle].map(escapeRegExp).join(String.raw`\s*`);
-  const pattern = new RegExp(String.raw`(?<![a-z0-9])${body}(?![a-z0-9])`, 'u');
+  const body = [...needle].map(escapeRegExp).join(String.raw`[\s._-]*`);
+  const suffix = String.raw`(?:s|es|['\u2019]s|ing)?`;
+  const pattern = new RegExp(String.raw`(?<![a-z0-9])${body}${suffix}(?![a-z0-9])`, 'u');
   return pattern.test(normalizeForGrounding(text).toLowerCase());
+}
+
+/** 公司名稱結尾的常見法人字樣（Line Corp 與 LINE Corporation 要視為同一家）。 */
+const COMPANY_SUFFIX =
+  /(?:[\s,.]+(?:corporation|corp|incorporated|inc|limited|ltd|company|co)\.?|股份有限公司|有限公司)\s*$/iu;
+
+/** 去掉法人字樣後的公司核心名稱（可能是空字串，mentionsName 對空字串回傳 false）。 */
+function companyCore(name: string): string {
+  let core = normalizeForGrounding(name).trim();
+  for (let prev = ''; prev !== core;) {
+    prev = core;
+    core = core.replace(COMPANY_SUFFIX, '').trim();
+  }
+  return core;
+}
+
+function mentionsCompany(text: string, company: string): boolean {
+  return mentionsName(text, company) || mentionsName(text, companyCore(company));
 }
 
 export interface JobIdentity {
@@ -158,7 +192,7 @@ export function groundingProblem(
   }
   const multipliers = new Set(sources.flatMap(extractMultipliers));
   if (extractMultipliers(text).some((m) => !multipliers.has(m))) return 'multiplier_not_in_claims';
-  if ([job.company, job.title].some((name) => mentionsName(text, name))) {
+  if (mentionsCompany(text, job.company) || mentionsName(text, job.title)) {
     return 'mentions_job_identity';
   }
   return null;

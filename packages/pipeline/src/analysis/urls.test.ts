@@ -32,3 +32,23 @@ describe('extractUrls', () => {
     expect(extractUrls('[www.b.example.org]')).toEqual(['www.b.example.org']);
   });
 });
+
+describe('extractUrls IPv6（P1-T047 對抗驗證）', () => {
+  it('keeps a bracketed IPv6 host right after scheme://', () => {
+    expect(extractUrls('服務入口 http://[abcd::ef]/admin，見')).toEqual([
+      'http://[abcd::ef]/admin',
+    ]);
+    expect(extractUrls('http://[::ffff:abcd:ef]/x')).toEqual(['http://[::ffff:abcd:ef]/x']);
+    expect(extractUrls('https://[abcd::ef]')).toEqual(['https://[abcd::ef]']);
+    expect(extractUrls('https://user@[abcd::ef]:8080/x.')).toEqual([
+      'https://user@[abcd::ef]:8080/x',
+    ]);
+  });
+
+  it('still splits Markdown links after an IPv6 URL', () => {
+    expect(extractUrls('[http://[abcd::ef]/a](http://[abcd::ef]/a)')).toEqual([
+      'http://[abcd::ef]/a',
+      'http://[abcd::ef]/a',
+    ]);
+  });
+});

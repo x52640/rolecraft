@@ -9,11 +9,11 @@
 import type { Claim, Id } from '@rolecraft/contracts';
 import { extractNumbers, numberKeys } from '@rolecraft/domain';
 
-import { extractUrls } from '../analysis/urls.ts';
 import { claimLabel } from '../generation/prompt.ts';
 import {
   extractLooseUrls,
   extractMultipliers,
+  fullUrls,
   normalizeForGrounding,
 } from '../generation/grounding.ts';
 import { commitmentProblem } from './commitments.ts';
@@ -32,14 +32,14 @@ export type DraftCheck =
 
 /** 數字、網址、倍數詞只能來自引用的事實項。 */
 export function draftGroundingProblem(raw: string, cited: readonly Claim[]): DraftProblem | null {
+  const rawSources = cited.flatMap((c) => [c.text, c.basis.userConfirmation?.text ?? '']);
+  // 網址抽取吃原文：全形標點要在正規化之前當成分隔，否則會黏進網址（與段落生成同一套）。
+  const urls = new Set(rawSources.flatMap(fullUrls));
+  if (fullUrls(raw).some((url) => !urls.has(url))) return 'link_not_in_claims';
+  const loose = new Set(rawSources.flatMap(extractLooseUrls));
+  if (extractLooseUrls(raw).some((url) => !loose.has(url))) return 'link_not_in_claims';
   const text = normalizeForGrounding(raw);
-  const sources = cited
-    .flatMap((c) => [c.text, c.basis.userConfirmation?.text ?? ''])
-    .map(normalizeForGrounding);
-  const urls = new Set(sources.flatMap(extractUrls));
-  if (extractUrls(text).some((url) => !urls.has(url))) return 'link_not_in_claims';
-  const loose = new Set(sources.flatMap(extractLooseUrls));
-  if (extractLooseUrls(text).some((url) => !loose.has(url))) return 'link_not_in_claims';
+  const sources = rawSources.map(normalizeForGrounding);
   const keys = numberKeys(sources.join('\n'));
   for (const token of extractNumbers(text)) {
     if (token.key === null || !keys.has(token.key)) return 'number_not_in_claims';

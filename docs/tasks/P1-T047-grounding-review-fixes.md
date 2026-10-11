@@ -72,9 +72,9 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：五項修正與回歸測試（每項先確認測試失敗再修）
-- 已通過驗證：`npm run verify` 全綠（2572 passed／13 skipped）
-- 下一步：協調者安排對抗驗證（R1）後收官
+- 最後完成：五項修正＋對抗驗證六項修正，皆附回歸測試（先確認測試失敗再修）
+- 已通過驗證：`npm run verify` 全綠（2647 passed／13 skipped）
+- 下一步：協調者收官
 - Blocker：無
 
 ## 完成結果
@@ -85,4 +85,9 @@ npm run verify
 - **網址結尾括號與 Markdown（P1-T022）**：`extractUrls` 的結尾「)」只在 token 內括號不成對時才去掉（`…/Software_(engineering)` 保留）；`[`、`]` 列為結束字元，Markdown `[url](url)` 兩段都抽得到，原文寫成 Markdown 連結時連結事實項也能通過。
 - **訊息草稿的完成度上限（P1-T029）**：`messages/prompt.ts` 沿用 `generation/completion.ts` 的 `completionCap`，在資料區塊外的事實項標示加上「，最高可寫：…」（只有功能與交付物），指令也加了「完成程度不能高於最高可寫」。
 - 已知殘餘：純 ASCII 名稱緊貼其他英數字時（例如「LINEPay」）不再算提到職缺名稱，這是字詞邊界的必然取捨；`check.ts` 不在本 Task 寫入範圍，訊息草稿的完整網址抽取沒有加全形標點分隔（只會多丟，不會放行）。
-
+- **對抗驗證修正**：
+  - IPv6 網址：`extractUrls` 允許 `scheme://`（可含 userinfo@）後緊接方括號 IPv6 主機，`http://[abcd::ef]/admin` 能抽出並被擋；Markdown `[url](url)` 照舊拆開。全形方括號包住的 IPv6 先轉半形再抽。
+  - 職缺名稱：純 ASCII 名稱字母間容許空白、-、_、.，結尾容許 s／es／'s／ing（Engineers、LINEs、Backend-Engineer、L-I-N-E 都會擋）；公司名另比對去掉 Corp／Corporation／Inc／Ltd／Co／Limited／Company／（股份）有限公司 後的核心名稱（Line Corp 擋 LINE Corporation），法人字樣前必須有空白或標點（Costco 不會被當成 Cost＋Co）。pipeline／online 仍不命中 LINE。
+  - 寬鬆網域：抽取前同樣把全形／CJK 標點當分隔；含全形括號的點寫法（evil［.］com、evil（．）com）在分隔前先轉成點，仍會被擋。路徑結束字元加上方括號，Markdown 連結不再誤擋。
+  - 訊息草稿：`draftGroundingProblem` 改用段落生成的 `fullUrls`（原文先分隔再正規化），草稿與事實項兩邊都吃原文。
+  - 「參」：只在緊鄰其他數字字元、阿拉伯數字、「點」「第」，或後接單位／量詞（萬、佰、拾、個、年等）時才算 3；參考／參與／參加／參觀不再被當成數字。「百分之參」改為無法辨識（擋下），「百分之參十」仍是 30%。

@@ -200,3 +200,22 @@ describe('P1-T047：句點變體只用在網域與 email 辨識', () => {
     expect(draftGroundingProblem('平均評分為 3', [metric])).toBeNull();
   });
 });
+
+describe('P1-T047 對抗驗證：訊息草稿的網址抽取比照段落', () => {
+  const link = (text: string) => [claim('l1', { type: 'link', text, completionStatus: null })];
+
+  it.each([
+    ['網站 https://a.com/x，已上線', '網站 https://a.com/x'],
+    ['網站 https://a.com/x', '網站 https://a.com/x，已上線'],
+    ['網站 https://a.com/x', '網站 https://a.com/x；React'],
+    ['作品集 https://a.com/x', '[a.com/x](https://a.com/x)'],
+  ])('全形標點不黏進網址：%s → %s', (source, draft) => {
+    expect(draftGroundingProblem(draft, link(source))).toBeNull();
+  });
+
+  it('捏造的 IPv6 網址仍被擋', () => {
+    expect(draftGroundingProblem('入口 http://[abcd::ef]/admin', link('https://a.com/x'))).toBe(
+      'link_not_in_claims',
+    );
+  });
+});

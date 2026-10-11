@@ -61,8 +61,21 @@ const ALL_CN = [
   ...Object.keys(CN_TENS_SHORTHAND),
 ].join('');
 
-/** 中文數字字元（含大寫、簡體、廿卅卌），用來組 regex。 */
-export const CN_NUMERAL_CLASS = `[${ALL_CN}]`;
+/**
+ * 「參」也是常用字（參考、參與、參加、參觀）：只有緊鄰其他數字字元、阿拉伯數字、「點」「第」，
+ * 或後面接單位／量詞（參萬、參佰、參個、參年）時才算 3。其他數字字元一律算。
+ */
+const CAN_BE_WORD = '參';
+const NUMERAL_NEIGHBOURS = `${ALL_CN}點点\\d`;
+const MEASURE_WORDS =
+  '個个人名位家項项台次件筆笔元塊块倍成%年月週周天日時时分秒歲岁場场套款支條条張张份頁页篇本';
+const ALWAYS_CN = ALL_CN.replace(CAN_BE_WORD, '');
+
+/** 中文數字字元（含大寫、簡體、廿卅卌）的 regex 片段（單一字元；「參」看前後文）。 */
+export const CN_NUMERAL_CLASS =
+  `(?:[${ALWAYS_CN}]` +
+  `|(?<=[${NUMERAL_NEIGHBOURS}第])${CAN_BE_WORD}` +
+  `|${CAN_BE_WORD}(?=\\s*[${NUMERAL_NEIGHBOURS}${MEASURE_WORDS}]))`;
 
 /** 中文單位字元，接在阿拉伯數字後面時要相乘（例如 3萬、1.5億）。 */
 export const CN_UNIT_CLASS = `[${Object.keys(CN_SMALL_UNITS).join('')}${Object.keys(CN_BIG_UNITS).join('')}]`;
