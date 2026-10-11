@@ -13,6 +13,7 @@ import type { FileStore } from '../files/file-store.ts';
 import { decode } from '../repositories/json-table.ts';
 import { transaction } from '../transaction.ts';
 import { deletedMaterialsHeldBy } from './materials.ts';
+import { processPendingPdfDeletions } from './pending-pdf-deletions.ts';
 
 export interface StorageSweep {
   /** 未投遞、含已刪素材副本而補刪的匯出版本（D19） */
@@ -58,13 +59,15 @@ export interface StorageSweepOptions {
 
 /**
  * 補救清掃（D19 縱深防禦）：本機輔助程式啟動時呼叫一次。
+ * 0. 先處理待刪 PDF 紀錄（deleteMaterial／刪投遞紀錄提交後沒刪掉的 D19 PDF；不套寬限期）。
+ *    任何一筆刪不掉都是一般 StorageError（擋啟動，裁定 #14），不是 OrphanPdfSweepError。
  * 1. 未投遞、卻保存了已刪素材副本的匯出版本整份刪除（素材若被繞過 deleteMaterial 刪掉，
  *    0003 觸發器仍會記入 deleted_materials，這裡補做 D19）。
  * 2. 清掉孤兒 PDF（刪檔失敗、程序中斷留下的檔案）。
  * 第 1 步補刪版本的 PDF 刪除失敗時，該版本資料列保留（下次清掃立即重試），第 2 步仍照跑；
  * 兩步都跑完才拋合併的 StorageError（已清除素材的 PDF 刪不掉仍擋啟動，裁定 #14）。
  * 只有第 2 步的孤兒檔刪不掉時改拋 OrphanPdfSweepError（帶已完成的結果），讓啟動流程記錄後照常上線。
- * deleteMaterial 與投遞紀錄 delete 結束時也會做第 2 步。不能在外層交易中呼叫。
+ * 不能在外層交易中呼叫。
  */
 export function sweepStorage(
   db: DatabaseSync,
@@ -84,7 +87,9 @@ export function sweepStorage(
     }
   };
   const purgedIds: string[] = [];
-  const released: string[] = [];
+  const pending = processPendingPdfDeletions(db, fileStore);
+  failures.push(...pending.failures);
+  const released: string[] = [...pending.released];
   const candidates = db.prepare('SELECT id FROM export_versions ORDER BY exported_at, id').all();
   for (const { id } of candidates) {
     const hashes = attempt(() => {

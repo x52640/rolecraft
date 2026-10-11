@@ -68,9 +68,9 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：#13 資料區鎖＋占用時的閘門、#14 孤兒 PDF 刪不掉不擋啟動，含測試與 bridge.md
-- 已通過驗證：worktree 內 `npm run verify` 綠（2730 測試通過、13 略過）
-- 下一步：協調者對抗驗證與收官
+- 最後完成：#13 資料區鎖＋占用時的閘門、#14 孤兒 PDF 刪不掉不擋啟動，含測試與 bridge.md；對抗驗證三項修正（唯讀鎖檔、D19 待刪 PDF 紀錄、刪除後清檔失敗不誤報）
+- 已通過驗證：worktree 內 `npm run verify` 綠（2755 測試通過、13 略過）
+- 下一步：協調者收官
 - Blocker：無
 
 ## 完成結果
@@ -97,8 +97,13 @@ npm run verify
 **已知殘餘／需擁有者或協調者裁定**
 
 - 編輯器 `pages/messages/labels.ts`、`pages/projects/failure-text.ts` 把 `helper_unavailable` 改寫成「連不到本機輔助程式」，使用者在這兩頁看不到裁定 #13 的訊息。要另開編輯器 Task 改成顯示 helper 的固定訊息。
-- `deleteMaterial`／刪投遞紀錄：交易提交後 PDF 才刪，刪不掉留下的檔在啟動時與一般孤兒無法區分，會依 #14 只記錄、不擋啟動。要擋需要新增「待刪 PDF」紀錄（migration），不在本 Task 範圍。
 - 舊 helper 在連線結束後若還在跑背景工作，會持續持有鎖；這段期間同一瀏覽器新起的 helper 也會顯示「另一個瀏覽器使用中」。舊 helper 結束後的下一個需要儲存的操作會自動接手。
 - 鎖檔被外部換成非 SQLite 檔時，helper 以設定錯誤結束（結束碼 1）；資料區在網路磁碟時檔案鎖不可靠，不支援。
 - 手動驗證（兩個真實瀏覽器同時開）需要擁有者，未做；已用真實子行程測試涵蓋。
 
+**對抗驗證修正**
+
+- 唯讀鎖檔（0444）：SQLite 以唯讀開啟時 `BEGIN EXCLUSIVE` 會成功卻沒有作業系統鎖，兩個 helper 都拿到。取鎖後在同一交易寫一次（`PRAGMA user_version = 1`，不提交），唯讀時拋 SQLITE_READONLY，照設定錯誤處理。測試：鎖檔改 0444 → 拋出。
+- D19 待刪 PDF 紀錄（裁定 #14）：新增 migration `0004_pending_pdf_deletions.sql`（`pending_pdf_deletions` 表，存 PDF 雜湊）與 `application/pending-pdf-deletions.ts`。`deleteMaterial` 與刪投遞紀錄在刪資料列的同一交易記下釋出的 PDF；提交後刪檔，成功（或檔已不在、或仍被匯出版本引用而不刪）才移除紀錄。啟動清掃先處理這張表，不套寬限期；刪不掉是一般 StorageError（擋啟動），不是 `OrphanPdfSweepError`。仍被匯出版本引用的 PDF 絕不刪。`purgeIfHoldsDeleted` 原本就在提交前刪檔、失敗回滾，維持不變。
+- 刪除後清檔失敗不誤報：`deleteMaterial`／刪投遞紀錄提交後的刪檔失敗不再拋錯（紀錄保證下次啟動重試並擋啟動），且只清這次釋出的 PDF，不再順帶清掃無關的孤兒檔（卡住的孤兒不會讓刪除失敗）。`claims.reject` 在事實項已不存在時，只要這次有移除引用或它曾被刪過（`deleted_materials` 有紀錄，新增 `isMaterialDeleted`）就回成功，重試不再回找不到；從未存在的 ID 仍回 `invalid_request`（沿用既有測試）。`applications.delete` 提交後不再拋錯，第一次就回成功；紀錄已不存在時維持 `application_not_found`（bridge.md 沒有要求重試成功）。
+- bridge.md 啟動清掃規則補上待刪 PDF 紀錄的行為。helper 原始碼沒有新增 fs／child_process，R7 靜態掃描不變。

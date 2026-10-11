@@ -107,7 +107,7 @@ describe('create rejects deleted materials (D19)', () => {
 });
 
 describe('orphan PDFs (D19: no leftover PDF holding deleted material)', () => {
-  it('PoC: PDF delete fails after commit → other PDFs still released, retry cleans up', () => {
+  it('PoC: PDF delete fails after commit → other PDFs still released, startup sweep cleans up', () => {
     const a = t.exportNow('A');
     const b = t.exportNow('B');
     const internals = fileStoreInternals(t.files);
@@ -116,16 +116,19 @@ describe('orphan PDFs (D19: no leftover PDF holding deleted material)', () => {
       if (hash === a.pdfHash) throw new Error('EPERM');
       return original(hash);
     };
-    expect(() => deleteMaterial(t.db, t.files, { kind: 'claim', id: t.fact.id })).toThrow(
-      StorageError,
-    );
+    // 提交後刪檔失敗不讓操作失敗（P1-T052 對抗驗證）；刪不掉的留在待刪紀錄
+    expect(
+      deleteMaterial(t.db, t.files, { kind: 'claim', id: t.fact.id }).releasedPdfHashes,
+    ).toEqual([b.pdfHash]);
     expect(t.exports.list()).toEqual([]);
     expect(t.files.has(b.pdfHash)).toBe(false); // 不因第一個失敗就停
     expect(t.files.has(a.pdfHash)).toBe(true);
+    expect(() => sweepStorage(t.db, t.files, { orphanGrace: true })).toThrow(StorageError);
 
     internals.delete = original;
-    const retry = deleteMaterial(t.db, t.files, { kind: 'claim', id: t.fact.id });
-    expect(retry.releasedPdfHashes).toEqual([a.pdfHash]);
+    expect(sweepStorage(t.db, t.files, { orphanGrace: true }).releasedPdfHashes).toEqual([
+      a.pdfHash,
+    ]);
     expect(fileCount()).toBe(0);
   });
 

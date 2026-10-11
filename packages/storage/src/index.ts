@@ -40,5 +40,5 @@ export {
   type AcquireDataDirLockOptions,
   type DataDirLock,
 } from './lock/data-dir-lock.ts';
-export { type MaterialKind, type MaterialRef } from './application/materials.ts';
+export { isMaterialDeleted, type MaterialKind, type MaterialRef } from './application/materials.ts';
 export { readInterviewInput, type InterviewInput } from './application/interview-input.ts';

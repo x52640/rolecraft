@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -114,6 +114,15 @@ describe('tryAcquireDataDirLock（裁定 #13）', () => {
     expect(() => tryAcquireDataDirLock(path.join(tempDir(), 'missing', 'deeper'))).toThrow();
     const dir = tempDir();
     writeFileSync(path.join(dir, DATA_DIR_LOCK_FILE), 'not a database '.repeat(100));
+    expect(() => tryAcquireDataDirLock(dir)).toThrow();
+  });
+
+  // 對抗驗證：唯讀鎖檔時 SQLite 以唯讀開啟，BEGIN EXCLUSIVE 會成功卻沒有作業系統鎖，兩邊都「拿到」
+  it.skipIf(process.getuid?.() === 0)('鎖檔唯讀（0444）：拋出（設定錯誤），不會假裝拿到鎖', () => {
+    const dir = tempDir();
+    tryAcquireDataDirLock(dir)?.release();
+    chmodSync(path.join(dir, DATA_DIR_LOCK_FILE), 0o444);
+    expect(() => tryAcquireDataDirLock(dir)).toThrow();
     expect(() => tryAcquireDataDirLock(dir)).toThrow();
   });
 });

@@ -229,6 +229,13 @@ describe('否決', () => {
     expect(stored('c-role')).toBeNull();
   });
 
+  it('已否決（已刪）的事實項再否決：回成功（可重試；P1-T052 對抗驗證）', async () => {
+    await send({ op: 'claims.reject', payload: { claimId: 'c-role' } });
+    expect(await send({ op: 'claims.reject', payload: { claimId: 'c-role' } })).toEqual({
+      ok: true,
+    });
+  });
+
   it('不存在的事實項：invalid_request', async () => {
     expect(await send({ op: 'claims.reject', payload: { claimId: 'ghost' } })).toMatchObject(
       INVALID,

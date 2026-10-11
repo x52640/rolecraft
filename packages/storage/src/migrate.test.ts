@@ -30,6 +30,8 @@ const CORE_TABLES = [
   'deleted_materials',
   'export_version_ledger',
   'export_versions',
+  // 0004（P1-T052）
+  'pending_pdf_deletions',
 ];
 
 /** 正式 migration 的全部版本與下一個可用版本（新增 migration 時測試不必跟著改）。 */

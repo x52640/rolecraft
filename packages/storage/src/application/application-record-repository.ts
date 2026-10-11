@@ -8,13 +8,14 @@ import {
   isExportVersionApplied,
   readExportVersion,
 } from '../export/export-version-repository.ts';
-import { assertNotInTransaction, sweepOrphanPdfs } from '../export/pdf-cleanup.ts';
+import { assertNotInTransaction } from '../export/pdf-cleanup.ts';
 import { assertImmutabilityGuards } from '../export/guards.ts';
 import type { FileStore } from '../files/file-store.ts';
 import { newId } from '../ids.ts';
 import { decode, encode } from '../repositories/json-table.ts';
 import { transaction } from '../transaction.ts';
 import { deletedMaterialsHeldBy } from './materials.ts';
+import { processPendingPdfDeletions, recordPendingPdfDeletions } from './pending-pdf-deletions.ts';
 
 /**
  * 投遞紀錄（F09、R3）：實際投出版本只能指向不可變的匯出版本，建立後不能改指向
@@ -107,19 +108,23 @@ export function createApplicationRecordRepository(
       assertNotInTransaction(db, '刪除投遞紀錄');
       const result = transaction(db, () => {
         const record = readApplicationRecord(db, id);
-        if (!record) return { deleted: false, purgedExportVersionIds: [] };
+        if (!record) return { deleted: false, purgedExportVersionIds: [], pdfHashes: [] };
         db.prepare('DELETE FROM application_records WHERE id = ?').run(id);
         const version = readExportVersion(db, record.exportVersionId);
         const purge =
           version !== null &&
           !isExportVersionApplied(db, version.id) &&
           deletedMaterialsHeldBy(db, version).length > 0;
-        if (!purge) return { deleted: true, purgedExportVersionIds: [] };
-        deleteUnappliedExportVersion(db, version.id);
-        return { deleted: true, purgedExportVersionIds: [version.id] };
+        if (!purge) return { deleted: true, purgedExportVersionIds: [], pdfHashes: [] };
+        const pdfHash = deleteUnappliedExportVersion(db, version.id);
+        const pdfHashes = pdfHash === null ? [] : [pdfHash];
+        recordPendingPdfDeletions(db, pdfHashes);
+        return { deleted: true, purgedExportVersionIds: [version.id], pdfHashes };
       });
-      // 提交後清掉不再被引用的 PDF（含先前失敗留下的孤兒檔）
-      return { ...result, releasedPdfHashes: sweepOrphanPdfs(db, fileStore) };
+      // 提交後只清這次釋出的 PDF；刪不掉的留在待刪紀錄，啟動清掃重試並擋啟動（不讓這次刪除失敗）
+      const { pdfHashes, ...deletion } = result;
+      const { released } = processPendingPdfDeletions(db, fileStore, pdfHashes);
+      return { ...deletion, releasedPdfHashes: released };
     },
   };
 }

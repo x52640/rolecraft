@@ -7,6 +7,7 @@ import { confirmClaim } from '@rolecraft/domain';
 import {
   createRepositories,
   deleteMaterial,
+  isMaterialDeleted,
   nowTimestamp,
   transaction,
   type FileStore,
@@ -130,7 +131,12 @@ export function createClaimsService(options: ClaimsServiceOptions): ClaimsServic
         }
         return positions;
       });
-      if (claims.get(claimId) === null) return Promise.resolve(removed.size > 0 ? OK : NOT_FOUND);
+      // 事實項已不存在：引用已清，回成功（bridge.md：可重試）。是否成功不看這次有沒有移除引用，
+      // 而看它是否被刪過（D19 紀錄）；從來沒有過的 ID 才回找不到。
+      if (claims.get(claimId) === null) {
+        const known = removed.size > 0 || isMaterialDeleted(db, { kind: 'claim', id: claimId });
+        return Promise.resolve(known ? OK : NOT_FOUND);
+      }
       try {
         // D19：刪除原件並記錄已刪素材；含其副本的未投遞匯出版本一併刪除、已投遞的保留。
         deleteMaterial(db, fileStore, { kind: 'claim', id: claimId });

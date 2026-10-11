@@ -49,6 +49,9 @@ export function tryAcquireDataDirLock(
   try {
     db.exec(`PRAGMA busy_timeout = ${String(waitMs)}`);
     db.exec('BEGIN EXCLUSIVE');
+    // 在同一交易做一次寫入：鎖檔唯讀（例如 0444）時 SQLite 以唯讀開啟，BEGIN EXCLUSIVE 仍會成功
+    // 卻沒有真的取得寫入鎖，兩個 helper 會同時「拿到」。寫入在唯讀時拋 SQLITE_READONLY，照設定錯誤處理。
+    db.exec('PRAGMA user_version = 1');
   } catch (error) {
     db.close();
     if (isBusy(error)) return null;

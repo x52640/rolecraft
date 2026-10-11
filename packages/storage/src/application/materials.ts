@@ -43,6 +43,15 @@ export function recordDeletedMaterial(db: DatabaseSync, ref: MaterialRef, at: st
   ).run(ref.kind, ref.id, at);
 }
 
+/** 這個素材是否被使用者刪除過（D19 紀錄；含繞過 deleteMaterial、由觸發器記下的）。 */
+export function isMaterialDeleted(db: DatabaseSync, ref: MaterialRef): boolean {
+  return (
+    db
+      .prepare('SELECT 1 FROM deleted_materials WHERE kind = ? AND material_id = ? LIMIT 1')
+      .get(ref.kind, ref.id) !== undefined
+  );
+}
+
 /** 使用者刪除過、而這個匯出版本仍保存其副本的素材（D19「明示」用）。 */
 export function deletedMaterialsHeldBy(db: DatabaseSync, version: MaterialCopies): MaterialRef[] {
   return db
