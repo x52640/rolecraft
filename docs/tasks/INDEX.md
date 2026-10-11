@@ -66,7 +66,7 @@
 | [P1-T057](P1-T057-editor-resume-claim-races.md) | 編輯器：履歷過期載入清空畫面、事實項存檔中繼續編輯被丟掉 | done | 1 | review | — |
 | [P1-T058](P1-T058-persist-helper-state.md) | helper：授權資料夾、選定模型、已驗證 Claude 版本存進資料區 | in_progress | 1 | helper | — |
 | [P1-T059](P1-T059-dev-install-script.md) | 開發用安裝腳本：註冊 helper、準備資料區與字型 | done | 1 | tooling | — |
-| [P1-T060](P1-T060-helper-analysis-flow.md) | helper：分析授權資料夾產生事實項、查詢進度與手動續跑 | blocked | 1 | helper | P1-T058 |
+| [P1-T060](P1-T060-helper-analysis-flow.md) | helper：分析授權資料夾產生事實項、查詢進度與手動續跑 | in_progress | 1 | helper | P1-T058 |
 
 ## 依賴清單
 

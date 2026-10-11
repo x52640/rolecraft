@@ -6,6 +6,7 @@
 ## 進行中
 
 - P1-T058 helper：授權資料夾、選定模型、已驗證 Claude 版本存進資料區（`docs/tasks/P1-T058-persist-helper-state.md`）
+- P1-T060 helper：分析授權資料夾產生事實項、查詢進度與手動續跑（`docs/tasks/P1-T060-helper-analysis-flow.md`）
 
 ## ready
 

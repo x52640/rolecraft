@@ -1,7 +1,7 @@
 ---
 id: P1-T060
 phase: 1
-status: blocked
+status: in_progress
 depends_on: ["P1-T058"]
 specs: ["bridge.md", "runtime-and-budget.md", "evidence-model.md", "sources-and-authorization.md", "providers.md"]
 track: helper
@@ -90,7 +90,7 @@ npm run verify
 - 最後完成：
 - 已通過驗證：
 - 下一步：
-- Blocker：等待相依：P1-T058
+- Blocker：無
 
 ## 完成結果
 
