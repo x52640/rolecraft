@@ -5,7 +5,7 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T052 helper：一個資料區只准一個 helper、孤兒 PDF 刪不掉不擋啟動（`docs/tasks/P1-T052-helper-single-instance-sweep.md`）
+- 無
 
 ## ready
 

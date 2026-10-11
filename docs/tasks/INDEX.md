@@ -58,7 +58,7 @@
 | [P1-T049](P1-T049-editor-review-fixes-a.md) | 編輯器：匯入、職缺、專案、訊息頁的競態與表單修正 | done | 1 | review | — |
 | [P1-T050](P1-T050-editor-review-fixes-b.md) | 編輯器：事實項、履歷、投遞紀錄頁的競態與顯示修正 | done | 1 | review | — |
 | [P1-T051](P1-T051-editor-import-drop-staged.md) | 編輯器：拿掉匯入頁「暫存校正」按鈕 | done | 1 | editor | — |
-| [P1-T052](P1-T052-helper-single-instance-sweep.md) | helper：一個資料區只准一個 helper、孤兒 PDF 刪不掉不擋啟動 | in_progress | 1 | helper | — |
+| [P1-T052](P1-T052-helper-single-instance-sweep.md) | helper：一個資料區只准一個 helper、孤兒 PDF 刪不掉不擋啟動 | done | 1 | helper | — |
 | [P1-T053](P1-T053-reauthorize-restore-claims.md) | 事實項：重新授權且內容未變時恢復原狀態 | done | 1 | domain | — |
 | [P1-T054](P1-T054-editor-helper-busy-notice.md) | 編輯器：helper 被另一個瀏覽器占用時顯示提示 | done | 1 | editor | — |
 
