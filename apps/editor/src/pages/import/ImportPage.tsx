@@ -33,12 +33,10 @@ export function ImportPage() {
   const [form, setForm] = useState<ProfileForm>(emptyForm);
   const [checked, setChecked] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function pick() {
     setError(null);
-    setNotice(null);
     // 取消或失敗時回到原畫面（例如在核對畫面按「改選其他檔案」），不清掉進行中的核對。
     const previous = phase;
     setPhase({ kind: 'busy', what: '等待選擇檔案…' });
@@ -64,21 +62,15 @@ export function ImportPage() {
     setForm(next);
     // 內容改了就要重新核對。
     setChecked(false);
-    setNotice(null);
   }
 
-  async function submit(review: Extract<Phase, { kind: 'review' }>, confirm: boolean) {
+  // 擁有者裁定 #12（P1-T051）：不提供「暫存校正」；只有確認後才寫入，存入前離開就丟掉修改。
+  async function submit(review: Extract<Phase, { kind: 'review' }>) {
     setError(null);
-    setNotice(null);
     const input = toProfileInput(form);
     if (!input.ok) return setProblems(input.problems);
     setProblems([]);
     const payload = { importId: review.importId, profile: input.profile };
-    if (!confirm) {
-      const saved = await bridge.send({ op: 'import.save_corrections', payload });
-      if (!saved.ok) return setError(failureText(saved));
-      return setNotice('已暫存校正（尚未確認，不會用於產生履歷）。');
-    }
     setPhase({ kind: 'busy', what: '寫入個人資料…' });
     const done = await bridge.send({ op: 'import.confirm', payload });
     if (!done.ok) return fail(failureText(done), review);
@@ -118,7 +110,7 @@ export function ImportPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            void submit(phase, true);
+            void submit(phase);
           }}
         >
           <p>
@@ -145,7 +137,9 @@ export function ImportPage() {
               ))}
             </ul>
           )}
-          {notice && <p role="status">{notice}</p>}
+          <p role="note" aria-label="尚未存入提醒">
+            存入前離開頁面，修改不會保留。
+          </p>
 
           <label>
             <input
@@ -155,9 +149,6 @@ export function ImportPage() {
             />
             我已逐欄核對，以上內容正確
           </label>
-          <button type="button" onClick={() => void submit(phase, false)}>
-            暫存校正
-          </button>
           <button type="submit" disabled={!checked}>
             確認並寫入個人資料
           </button>

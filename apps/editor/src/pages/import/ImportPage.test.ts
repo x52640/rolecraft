@@ -40,7 +40,6 @@ function setup(result: ImportResult | null, overrides: Record<string, unknown> =
       ? { ok: true, selection: { status: 'selected', importId: 'imp-1', displayName: 'x.pdf' } }
       : { ok: true, selection: { status: 'cancelled' } },
     'import.get': { ok: true, result },
-    'import.save_corrections': { ok: true },
     'import.confirm': { ok: true, profileId: 'p-1' },
     ...overrides,
   };
@@ -120,13 +119,20 @@ describe('<ImportPage />（P1-T020）', () => {
     expect(box).toHaveProperty('checked', false);
   });
 
-  it('暫存校正：送 save_corrections，提示尚未確認，不送 confirm', async () => {
+  it('沒有「暫存校正」：核對畫面只有存入，並提醒存入前離開會丟掉修改（P1-T051）', async () => {
     const { sent } = setup(PARSED);
     await pickFile();
-    fireEvent.click(screen.getByRole('button', { name: '暫存校正' }));
-    await screen.findByText(/已暫存校正（尚未確認/u);
-    expect(sent('import.save_corrections')).toHaveLength(1);
-    expect(sent('import.confirm')).toEqual([]);
+    expect(screen.queryByRole('button', { name: /暫存/u })).toBeNull();
+    expect(screen.queryByText(/暫存/u)).toBeNull();
+    expect(screen.getByRole('note', { name: '尚未存入提醒' }).textContent).toContain(
+      '存入前離開頁面，修改不會保留',
+    );
+    fireEvent.change(screen.getByLabelText('姓名'), { target: { value: '王大明' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: '我已逐欄核對，以上內容正確' }));
+    fireEvent.click(screen.getByRole('button', { name: '確認並寫入個人資料' }));
+    await screen.findByText(/已確認並寫入個人資料/u);
+    expect(sent('import.save_corrections')).toEqual([]);
+    expect(sent('import.confirm')).toHaveLength(1);
   });
 
   it('解析失敗：清楚提示原因，改為手動輸入並可確認（D18）', async () => {
