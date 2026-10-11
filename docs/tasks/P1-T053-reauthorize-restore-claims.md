@@ -6,7 +6,7 @@ depends_on: []
 specs: ["evidence-model.md", "sources-and-authorization.md"]
 track: domain
 primary_repo: rolecraft
-write_paths: ["docs/specs/evidence-model.md", "packages/domain/src/source-change/", "packages/pipeline/src/analysis/plan.ts", "packages/pipeline/src/analysis/plan.test.ts", "packages/contracts/src/entities/claim.ts", "packages/contracts/src/entities/entities.test.ts", "packages/storage/src/repositories/", "packages/storage/src/schema/"]
+write_paths: ["docs/specs/evidence-model.md", "packages/domain/src/source-change/", "packages/pipeline/src/analysis/plan.ts", "packages/pipeline/src/analysis/plan.test.ts", "packages/contracts/src/entities/claim.ts", "packages/contracts/src/entities/entities.test.ts", "packages/storage/src/repositories/", "packages/storage/src/migrations/", "packages/storage/src/migrate.test.ts"]
 contract_change: additive
 expected_commit: "feat(P1-T053): 事實項：重新授權且內容未變時恢復原狀態"
 ---

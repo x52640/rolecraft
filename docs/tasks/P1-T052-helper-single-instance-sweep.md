@@ -6,7 +6,7 @@ depends_on: []
 specs: ["bridge.md", "architecture.md"]
 track: helper
 primary_repo: rolecraft
-write_paths: ["packages/storage/src/", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "apps/helper/src/services/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "packages/contracts/src/bridge/", "docs/specs/bridge.md"]
+write_paths: ["packages/storage/src/lock/", "packages/storage/src/application/", "packages/storage/src/files/", "packages/storage/src/index.ts", "packages/storage/src/index.test.ts", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "apps/helper/src/services/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "packages/contracts/src/bridge/", "docs/specs/bridge.md"]
 contract_change: additive
 expected_commit: "feat(P1-T052): helper：一個資料區只准一個 helper、孤兒 PDF 刪不掉不擋啟動"
 ---
