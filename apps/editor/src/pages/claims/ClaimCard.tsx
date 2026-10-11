@@ -70,7 +70,13 @@ export function ClaimCard(props: ClaimCardProps) {
           <div className="claim-edit">
             <label>
               修改內容
-              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} />
+              {/* 存檔中停用：成功後會關閉編輯框，期間多打的字會消失 */}
+              <textarea
+                value={draft}
+                disabled={busy}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={3}
+              />
             </label>
             <p className="claim-hint">儲存後原本的確認會失效、改為待複核，需要對照原文重新確認。</p>
             <button

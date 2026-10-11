@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ResumeVersion } from '@rolecraft/contracts';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -37,7 +37,7 @@ interface Sent {
 type Reply = (req: Sent) => Promise<unknown> | undefined;
 
 /** 假 helper：resume.get 交給測試決定，其餘回固定內容。 */
-function transportWith(onGet: Reply): BridgeTransport {
+function transportWith(onGet: Reply, onOther?: Reply): BridgeTransport {
   return {
     send(raw) {
       const req = raw as Sent;
@@ -71,7 +71,7 @@ function transportWith(onGet: Reply): BridgeTransport {
         case 'resume.check_export':
           return Promise.resolve({ ok: true, ready: false, issues: [], blockers: [] });
         default:
-          return Promise.resolve({ ok: true });
+          return onOther?.(req) ?? Promise.resolve({ ok: true });
       }
     },
   };
@@ -123,5 +123,45 @@ describe('<ResumesPage /> 競態與重新整理', () => {
     await screen.findByRole('article', { name: '舊內容' });
     fireEvent.click(screen.getByRole('button', { name: '重新整理' }));
     await screen.findByRole('article', { name: '新內容' });
+  });
+
+  it('舊版本的寫入完成後才回來：不會讓已切換的新版本載入失效而畫面空白', async () => {
+    let releaseAccept = null as (() => void) | null;
+    let releaseV2 = null as (() => void) | null;
+    mount(
+      transportWith(
+        (req) => {
+          if (req.payload.resumeVersionId === 'v-2') {
+            return new Promise((resolve) => {
+              releaseV2 = () =>
+                resolve({ ok: true, version: versionOf('v-2', '第二版內容'), originals: [] });
+            });
+          }
+          return Promise.resolve({
+            ok: true,
+            version: versionOf('v-1', '第一版內容'),
+            originals: [],
+          });
+        },
+        (req) => {
+          if (req.op !== 'resume.accept_section') return undefined;
+          return new Promise((resolve) => {
+            releaseAccept = () => resolve({ ok: true });
+          });
+        },
+      ),
+    );
+    const card = await screen.findByRole('article', { name: '第一版內容' });
+    fireEvent.click(within(card).getByRole('button', { name: '接受措辭' }));
+    await waitFor(() => expect(releaseAccept).not.toBeNull());
+    fireEvent.change(screen.getByRole('combobox', { name: /^版本/ }), {
+      target: { value: 'v-2' },
+    });
+    await waitFor(() => expect(releaseV2).not.toBeNull());
+    releaseAccept?.();
+    await new Promise((r) => setTimeout(r, 0));
+    releaseV2?.();
+    await screen.findByRole('article', { name: '第二版內容' });
+    expect(screen.queryByRole('article', { name: '第一版內容' })).toBeNull();
   });
 });

@@ -127,4 +127,30 @@ describe('<ClaimsPage /> 競態與失敗處理', () => {
       expect(within(screen.getByRole('article')).queryByRole('textbox')).toBeNull(),
     );
   });
+
+  it('存檔中：編輯框停用，不能再輸入會被丟掉的字', async () => {
+    let releaseUpdate = null as (() => void) | null;
+    const transport: BridgeTransport = {
+      send(raw) {
+        const req = raw as Sent;
+        if (req.op === 'claims.list_projects') {
+          return Promise.resolve({ ok: true, projects: [PROJECTS[0]] });
+        }
+        if (req.op === 'claims.list') {
+          return Promise.resolve({ ok: true, claims: [claimOf('c1', '負責後端')] });
+        }
+        return new Promise((resolve) => {
+          releaseUpdate = () => resolve({ ok: true });
+        });
+      },
+    };
+    mount(transport);
+    const role = await screen.findByRole('article', { name: '負責後端' });
+    fireEvent.click(within(role).getByRole('button', { name: '修改' }));
+    fireEvent.change(within(role).getByRole('textbox'), { target: { value: '負責後端與部署' } });
+    fireEvent.click(within(role).getByRole('button', { name: '儲存修改' }));
+    await waitFor(() => expect(releaseUpdate).not.toBeNull());
+    expect(within(role).getByRole<HTMLTextAreaElement>('textbox').disabled).toBe(true);
+    releaseUpdate?.();
+  });
 });

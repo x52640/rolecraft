@@ -69,6 +69,8 @@ export function useResumeEditor() {
 
   const loadView = useCallback(
     async (id: string) => {
+      // 已切走的版本（例如舊版本的寫入完成後才回來）不讀，也不能遞增序號，否則會讓目前版本的讀取失效
+      if (currentVersion.current !== id) return;
       viewSeq.current += 1;
       const seq = viewSeq.current;
       const stale = () => seq !== viewSeq.current || currentVersion.current !== id;
