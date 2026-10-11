@@ -4,6 +4,7 @@
 // 尚未接上的服務留空，handler 回 not_implemented，不偽造成功。
 import type { BridgeFailure } from '@rolecraft/contracts';
 
+import type { AnalysisService } from './analysis/service.ts';
 import type { ApplicationsService } from './applications/service.ts';
 import type { ClaimsService } from './claims/service.ts';
 import type { ExportService } from './export/service.ts';
@@ -15,6 +16,7 @@ import type { ResumeService } from './resume/service.ts';
 import type { SourcesService } from './sources/service.ts';
 
 export type {
+  AnalysisService,
   ApplicationsService,
   ClaimsService,
   ExportService,
@@ -37,6 +39,7 @@ export interface HelperServices {
   claims?: ClaimsService;
   resume?: ResumeService;
   messages?: MessagesService;
+  analysis?: AnalysisService;
 }
 
 /** 服務尚未接上：回 not_implemented。 */

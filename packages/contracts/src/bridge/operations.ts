@@ -65,6 +65,9 @@ export const BridgeOperation = z.enum([
   'messages.list',
   'messages.get',
   'messages.update_draft',
+  // analysis：分析授權資料夾產生事實項、查詢進度與手動續跑（P1-T060）；續跑只由使用者觸發（D21）
+  'analysis.start',
+  'analysis.status',
 ]);
 export type BridgeOperation = z.infer<typeof BridgeOperation>;
 

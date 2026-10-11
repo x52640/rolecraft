@@ -1,6 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 import {
+  createAnalysisStateRepository,
+  type AnalysisStateRepository,
+} from './analysis-state-repository.ts';
+import {
   createAuthorizedFolderRepository,
   type AuthorizedFolderRepository,
 } from './authorized-folder-repository.ts';
@@ -63,6 +67,7 @@ export interface Repositories {
   sourceReadLog: SourceReadLogRepository;
   providerSelections: ProviderSelectionRepository;
   claudeVersionRecords: ClaudeVersionRecordRepository;
+  analysisState: AnalysisStateRepository;
 }
 
 /**
@@ -86,10 +91,12 @@ export function createRepositories(db: DatabaseSync): Repositories {
     sourceReadLog: createSourceReadLogRepository(db),
     providerSelections: createProviderSelectionRepository(db),
     claudeVersionRecords: createClaudeVersionRecordRepository(db),
+    analysisState: createAnalysisStateRepository(db),
   };
 }
 
 export type {
+  AnalysisStateRepository,
   AuthorizedFolderRepository,
   ClaimRepository,
   ClaudeVersionRecordRepository,
@@ -111,4 +118,9 @@ export type {
   StoredFolderItem,
   StoredItemStatus,
 } from './authorized-folder-repository.ts';
+export type {
+  AnalysisJobRow,
+  AnalyzedDocumentRow,
+  DocumentSummaryRow,
+} from './analysis-state-repository.ts';
 export type { SourceReadLogEntry } from './source-read-log-repository.ts';

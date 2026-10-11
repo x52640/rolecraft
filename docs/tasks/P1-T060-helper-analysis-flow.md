@@ -81,16 +81,25 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：
-- 已通過驗證：
-- 下一步：
+- 最後完成：bridge.md、contracts（`analysis.start`／`analysis.status`）、helper `handlers/analysis/`、資料區 0006、專案頁按鈕與事實項頁重新整理（工作者單一 commit，基準 f0540c9）
+- 已通過驗證：worktree 內 `npm run verify` 綠
+- 下一步：協調者收官（範圍稽核含下方範圍外檔案）、對抗驗證（高風險）
 - Blocker：無
 
 ## 完成結果
 
+- `analysis.start`：先同步授權集合（重新列舉、只讀已授權且仍在的文件、讀檔留紀錄），`planAnalysis` 依 R2 重新判定既有事實項（撤銷→來源已移除＋保存恢復依據；同 hash 重新授權→恢復），來源文件與判定結果同一交易寫回；再對新增或變更文件建計畫並在背景執行。已在跑回同一工作 id；最近一次未完成就先 `recheck`（R6）通過才以 `resumeJob` 從第一個未完成單元續跑；暫停期間待跑單元的文件變了則改建新計畫，舊工作標「來源已變更」。
+- `commitUnit`：新事實項、`claimUpdates`、工作狀態、計數、該文件摘要與已分析版本同一交易（RESIDUALS P1-T046）；中途失敗整筆回滾、工作改為已暫停（interrupted）。
+- 被擋（R6 不通過、供應商不可重試錯誤、計畫過期）與暫停原因寫進資料區，`analysis.status` 重開後仍查得到；重開時執行中的工作由既有 `pauseInterruptedJobs` 改為已暫停，不自動續跑。
+- 模型與執行端沿用履歷生成的選定 Claude 模型＋`ClaudeService.run`（R5、R6 每次送出重做）；未選定或不可用回 `no_model`，不讀檔、不呼叫模型。
+- 編輯器：專案頁「分析資料夾」按鈕、進度與暫停／被擋原因（暫停或被擋時變「繼續分析」，執行中每 2 秒查一次）；事實項頁看到分析結束就重新讀取。
+- 測試：helper 端到端 10 則（暫存資料區＋假資料夾＋假 provider：完成、無模型、R6 被擋、額度暫停→重開→手動續跑、續跑前 R6 不通過、暫停期間文件變更、撤銷與恢復、刪檔、commitUnit 回滾、重複按下），storage 4 則，編輯器 6 則，main 組裝 1 則。
+- 範圍外但必要的檔案：`packages/storage/src/migrations/0006_analysis_state.sql`（分析計畫、已分析版本、全域摘要無處可存，續跑與增量判斷需要）、`packages/storage/src/migrate.test.ts`（新 migration 必須更新資料表清單）、`apps/helper/src/bridge/__fixtures__/editor-requests.ts`（dispatch 測試要求涵蓋每個操作）。
+- 保守選擇／待裁定：分析出的事實項沒有歸入任何專案（ProjectEvidence 產生來源不在範圍），事實項頁的專案清單仍看不到它們；有資料夾無法列舉就整個不分析（不把暫時讀不到當刪除）；已授權檔讀不到（刪除、變符號連結、過大等）視同刪除，不保存恢復依據；移除資料夾視同撤銷授權；續跑前 R6 用 `providers.recheck`（安裝、登入、版本閘門、R6），通過才續跑；`deleteMaterial` 刪來源文件時不清 `analyzed_documents`／`document_summaries`（摘要只取已授權文件，不影響輸出）。
+- 手動驗證需擁有者（自己的資料夾跑一次，併 P1-T032），本次未做。

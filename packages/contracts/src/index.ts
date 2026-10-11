@@ -29,5 +29,6 @@ export * from './bridge/editor/export.ts';
 export * from './bridge/editor/claims.ts';
 export * from './bridge/editor/resume.ts';
 export * from './bridge/editor/messages.ts';
+export * from './bridge/editor/analysis.ts';
 export * from './bridge/envelope.ts';
 export * from './bridge/protocol.ts';

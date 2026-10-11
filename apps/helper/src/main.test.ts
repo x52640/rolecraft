@@ -178,6 +178,20 @@ describe('服務組裝（createServices，P1-T043）', () => {
     expect(await send(services, 'applications.list')).toEqual({ ok: true, applications: [] });
   });
 
+  it('分析（P1-T060）：有 storage 才接；未選定模型時不讀檔、不呼叫模型', async () => {
+    expect(await send(createServices(null, {}), 'analysis.start')).toMatchObject({
+      ok: false,
+      error: { code: 'not_implemented' },
+    });
+    const services = createServices(storage(), {});
+    expect(await send(services, 'analysis.status')).toEqual({ ok: true, analysis: null });
+    expect(await send(services, 'analysis.start')).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_request', message: expect.stringContaining('選定') as unknown },
+    });
+    expect(await send(services, 'analysis.status')).toEqual({ ok: true, analysis: null });
+  });
+
   it('真實選取器＋假 osascript：回應只有檔名／名稱，不含路徑；非 PDF 回固定錯誤', async () => {
     const pdfPath = path.join(dir, '我的履歷.pdf');
     const fakePath = path.join(dir, 'fake.pdf');

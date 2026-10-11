@@ -5,6 +5,8 @@
 import type { BridgeOperation } from '@rolecraft/contracts';
 
 import { resolveServices } from '../services/data-dir.ts';
+import { analysisStart } from './analysis/start.ts';
+import { analysisStatus } from './analysis/status.ts';
 import { applicationsCreate } from './applications/create.ts';
 import { applicationsDelete } from './applications/delete.ts';
 import { applicationsList } from './applications/list.ts';
@@ -102,6 +104,8 @@ const RAW_HANDLERS: HandlerTable = {
   'messages.list': messagesList,
   'messages.get': messagesGet,
   'messages.update_draft': messagesUpdateDraft,
+  'analysis.start': analysisStart,
+  'analysis.status': analysisStatus,
 };
 
 function gated<Op extends BridgeOperation>(op: Op, handler: OpHandler<Op>): OpHandler<Op> {

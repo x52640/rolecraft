@@ -30,10 +30,11 @@ describe('編輯器操作清單（P1-T041）', () => {
     expect(Object.keys(editorRequests).sort()).toEqual([...editorOps].sort());
   });
 
-  it('編輯器操作以「群組.動作」命名，群組只有既定九組', () => {
+  it('編輯器操作以「群組.動作」命名，群組只有既定十組', () => {
     const groups = new Set(Object.keys(editorRequests).map((op) => op.split('.')[0]));
     expect([...groups].sort()).toEqual(
       [
+        'analysis',
         'applications',
         'claims',
         'export',

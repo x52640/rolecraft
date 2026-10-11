@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import type { Claim } from '@rolecraft/contracts';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BridgeProvider } from '../../bridge/BridgeProvider.tsx';
 import type { BridgeTransport } from '../../bridge/transport.ts';
+import { ANALYSIS_POLL_MS } from '../projects/useAnalysis.ts';
 import { ClaimsPage } from './ClaimsPage.tsx';
 
 const excerpt = (text: string) => ({
@@ -69,7 +70,11 @@ function fakeHelper(claims: Claim[] = [FEATURE, ROLE, REVIEW], fail = false) {
       }
     },
   };
-  return { transport, sent, writes: () => sent.filter((s) => !s.op.includes('list')) };
+  return {
+    transport,
+    sent,
+    writes: () => sent.filter((s) => !s.op.includes('list') && s.op !== 'analysis.status'),
+  };
 }
 
 function renderPage(helper: ReturnType<typeof fakeHelper>) {
@@ -247,5 +252,51 @@ describe('<ClaimsPage />', () => {
     renderPage(fakeHelper([], true));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('此操作尚未支援'));
     expect(screen.queryByRole('article')).toBeNull();
+  });
+
+  it('分析（P1-T060）在這頁開著時跑完：重新讀專案與事實項', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const sent: Sent[] = [];
+    let statuses = 0;
+    let lists = 0;
+    const running = {
+      workJobId: 'job-1',
+      state: 'running',
+      pauseReason: null,
+      blockReason: null,
+      completedUnits: 0,
+      totalUnits: 1,
+      claimsAdded: 0,
+      claimsUpdated: 0,
+    };
+    const transport: BridgeTransport = {
+      send(raw) {
+        const req = raw as Sent;
+        sent.push(req);
+        if (req.op === 'analysis.status') {
+          statuses += 1;
+          const analysis =
+            statuses === 1 ? running : { ...running, state: 'completed', completedUnits: 1 };
+          return Promise.resolve({ ok: true, analysis });
+        }
+        if (req.op === 'claims.list_projects') {
+          return Promise.resolve({
+            ok: true,
+            projects: [{ id: 'p1', name: 'RoleCraft', summary: '', claimIds: [] }],
+          });
+        }
+        lists += 1;
+        return Promise.resolve({ ok: true, claims: lists === 1 ? [] : [ROLE] });
+      },
+    };
+    try {
+      renderPage({ transport, sent, writes: () => [] });
+      await screen.findByText('這個專案還沒有事實項。');
+      await act(() => vi.advanceTimersByTimeAsync(ANALYSIS_POLL_MS));
+      expect(await screen.findByRole('article', { name: '負責後端' })).toBeTruthy();
+      expect(sent.filter((r) => r.op === 'claims.list_projects')).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

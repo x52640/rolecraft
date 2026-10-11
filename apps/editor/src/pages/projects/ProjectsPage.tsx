@@ -2,6 +2,7 @@ import type { SourceRootView } from '@rolecraft/contracts';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
+import { AnalysisPanel } from './AnalysisPanel.tsx';
 import { failureText } from './failure-text.ts';
 import { FolderPreview } from './FolderPreview.tsx';
 
@@ -69,7 +70,7 @@ export function ProjectsPage() {
         規格、計畫等文字文件；原始碼、相依套件、建置產物、憑證與隱藏檔會自動排除。
       </p>
       <p role="note" className="placeholder-note">
-        專案摘要與事實項（分析結果）尚未實作。
+        專案摘要與「依專案歸類事實項」尚未實作。
       </p>
       <button type="button" disabled={busy} onClick={() => void addFolders()}>
         新增資料夾
@@ -96,6 +97,7 @@ export function ProjectsPage() {
           ))}
         </ul>
       )}
+      <AnalysisPanel />
       {current && (
         <FolderPreview
           key={current.rootId}

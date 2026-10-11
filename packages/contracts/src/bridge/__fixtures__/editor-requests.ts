@@ -113,4 +113,6 @@ export const editorRequests = {
     op: 'messages.update_draft',
     payload: { messageDraftId: ID, draft: '謝謝您的邀約' },
   },
+  'analysis.start': { op: 'analysis.start', payload: {} },
+  'analysis.status': { op: 'analysis.status', payload: {} },
 } as const;

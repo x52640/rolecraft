@@ -38,6 +38,10 @@ const CORE_TABLES = [
   'claude_version_records',
   'provider_selections',
   'source_read_log',
+  // 0006（P1-T060）
+  'analysis_jobs',
+  'analyzed_documents',
+  'document_summaries',
 ];
 
 /** 正式 migration 的全部版本與下一個可用版本（新增 migration 時測試不必跟著改）。 */

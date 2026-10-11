@@ -48,6 +48,7 @@ describe('分派表（P1-T041）', () => {
     providers: {},
     pdfExport: {},
     resume: {},
+    analysis: {},
     messages: {
       submitCapture: () => Promise.resolve({ messageDraftId: 'm-1' }),
       requestDraft: () => Promise.resolve({ workJobId: 'w-1' }),

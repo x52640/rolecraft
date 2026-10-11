@@ -14,6 +14,7 @@ import {
 import { EXIT_CODES, startHost } from './bridge/host.ts';
 import { createLineLogger } from './bridge/logger.ts';
 import { ALLOWED_ORIGINS_ENV, parseAllowedOrigins } from './bridge/origin.ts';
+import { createAnalysisWithClaude } from './handlers/analysis/assemble.ts';
 import { createApplicationsService } from './handlers/applications/storage-service.ts';
 import { createClaimsService, type HelperStorage } from './handlers/claims/storage-service.ts';
 import { createExportService } from './handlers/export/export-service.ts';
@@ -63,9 +64,10 @@ export function createServices(
   // 有資料區時選定模型、授權資料夾、已驗證版本存進資料區（P1-T058）
   const providers =
     base.providers ?? createProvidersService(storage ? persistedProvidersOptions(storage.db) : {});
+  const sources = assembleSources(base.sources, folder, storage?.db);
   return {
     providers,
-    sources: assembleSources(base.sources, folder, storage?.db),
+    sources,
     ...(repositories && { jobs: createJobsService(repositories.jobSnapshots) }),
     ...(repositories &&
       pdf && {
@@ -80,6 +82,7 @@ export function createServices(
     ...(storage && { claims: createClaimsService(storage) }),
     ...(storage && { resume: createResumeWithClaude(storage.db, providers) }),
     ...(storage && { messages: createMessagesService(storage.db, providers) }),
+    ...(storage && { analysis: createAnalysisWithClaude(storage.db, providers, sources) }),
     ...(storage && isRuntime(storage) && { pdfExport: createExportService(storage) }),
   };
 }

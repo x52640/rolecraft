@@ -2,6 +2,7 @@ import type { BridgeFailure, Claim, ProjectEvidence } from '@rolecraft/contracts
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
+import { useAnalysis } from '../projects/useAnalysis.ts';
 import type { CompletionChoice } from './ClaimCard.tsx';
 import { needsCompletion } from './labels.ts';
 
@@ -36,6 +37,10 @@ export function useClaimsReview() {
   const [notice, setNotice] = useState<string | null>(null);
   // 目前選的專案：讀取回來時比對，丟掉已切走的專案的回應，避免舊清單蓋掉新清單
   const currentProject = useRef<string | null>(null);
+  // 分析（P1-T060）在這頁開著時跑完：重新讀專案與目前專案的事實項
+  const [generation, setGeneration] = useState(0);
+  const onAnalysisFinished = useCallback(() => setGeneration((g) => g + 1), []);
+  useAnalysis(onAnalysisFinished);
 
   useEffect(() => {
     let live = true;
@@ -46,12 +51,13 @@ export function useClaimsReview() {
           ? { state: 'ready', value: res.projects }
           : { state: 'error', message: errorOf(res) },
       );
-      if (res.ok && res.projects[0]) setProjectId(res.projects[0].id);
+      const first = res.ok ? res.projects[0] : undefined;
+      if (first) setProjectId((current) => current ?? first.id);
     });
     return () => {
       live = false;
     };
-  }, [bridge]);
+  }, [bridge, generation]);
 
   const reload = useCallback(
     async (id: string) => {
@@ -71,7 +77,7 @@ export function useClaimsReview() {
     setChoices({});
     setSelected(new Set());
     void reload(projectId);
-  }, [projectId, reload]);
+  }, [projectId, reload, generation]);
 
   /** 執行一組寫入，完成後重新讀取並清掉相關選擇；回傳寫入是否成功。 */
   async function run(
