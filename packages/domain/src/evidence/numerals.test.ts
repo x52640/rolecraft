@@ -4,13 +4,25 @@ import { extractNumbers, numberKeys } from './numbers.ts';
 
 const keys = (text: string): string[] => [...numberKeys(text)].sort();
 
-describe('「參」只在數字前後文才算 3', () => {
-  it.each(['參考文件', '參與搜尋功能', '參加黑客松', '參觀工廠', '參數調校', '參閱規格'])(
-    '%s 不含數字',
-    (text) => {
-      expect(extractNumbers(text)).toEqual([]);
-    },
-  );
+describe('「參」只在一般詞裡不算 3', () => {
+  it.each([
+    '參考文件',
+    '參與搜尋功能',
+    '參加黑客松',
+    '參觀工廠',
+    '參數調校',
+    '參閱規格',
+    '毀譽參半',
+    '人參',
+    '參團旅遊',
+    '海參',
+    '參照規範',
+    '參賽作品',
+    '參選',
+    '參展',
+  ])('%s 不含數字', (text) => {
+    expect(extractNumbers(text)).toEqual([]);
+  });
 
   it.each([
     ['參萬人', ['#30000']],
@@ -28,8 +40,8 @@ describe('「參」只在數字前後文才算 3', () => {
     expect(keys(text)).toEqual(expected);
   });
 
-  it('百分之參：無法辨識，當成擋下', () => {
-    expect(extractNumbers('提升百分之參').some((t) => t.key === null)).toBe(true);
+  it('百分之參：反向判斷後「參」算 3，是 3%（P1-T056）', () => {
+    expect(keys('提升百分之參')).toEqual(['%3']);
   });
 });
 
@@ -60,5 +72,26 @@ describe('「參」的前後文補齊百分比後綴與量詞（P1-T056）', () 
     for (const text of ['百分之三十', '百分之 30', '百分之thirty', '百分之 參拾']) {
       expect(extractNumbers(text).some((t) => t.key === null)).toBe(false);
     }
+  });
+});
+
+describe('「參」反向判斷：預設算 3（P1-T056 對抗驗證）', () => {
+  it.each([
+    ['提升參 pp', ['#3']],
+    ['參 bps', ['#3']],
+    ['參×', ['#3']],
+    ['參小時', ['#3']],
+    ['參美元', ['#3']],
+    ['參公里', ['#3']],
+    ['參毫秒', ['#3']],
+    ['參所大學', ['#3']],
+    ['參國', ['#3']],
+  ])('%s 抽得到數字', (text, expected) => {
+    expect(extractNumbers(text).length).toBeGreaterThan(0);
+    expect(keys(text).every((k) => expected.includes(k))).toBe(true);
+  });
+
+  it('參 k 用戶：抽得到（不會被當成沒有數字放行）', () => {
+    expect(extractNumbers('參 k 用戶').length).toBeGreaterThan(0);
   });
 });

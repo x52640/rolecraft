@@ -62,29 +62,24 @@ const ALL_CN = [
 ].join('');
 
 /**
- * 「參」也是常用字（參考、參與、參加、參觀）：只有緊鄰其他數字字元、阿拉伯數字、「點」「第」，
- * 或後面接單位／量詞（參萬、參佰、參個、參年、參批）、百分比後綴（參%、參‰、參百分點、參 percent）
- * 或約數字尾（參多）時才算 3；寧可多抽。其他數字字元一律算。
+ * 「參」預設算 3（寧可多抽）；只有在已知的一般詞裡才不算：後接參考、參與、參加…，或前接人參、海參…
+ * 前面緊鄰其他數字字元、阿拉伯數字、「點」「第」時，即使後面像一般詞也算 3。
  */
 const CAN_BE_WORD = '參';
+/** 「參」開頭的一般詞的第二個字（參考、參與、參半、參團…）。 */
+const WORD_AFTER =
+  '考與与加觀观數数閱阅團团半照謀谋議议賽赛選选展拜透悟差見见訪访酌政軍军院股演事贊赞' +
+  '詳详禪禅會会校劾戰战雜杂商宿星訂订評评驗验看證证';
+/** 「參」結尾的一般詞的第一個字（人參、海參、黨參、丹參、西洋參、高麗參、紅參、苦參、沙參、太子參）。 */
+const WORD_BEFORE = '人海黨党丹洋麗丽紅红苦沙子玄';
 const NUMERAL_NEIGHBOURS = `${ALL_CN}點点\\d`;
-const MEASURE_WORDS =
-  '個个人名位家項项台次件筆笔元塊块倍成年月週周天日時时分秒歲岁場场套款支條条張张份頁页篇本' +
-  '批組组輪轮隊队班群間间座輛辆顆颗隻只雙双種种類类樣样屆届季期版層层級级段章節节題题' +
-  '門门堂封則则句字行列片部集號号樓楼戶户箱包袋杯瓶斤磅尺米度遍趟回處处';
-/** 解析器認得的百分比／百分點後綴（%、‰、‱、百分點標記 U+E000）與約數字尾（參多、參餘）。 */
-const PERCENT_AND_APPROX = '%‰‱\\uE000餘余多';
-/** 英文百分比後綴（參 percent，不分大小寫；CN_NUMERAL_CLASS 會被嵌進沒有 i 旗標的 regex）。 */
-const anyCase = (word: string): string =>
-  word.replace(/[a-z]/gu, (c) => `[${c}${c.toUpperCase()}]`);
-const PERCENT_WORDS = `${anyCase('percent')}\\b|${anyCase('per')}\\s+${anyCase('cent')}\\b|${anyCase('pct')}\\b`;
 const ALWAYS_CN = ALL_CN.replace(CAN_BE_WORD, '');
 
 /** 中文數字字元（含大寫、簡體、廿卅卌）的 regex 片段（單一字元；「參」看前後文）。 */
 export const CN_NUMERAL_CLASS =
   `(?:[${ALWAYS_CN}]` +
   `|(?<=[${NUMERAL_NEIGHBOURS}第])${CAN_BE_WORD}` +
-  `|${CAN_BE_WORD}(?=\\s*(?:[${NUMERAL_NEIGHBOURS}${MEASURE_WORDS}${PERCENT_AND_APPROX}]|${PERCENT_WORDS})))`;
+  `|(?<![${WORD_BEFORE}])${CAN_BE_WORD}(?![${WORD_AFTER}]))`;
 
 /** 中文單位字元，接在阿拉伯數字後面時要相乘（例如 3萬、1.5億）。 */
 export const CN_UNIT_CLASS = `[${Object.keys(CN_SMALL_UNITS).join('')}${Object.keys(CN_BIG_UNITS).join('')}]`;

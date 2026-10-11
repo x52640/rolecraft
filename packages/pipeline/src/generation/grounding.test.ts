@@ -196,7 +196,7 @@ describe('groundingProblem（P1-T056）', () => {
     expect(groundingProblem('後台 https://a.com/x?filter[role]=user', source, job)).toBeNull();
     for (const text of [
       '後台 https://a.com/x?filter［role］=admin',
-      '後台 https://a.com/x?filter［role］=user［2］',
+      '後台 https://a.com/x?filter［role］=user［2］&x=1',
       '後台 https://a.com/x?filter\u200B[role]=admin',
     ]) {
       expect(groundingProblem(text, source, job)).toBe('link_not_in_claims');

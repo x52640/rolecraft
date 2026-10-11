@@ -8,11 +8,15 @@
 import type { Claim } from '@rolecraft/contracts';
 import { extractNumbers, numberKeys } from '@rolecraft/domain';
 
+import { continuesUrl, scanUrl } from '../analysis/url-scan.ts';
 import { extractUrls } from '../analysis/urls.ts';
 import type { SectionDropReason } from './types.ts';
 
-/** 所有格式字元（\p{Cf}：零寬、軟連字號、蒙古文母音分隔、tag 字元等）與組合字形連接符 U+034F。 */
-const INVISIBLE = /[\p{Cf}\u034F]/gu;
+/**
+ * 不可見字元：Default_Ignorable_Code_Point（零寬、變體選擇符 U+FE0F／U+E0100、蒙古文變體選擇符、
+ * Hangul 填充字 U+3164、組合字形連接符 U+034F 等）與所有格式字元（\p{Cf}）。
+ */
+const INVISIBLE = /[\p{Default_Ignorable_Code_Point}\p{Cf}]/gu;
 /** 中日文句點變體（NFKC 後仍不是「.」的）：當成點，避免「example。com」繞過網域檢查。 */
 const IDEOGRAPHIC_DOTS = /[\u3002\uFF61\uFE52]/gu;
 /** 「[.]」「(.)」「[dot]」「(dot)」寫法。 */
@@ -50,16 +54,15 @@ export function normalizeLooseDots(text: string): string {
 const FULLWIDTH_IPV6 =
   /\uFF3B([0-9a-f.\uFF10-\uFF19\uFF21-\uFF26\uFF41-\uFF46\uFF0E]*[:\uFF1A][0-9a-f:.\uFF10-\uFF19\uFF21-\uFF26\uFF41-\uFF46\uFF0E\uFF1A]*)\uFF3D/giu;
 
-/** 查詢字串（「?」後到此都是 ASCII 可見字元）裡的全形方括號（?a=［1］）：換成半形保留在網址裡。 */
-const FULLWIDTH_QUERY_BRACKETS = /(?<=\?[!-~\uFF3B\uFF3D]*)\uFF3B([!-Z^-~]*)\uFF3D/gu;
-
-/** 把全形／CJK 標點換成空白（在 NFKC 之前做，否則會變成半形黏進網址）。 */
+/**
+ * 把全形／CJK 標點換成空白（在 NFKC 之前做，否則會變成半形黏進網址）。但標點後面緊接網址字元時
+ * （`?filter［role］=admin`、`?id=1！role=admin`）是截斷，不換，讓它留在網址 token 裡（寧可判不符）。
+ */
 function separateUrls(text: string): string {
-  return text
-    .replace(INVISIBLE, '')
-    .replace(FULLWIDTH_IPV6, '[$1]')
-    .replace(FULLWIDTH_QUERY_BRACKETS, '[$1]')
-    .replace(URL_SEPARATORS, ' ');
+  const visible = text.replace(INVISIBLE, '').replace(FULLWIDTH_IPV6, '[$1]');
+  return visible.replace(URL_SEPARATORS, (ch: string, at: number) =>
+    continuesUrl(visible, at) ? ch : ' ',
+  );
 }
 
 /** 完整網址抽取：先把全形／CJK 標點換成空白，再正規化。段落與訊息草稿共用。 */
@@ -78,12 +81,14 @@ const FILE_EXTENSIONS = new Set(
 );
 
 const HOST = String.raw`(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,24})`;
-/** 路徑結束：空白、引號、角括號、方括號（Markdown 連結）、反引號、CJK 標點與漢字。 */
-const PATH_STOP = String.raw`\s<>"'\x60\[\]\u3000-\u303F\u3400-\u4DBF\u4E00-\u9FFF`;
-/** 路徑與查詢字串：「?」之後容許成對的方括號（`?filter[user]=owner`），與 extractUrls 同規則。 */
-const PATH = String.raw`(?:\/[^${PATH_STOP}?]*)?(?:\?(?:[^${PATH_STOP}]|\[[^${PATH_STOP}]*\])*)?`;
-const LOOSE_URL = new RegExp(String.raw`(?<![a-z0-9_.-])${HOST}(?![a-z0-9-])(${PATH})?`, 'giu');
-const TRAILING_PUNCTUATION = /[.,;:!?)\]}]+$/u;
+/**
+ * 路徑結束：空白、引號、角括號、反引號、CJK 標點（U+302A–302F、U+303F 除外）與漢字。
+ * 方括號是網址字元；Markdown 分界、截斷與結尾註記交給 scanUrl（與完整網址同規則）。
+ */
+const PATH_STOP = String.raw`\s<>"'\x60\u3000-\u3029\u3030-\u303E\u3400-\u4DBF\u4E00-\u9FFF`;
+const PATH_FIRST = new RegExp(`(?:[/?][^${PATH_STOP}]*)?`, 'uy');
+const PATH_RUN = new RegExp(`[^${PATH_STOP}]*`, 'uy');
+const LOOSE_HOST = new RegExp(String.raw`(?<![a-z0-9_.-])${HOST}(?![a-z0-9-])`, 'giu');
 /** 「[.]」「（．）」「［dot］」等含全形括號的點寫法：要在全形標點換成空白之前先轉成「.」。 */
 const RAW_BRACKET_DOT =
   /\s*[[(\uFF08\uFF3B]\s*(?:[.\uFF0E\u3002\uFF61\uFE52]|dot|\uFF44\uFF4F\uFF54)\s*[\])\uFF09\uFF3D]\s*/giu;
@@ -96,12 +101,14 @@ export function extractLooseUrls(text: string): string[] {
   const tokens: string[] = [];
   // 先去隱形字元再認方括號點，否則「evil［\u200B.］com」漏抓
   const separated = separateUrls(text.replace(INVISIBLE, '').replace(RAW_BRACKET_DOT, '.'));
-  for (const match of normalizeLooseDots(separated).matchAll(LOOSE_URL)) {
-    const tld = (match[1] ?? '').toLowerCase();
-    if (FILE_EXTENSIONS.has(tld)) continue;
-    const path = (match[2] ?? '').replace(TRAILING_PUNCTUATION, '');
-    const host = match[0].slice(0, match[0].length - (match[2]?.length ?? 0)).toLowerCase();
-    tokens.push(`${host}${path}`);
+  const loose = normalizeLooseDots(separated);
+  const hosts = new RegExp(LOOSE_HOST);
+  for (let m = hosts.exec(loose); m !== null; m = hosts.exec(loose)) {
+    const hostEnd = m.index + m[0].length;
+    if (FILE_EXTENSIONS.has((m[1] ?? '').toLowerCase())) continue;
+    const { url: path, next } = scanUrl(loose, hostEnd, PATH_RUN, PATH_FIRST);
+    tokens.push(`${m[0].toLowerCase()}${path}`);
+    hosts.lastIndex = Math.max(next, hostEnd);
   }
   return tokens;
 }

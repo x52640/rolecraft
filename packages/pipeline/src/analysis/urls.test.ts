@@ -53,6 +53,43 @@ describe('extractUrls IPv6（P1-T047 對抗驗證）', () => {
   });
 });
 
+describe('extractUrls 截斷不放行、Markdown 分界（P1-T056 對抗驗證）', () => {
+  it('結束字元後緊接網址字元：不得截成較短的網址', () => {
+    for (const text of [
+      '見 https://a.com/x?id=1[&role=admin',
+      '見 https://a.com/x?id=1]&role=admin',
+      '見 https://a.com/x?id=1［&role=admin',
+      '見 https://a.com/x?id=1"&role=admin',
+      '見 https://a.com/x?id=1！role=admin',
+    ]) {
+      expect(extractUrls(text)).not.toContain('https://a.com/x?id=1');
+    }
+    for (const text of [
+      'https://github.com/alice〪-fake',
+      'https://github.com/alice〿-fake',
+      'https://github.com/alice"-fake',
+    ]) {
+      expect(extractUrls(text)).not.toContain('https://github.com/alice');
+    }
+  });
+
+  it('巢狀方括號與路徑方括號整段保留', () => {
+    expect(extractUrls('https://a.com/x?a[[b]]=admin')).toEqual(['https://a.com/x?a[[b]]=admin']);
+    expect(extractUrls('https://a.com/a[1]/b')).toEqual(['https://a.com/a[1]/b']);
+  });
+
+  it('相連的 Markdown 連結與結尾註記', () => {
+    expect(extractUrls('[作品](https://a.com?id=1)[GitHub](https://b.com)')).toEqual([
+      'https://a.com?id=1',
+      'https://b.com',
+    ]);
+    expect(extractUrls('https://a.com?id=1[作品集]')).toEqual(['https://a.com?id=1']);
+    expect(extractUrls('https://a.com/x（已上線）')).toEqual(['https://a.com/x']);
+    expect(extractUrls('https://a.com，2023 年上線')).toEqual(['https://a.com']);
+    expect(extractUrls('https://a.com?tab=repos［GitHub］')).toEqual(['https://a.com?tab=repos']);
+  });
+});
+
 describe('extractUrls 查詢參數方括號（P1-T056）', () => {
   it('keeps brackets inside the query string', () => {
     expect(extractUrls('見 https://a.example.com/list?filter[role]=admin&x[]=1。')).toEqual([
