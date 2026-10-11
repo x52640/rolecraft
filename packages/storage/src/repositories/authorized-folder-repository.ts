@@ -16,11 +16,19 @@ export interface StoredFolderItem {
   readonly status: StoredItemStatus;
 }
 
+/** 加入時資料夾的實際路徑與 (dev, ino)（十進位字串）；還原後開啟時比對。 */
+export interface StoredFolderIdentity {
+  readonly realPath: string;
+  readonly dev: string;
+  readonly ino: string;
+}
+
 export interface StoredFolder {
   readonly id: string;
   readonly absolutePath: string;
   readonly displayName: string;
   readonly authorizedAt: string;
+  readonly identity: StoredFolderIdentity;
   readonly items: readonly StoredFolderItem[];
 }
 
@@ -32,6 +40,8 @@ export interface AuthorizedFolderRepository {
   remove(id: string): boolean;
   /** 新增或更新文件狀態（同一交易）；資料夾不存在或 ID 對不上就整筆失敗 */
   saveItems(folderId: string, items: readonly StoredFolderItem[]): void;
+  /** 清掉資料夾下所有文件狀態（身分不符時降為待確認） */
+  clearItems(folderId: string): void;
 }
 
 const where = (id: unknown) => `authorized_folders[${String(id)}]`;
@@ -68,7 +78,8 @@ export function createAuthorizedFolderRepository(db: DatabaseSync): AuthorizedFo
       );
       return db
         .prepare(
-          'SELECT id, absolute_path, display_name, authorized_at FROM authorized_folders ORDER BY rowid',
+          `SELECT id, absolute_path, display_name, authorized_at, real_path, root_dev, root_ino
+           FROM authorized_folders ORDER BY rowid`,
         )
         .all()
         .map((row) => {
@@ -78,14 +89,33 @@ export function createAuthorizedFolderRepository(db: DatabaseSync): AuthorizedFo
             absolutePath: text(row['absolute_path'], 'absolute_path', id),
             displayName: text(row['display_name'], 'display_name', id),
             authorizedAt: text(row['authorized_at'], 'authorized_at', id),
+            identity: {
+              realPath: text(row['real_path'], 'real_path', id),
+              dev: text(row['root_dev'], 'root_dev', id),
+              ino: text(row['root_ino'], 'root_ino', id),
+            },
             items: items.all(id).map((r) => toItem(r, id)),
           };
         });
     },
     add(folder) {
+      const { realPath, dev, ino } = folder.identity;
       db.prepare(
-        'INSERT INTO authorized_folders (id, absolute_path, display_name, authorized_at) VALUES (?, ?, ?, ?)',
-      ).run(folder.id, folder.absolutePath, folder.displayName, folder.authorizedAt);
+        `INSERT INTO authorized_folders
+           (id, absolute_path, display_name, authorized_at, real_path, root_dev, root_ino)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        folder.id,
+        folder.absolutePath,
+        folder.displayName,
+        folder.authorizedAt,
+        realPath,
+        dev,
+        ino,
+      );
+    },
+    clearItems(folderId) {
+      db.prepare('DELETE FROM authorized_folder_items WHERE folder_id = ?').run(folderId);
     },
     remove(id) {
       return transaction(db, () => {

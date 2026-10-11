@@ -9,15 +9,16 @@ import path from 'node:path';
 import { SourceEntry, type SourceRoot, type SourceRootView } from '@rolecraft/contracts';
 import {
   createNodeFolderAccess,
+  readFolderIdentity,
   SourceRegistry,
   type FolderAccess,
-  type SourceItem,
+  type FolderIdentity,
 } from '@rolecraft/sources';
-import type { StoredFolderItem } from '@rolecraft/storage';
 
 import { MAX_OUTGOING_BYTES } from '../../bridge/framing.ts';
-import { lazyFolderAccess, type SourcesStore } from './persistence.ts';
+import { openVerifiedFolder, storedItems, type SourcesStore } from './persistence.ts';
 import { buildPreviewEntries } from './preview-tree.ts';
+import { restoreRoot, type RootState, type RootsContext, writeMemoryToStore } from './restore.ts';
 import type {
   PickFoldersResult,
   PreviewResult,
@@ -40,17 +41,11 @@ export interface LocalSourcesOptions {
   readonly newId?: () => string;
   /** 只供測試調小。 */
   readonly maxPreviewBytes?: number;
-  /** 資料區保存（P1-T058）；省略時全在記憶體（未設資料區）。 */
+  /** 資料區保存（P1-T058）；省略時全在記憶體（未設資料區），之後可 attachStore 接上。 */
   readonly store?: SourcesStore;
   readonly clock?: () => Date;
-}
-
-interface RootState {
-  readonly absolutePath: string;
-  /** 子資料夾相對路徑 → 預覽 ID（跨次預覽沿用）。 */
-  readonly containerIds: Map<string, string>;
-  /** 最近一次預覽回過的文件 ID；update_authorization 只接受這些。 */
-  previewed: ReadonlySet<string>;
+  /** 讀資料夾身分（實際路徑＋dev/ino）；預設本機 fs 版。 */
+  readonly identify?: (absolutePath: string) => Promise<FolderIdentity>;
 }
 
 const UNNAMED = '（未命名資料夾）';
@@ -64,21 +59,15 @@ function displayName(absolutePath: string): string {
   return absolutePath === path.sep ? path.sep : UNNAMED;
 }
 
-/** 要寫進資料區的一筆文件狀態（呼叫前已確認 id 在 current 裡）。 */
-function stored(
-  current: ReadonlyMap<string, SourceItem>,
-  id: string,
-  status: 'authorized' | 'revoked',
-): StoredFolderItem {
-  const item = current.get(id);
-  if (!item) throw new Error('文件不在授權集合');
-  return { id, relPath: item.relPath, sizeBytes: item.size, status };
-}
-
 /** createSourcesService 的回傳：handler 用的服務，加上授權集合本身。 */
 export type LocalSources = SourcesService & {
   /** 授權集合與讀檔紀錄；後續分析（讀檔）只能經由它、只用文件 ID。 */
   readonly registry: SourceRegistry;
+  /**
+   * 資料區被占用期間建立、接手後才接上資料區（P1-T058）：記憶體中的資料夾、授權與讀檔紀錄寫進資料區
+   * （同一路徑以記憶體為準），資料區已有的其他資料夾一併還原；之後的變更與讀檔都寫資料區。
+   */
+  attachStore(store: SourcesStore): void;
 };
 
 /** 組裝 sources 服務；沒給 picker 時不提供 pickFolders（回 not_implemented）。 */
@@ -87,6 +76,7 @@ export function createSourcesService(options: LocalSourcesOptions = {}): LocalSo
   const { picker } = options;
   return {
     registry: core.registry,
+    attachStore: (store) => core.attachStore(store),
     listFolders: () => core.listFolders(),
     preview: (rootId) => core.preview(rootId),
     updateAuthorization: (rootId, authorize, revoke) =>
@@ -100,41 +90,41 @@ class LocalSourcesCore {
   readonly registry: SourceRegistry;
   readonly #roots = new Map<string, RootState>();
   readonly #openFolder: (absolutePath: string) => Promise<FolderAccess>;
+  readonly #identify: (absolutePath: string) => Promise<FolderIdentity>;
   readonly #newId: () => string;
   readonly #maxPreviewBytes: number;
-  readonly #store: SourcesStore | undefined;
   readonly #clock: () => Date;
+  #store: SourcesStore | null = null;
   #picking = false;
+  readonly #ctx: RootsContext;
 
   constructor(options: LocalSourcesOptions = {}) {
-    const store = options.store;
-    this.#store = store;
     this.#clock = options.clock ?? (() => new Date());
     // 讀檔紀錄寫不進資料區 → 該次讀取丟錯、不交出內容（R4：每次讀取都要有紀錄）。
     this.registry =
-      options.registry ??
-      new SourceRegistry(store ? { onRead: (entry) => store.appendRead(entry) } : {});
+      options.registry ?? new SourceRegistry({ onRead: (entry) => this.#store?.appendRead(entry) });
     this.#openFolder = options.openFolder ?? ((p) => createNodeFolderAccess(p));
+    this.#identify = options.identify ?? readFolderIdentity;
     this.#newId = options.newId ?? randomUUID;
     this.#maxPreviewBytes = options.maxPreviewBytes ?? MAX_PREVIEW_BYTES;
-    if (store) this.#restore(store);
+    this.#ctx = {
+      registry: this.registry,
+      roots: this.#roots,
+      identify: this.#identify,
+      openFolder: this.#openFolder,
+      store: () => this.#store,
+    };
+    if (options.store) {
+      for (const saved of options.store.load()) restoreRoot(this.#ctx, saved);
+      this.#store = options.store;
+    }
   }
 
-  /** 還原保存的資料夾：ID、授權狀態沿用；路徑已失效的照常列出，預覽時回無法讀取（不自動刪）。 */
-  #restore(store: SourcesStore): void {
-    for (const saved of store.load()) {
-      this.registry.restoreFolder({
-        id: saved.id,
-        label: saved.displayName,
-        access: lazyFolderAccess(saved.absolutePath, this.#openFolder),
-        items: saved.items.map((item) => ({ ...item, size: item.sizeBytes })),
-      });
-      this.#roots.set(saved.id, {
-        absolutePath: saved.absolutePath,
-        containerIds: new Map(),
-        previewed: new Set(),
-      });
-    }
+  attachStore(store: SourcesStore): void {
+    if (this.#store) return;
+    const rest = writeMemoryToStore(this.#ctx, store);
+    this.#store = store;
+    for (const row of rest) restoreRoot(this.#ctx, row);
   }
 
   async pickFolders(picker: FolderPicker): Promise<PickFoldersResult> {
@@ -164,19 +154,33 @@ class LocalSourcesCore {
     for (const [rootId, state] of this.#roots) {
       if (state.absolutePath === absolutePath) return { rootId, name: displayName(absolutePath) };
     }
+    // 資料區已有同一路徑（例如另一個 helper 加的）：沿用它，開啟時一樣比對身分。
+    const saved = this.#store?.load().find((f) => f.absolutePath === absolutePath);
+    if (saved) {
+      restoreRoot(this.#ctx, saved);
+      return { rootId: saved.id, name: saved.displayName };
+    }
     const before = new Set(this.registry.folders().map((f) => f.id));
     try {
-      const access = await this.#openFolder(absolutePath);
+      const { access, identity } = await openVerifiedFolder(
+        absolutePath,
+        this.#identify,
+        this.#openFolder,
+      );
       const summary = await this.registry.addFolder(displayName(absolutePath), access);
+      const addedAt = this.#clock().toISOString();
       // 先寫進資料區才算加入；寫不進去就照失敗處理（下方清掉 registry 裡的半套狀態）。
       this.#store?.addFolder({
         id: summary.id,
         absolutePath,
         displayName: summary.label,
-        authorizedAt: this.#clock().toISOString(),
+        authorizedAt: addedAt,
+        identity,
       });
       this.#roots.set(summary.id, {
         absolutePath,
+        identity,
+        addedAt,
         containerIds: new Map(),
         previewed: new Set(),
       });
@@ -240,21 +244,27 @@ class LocalSourcesCore {
       authorize.every((id) => state.previewed.has(id) && current.get(id)?.present === true) &&
       revoke.every((id) => state.previewed.has(id) && current.has(id));
     if (!ok) return 'invalid_entry';
-    // 撤銷一律先生效（停止讀取不等資料區）；授權要先寫進資料區才生效，寫不進去就丟錯、不授權。
+    // 先寫進資料區才生效（撤銷也是）：寫不進去就丟錯、記憶體不變，不會重啟後又變回已授權。
+    const pick = (ids: readonly string[], status: 'authorized' | 'revoked') =>
+      ids.flatMap((id) => {
+        const item = current.get(id);
+        return item ? [{ ...item, status }] : [];
+      });
+    this.#store?.saveItems(
+      rootId,
+      storedItems([...pick(revoke, 'revoked'), ...pick(authorize, 'authorized')]),
+    );
     for (const id of revoke) this.registry.revoke(id);
-    this.#store?.saveItems(rootId, [
-      ...revoke.filter((id) => !authorize.includes(id)).map((id) => stored(current, id, 'revoked')),
-      ...authorize.map((id) => stored(current, id, 'authorized')),
-    ]);
     for (const id of authorize) this.registry.authorize(id);
     return 'ok';
   }
 
   removeFolder(rootId: string): boolean {
     if (!this.#roots.has(rootId)) return false;
+    // 先從資料區移除才生效：寫不進去就丟錯、記憶體不變。
+    this.#store?.removeFolder(rootId);
     this.#roots.delete(rootId);
     this.registry.removeFolder(rootId);
-    this.#store?.removeFolder(rootId);
     return true;
   }
 }

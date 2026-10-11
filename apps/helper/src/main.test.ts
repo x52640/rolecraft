@@ -260,6 +260,25 @@ describe('服務組裝（createServices，P1-T043）', () => {
     second.close();
   });
 
+  it('資料區占用後接手（base）：沿用同一個 sources 服務並接上資料區', async () => {
+    const pickers = fakePickers();
+    const base = createServices(null, pickers);
+    expect(await send(base, 'sources.pick_folders')).toMatchObject({ ok: true });
+    const { db } = openDatabase(':memory:');
+    const full = createServices(
+      { db, fileStore: createLocalFileStore(path.join(dir, 'files')) },
+      pickers,
+      base,
+    );
+    expect(full.sources).toBe(base.sources);
+    expect(
+      createRepositories(db)
+        .authorizedFolders.list()
+        .map((f) => f.displayName),
+    ).toEqual(['專案甲']);
+    db.close();
+  });
+
   it('沒有 storage：兩次 createServices 互不相干（全在記憶體，行為不變）', async () => {
     const s1 = createServices(null, fakePickers());
     expect(await send(s1, 'sources.pick_folders')).toMatchObject({ ok: true });

@@ -148,7 +148,9 @@ describe('sources 持久化（P1-T058）', () => {
       addFolder: () => {},
       removeFolder: () => {},
       saveItems: () => {},
+      clearItems: () => {},
       appendRead: () => {},
+      transaction: (fn) => fn(),
       ...overrides,
     });
     const boom = () => {

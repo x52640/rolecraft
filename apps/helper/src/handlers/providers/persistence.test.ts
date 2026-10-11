@@ -134,27 +134,60 @@ describe('providers 持久化（P1-T058）', () => {
     });
   });
 
-  it('資料區寫入失敗：記憶體狀態與這次選定照常', async () => {
-    const failing: ProvidersStore = {
-      loadSelectedModel: () => null,
-      saveSelectedModel: () => {
-        throw new Error('disk');
-      },
-      saveConnection: () => {
-        throw new Error('disk');
-      },
-      appendRunCheck: () => {
-        throw new Error('disk');
-      },
+  /** 指定哪些寫入會失敗的 store（記憶體版）。 */
+  function memoryStore(fails: { selection?: boolean; runCheck?: boolean; connection?: boolean }) {
+    const disk = { selected: null as string | null, runs: [] as string[] };
+    const boom = () => {
+      throw new Error('disk');
     };
+    const store: ProvidersStore = {
+      loadSelectedModel: () => disk.selected,
+      saveSelectedModel: (_p, model) => (fails.selection ? boom() : (disk.selected = model)),
+      saveConnection: () => (fails.connection ? boom() : undefined),
+      appendRunCheck: (r) => (fails.runCheck ? boom() : void disk.runs.push(r.id)),
+    };
+    return { disk, store };
+  }
+
+  async function selectSecond(store: ProvidersStore, recordId: string) {
     const providers = createProvidersService({
-      claudeProbe: fakeProbe({ record: record('22222222-2222-4222-8222-222222222222') }),
-      store: failing,
+      claudeProbe: fakeProbe({ record: record(recordId) }),
+      store,
     });
-    expect((await providers.recheck('claude')).state).toBe('available');
-    const [first] = await providers.listCandidates('claude');
-    const result = await providers.selectCandidate('claude', first?.candidateId ?? '');
-    expect(result).toEqual({ kind: 'verified', verification: 'passed' });
-    expect((await providers.status())[0]?.selectedCandidateId).toBe(first?.candidateId);
+    await providers.recheck('claude');
+    const candidates = await providers.listCandidates('claude');
+    const selectedBefore = (await providers.status())[0]?.selectedCandidateId;
+    const result = providers.selectCandidate('claude', candidates[1]?.candidateId ?? '');
+    return { providers, result, selectedBefore };
+  }
+
+  it('選定寫不進資料區：回錯誤、記憶體保留原本的選定（重啟後不會回到舊模型而不自知）', async () => {
+    const { disk, store } = memoryStore({ selection: true });
+    disk.selected = 'opus';
+    const { providers, result, selectedBefore } = await selectSecond(
+      store,
+      '33333333-3333-4333-8333-333333333333',
+    );
+    await expect(result).rejects.toThrow();
+    expect((await providers.status())[0]?.selectedCandidateId).toBe(selectedBefore);
+    expect(selectedBefore).not.toBeNull();
+    expect(disk.selected).toBe('opus');
+  });
+
+  it('R6 確認紀錄寫不進資料區：這次驗證視同失敗、不記選定', async () => {
+    const { disk, store } = memoryStore({ runCheck: true });
+    const { providers, result } = await selectSecond(store, '44444444-4444-4444-8444-444444444444');
+    expect(await result).toEqual({ kind: 'verified', verification: 'failed' });
+    expect((await providers.status())[0]?.selectedCandidateId).toBeNull();
+    expect(disk.selected).toBeNull();
+  });
+
+  it('連接狀態寫不進資料區：記憶體狀態照常（重啟後本來就要重新檢查）', async () => {
+    const { disk, store } = memoryStore({ connection: true });
+    const { providers, result } = await selectSecond(store, '55555555-5555-4555-8555-555555555555');
+    expect(await result).toEqual({ kind: 'verified', verification: 'passed' });
+    expect((await providers.status())[0]?.state).toBe('available');
+    expect(disk.selected).toBe('sonnet');
+    expect(disk.runs).toEqual(['55555555-5555-4555-8555-555555555555']);
   });
 });

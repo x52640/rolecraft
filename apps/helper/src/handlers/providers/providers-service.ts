@@ -35,12 +35,12 @@ export function claudeServiceOf(providers: ProvidersService): ClaudeService | un
   return sharedClaude.get(providers);
 }
 
-/** 保存失敗不影響記憶體中的狀態與這次操作的結果（下次寫入再試）。 */
+/** 連接狀態的保存失敗不影響記憶體中的狀態（重啟後本來就要重新檢查；下次寫入再試）。 */
 function persist(write: () => void): void {
   try {
     write();
   } catch {
-    // 資料區寫入失敗：記憶體狀態照常，不讓狀態查詢或選定因此失敗。
+    // 資料區寫入失敗：記憶體狀態照常，不讓狀態查詢因此失敗。
   }
 }
 
@@ -156,9 +156,15 @@ export function createProvidersService(
     // 槽位已因硬期限釋放：結果過期，不寫任何狀態（避免蓋掉之後其他候選的結果）。
     if (stale()) return { kind: 'verified', verification: 'unknown' };
     const { record } = result;
+    // R6 確認紀錄寫不進資料區：這次驗證視同失敗、不記選定（與 draft-job、generation 一致）。
+    let verification = result.verification;
     if (record) {
       lastRunCheck = record;
-      if (store) persist(() => store.appendRunCheck(record));
+      try {
+        store?.appendRunCheck(record);
+      } catch {
+        verification = 'failed';
+      }
     }
     if (result.quotaExhausted) update('claude', { state: 'quota_exhausted' });
     if (result.blocked) {
@@ -173,12 +179,13 @@ export function createProvidersService(
       }
     }
     // 只有短驗證通過才記為選定；失敗或無法確認時保留原本的選定。
-    if (result.verification === 'passed') {
+    // 選定要先寫進資料區才生效：寫不進去就丟錯（handler 回錯誤），記憶體保留原本的選定。
+    if (verification === 'passed') {
+      store?.saveSelectedModel('claude', entry.model);
       verifiedModels.add(entry.model);
       saveConnection(update('claude', { selectedCandidateId: entry.candidate.candidateId }));
-      if (store) persist(() => store.saveSelectedModel('claude', entry.model));
     }
-    return { kind: 'verified', verification: result.verification };
+    return { kind: 'verified', verification };
   };
 
   const impl: ProvidersServiceImpl = {

@@ -24,8 +24,8 @@ import { persistedProvidersOptions } from './handlers/providers/persistence.ts';
 import { createProvidersService } from './handlers/providers/providers-service.ts';
 import { createResumeWithClaude, pauseInterruptedJobs } from './handlers/resume/assemble.ts';
 import type { HelperServices } from './handlers/services.ts';
-import { createSourcesService, type FolderPicker } from './handlers/sources/local-sources.ts';
-import { createSourcesStore } from './handlers/sources/persistence.ts';
+import { assembleSources } from './handlers/sources/assemble.ts';
+import type { FolderPicker } from './handlers/sources/local-sources.ts';
 import { connectDataDir } from './services/data-dir.ts';
 import { writeNotice } from './services/notice.ts';
 import { runtimeConfigFromEnv, type HelperRuntime } from './services/runtime.ts';
@@ -65,12 +65,7 @@ export function createServices(
     base.providers ?? createProvidersService(storage ? persistedProvidersOptions(storage.db) : {});
   return {
     providers,
-    sources:
-      base.sources ??
-      createSourcesService({
-        ...(folder && { picker: folder }),
-        ...(storage && { store: createSourcesStore(storage.db) }),
-      }),
+    sources: assembleSources(base.sources, folder, storage?.db),
     ...(repositories && { jobs: createJobsService(repositories.jobSnapshots) }),
     ...(repositories &&
       pdf && {

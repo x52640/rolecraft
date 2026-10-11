@@ -15,7 +15,13 @@ beforeEach(() => {
 });
 afterEach(() => t.cleanup());
 
-const folder = { id: 'f1', absolutePath: '/Users/x/proj', displayName: 'proj', authorizedAt: T };
+const folder = {
+  id: 'f1',
+  absolutePath: '/Users/x/proj',
+  displayName: 'proj',
+  authorizedAt: T,
+  identity: { realPath: '/Users/x/proj', dev: '16777230', ino: '18446744073709551615' },
+};
 
 describe('authorizedFolders', () => {
   it('新增、存文件狀態、重開資料庫後原樣讀回（ID 不變）', () => {
@@ -88,6 +94,17 @@ describe('authorizedFolders', () => {
         )
         .run(),
     ).toThrow(/CHECK/);
+  });
+});
+
+describe('authorizedFolders clearItems', () => {
+  it('清掉資料夾下的文件狀態，資料夾與身分保留', () => {
+    repos.authorizedFolders.add(folder);
+    repos.authorizedFolders.saveItems('f1', [
+      { id: 'i1', relPath: 'a.md', sizeBytes: 1, status: 'authorized' },
+    ]);
+    repos.authorizedFolders.clearItems('f1');
+    expect(repos.authorizedFolders.list()).toEqual([{ ...folder, items: [] }]);
   });
 });
 

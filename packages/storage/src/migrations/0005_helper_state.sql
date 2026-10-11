@@ -2,11 +2,16 @@
 -- 選定的模型（存模型別名，不存每次啟動重新配發的候選 ID）、Claude CLI 版本驗證紀錄（D22）。
 
 -- 授權資料夾：不透明 ID 跨重啟不變；絕對路徑只留在 helper（R7）。
+-- real_path、root_dev、root_ino：加入時的實際路徑與 (dev, ino)；重啟後第一次開啟不一致
+-- （原路徑換成符號連結或別的資料夾）就整個資料夾不可讀、文件降為待確認。
 CREATE TABLE authorized_folders (
   id TEXT PRIMARY KEY,
   absolute_path TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL,
-  authorized_at TEXT NOT NULL
+  authorized_at TEXT NOT NULL,
+  real_path TEXT NOT NULL,
+  root_dev TEXT NOT NULL,
+  root_ino TEXT NOT NULL
 ) STRICT;
 
 -- 使用者在預覽中確認或撤銷過的文件；待確認的候選不存（下次預覽重新列出）。

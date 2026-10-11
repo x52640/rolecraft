@@ -9,6 +9,7 @@ export {
   type FilterOptions,
 } from './filter.ts';
 export { type RegistryOptions, type RestoredFolder, SourceRegistry } from './registry.ts';
+export { type FolderIdentity, readFolderIdentity, sameFolderIdentity } from './folder-identity.ts';
 export { createNodeFolderAccess, type NodeFolderAccessOptions } from './node-folder-access.ts';
 export {
   createMacFolderPicker,

@@ -107,6 +107,7 @@ export type {
 };
 export type {
   StoredFolder,
+  StoredFolderIdentity,
   StoredFolderItem,
   StoredItemStatus,
 } from './authorized-folder-repository.ts';
