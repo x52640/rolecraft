@@ -6,7 +6,7 @@ depends_on: []
 specs: ["evidence-model.md", "runtime-and-budget.md"]
 track: review
 primary_repo: rolecraft
-write_paths: ["packages/pipeline/src/analysis/plan.ts", "packages/pipeline/src/analysis/plan.test.ts", "packages/pipeline/src/analysis/runner.ts", "packages/pipeline/src/analysis/runner.test.ts"]
+write_paths: ["packages/pipeline/src/analysis/drafts.ts", "packages/pipeline/src/analysis/drafts.test.ts", "packages/pipeline/src/analysis/plan.ts", "packages/pipeline/src/analysis/plan.test.ts", "packages/pipeline/src/analysis/runner.ts", "packages/pipeline/src/analysis/runner.test.ts"]
 contract_change: none
 expected_commit: "fix(P1-T046): pipeline 分析：預算失敗保留來源更新、避免重複分析、跨單元去重、取消後的錯誤"
 ---
