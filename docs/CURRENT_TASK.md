@@ -5,7 +5,9 @@
 <!-- index:start -->
 ## 進行中
 
-- 無
+- P1-T055 providers：逾時後的過期驗證不再覆寫狀態（`docs/tasks/P1-T055-providers-stale-refresh.md`）
+- P1-T056 事實檢查：網址查詢參數方括號、零寬字元點、參字數量詞（`docs/tasks/P1-T056-grounding-url-numeral-fixes.md`）
+- P1-T057 編輯器：履歷過期載入清空畫面、事實項存檔中繼續編輯被丟掉（`docs/tasks/P1-T057-editor-resume-claim-races.md`）
 
 ## ready
 
@@ -15,9 +17,10 @@
 ## 下一步（2026-10-11 codex 補審後）
 
 1. 第二輪 14 個 Task 已跑 codex review（見 REVIEW_QUEUE「第二輪補審」）；仍成立的 29 項由 P1-T044～T050 修完並收官，T044～T047 另跑對抗驗證、屬實項已修。
-2. 剩下全部需擁有者：P1-T017 → 解鎖 T018；T031 等 T018；T032 驗收。下方「待擁有者裁定」先看前 5 項；#12～#16 已裁定並實作。
-3. 建議下一批 Task（尚未建立，需擁有者同意範圍）：工作進度查詢與手動續跑操作（D21）；授權集合／匯入暫存／供應商狀態／Claude 已驗證版本的持久化；ProjectEvidence 產生來源；分析流程接進 helper（commitUnit 要在同一交易寫 claimUpdates）。
-4. 只有擁有者說「推」才 push；本機 `refs/original` 待擁有者同意後清除。
+2. 第三輪：P1-T044～T054 的 17 個程式 commit 已跑 codex review，仍成立項由 P1-T055～T057 修正（進行中）。
+3. 剩下全部需擁有者：P1-T017 → 解鎖 T018；T031 等 T018；T032 驗收。下方「待擁有者裁定」先看前 5 項；#12～#16 已裁定並實作。
+4. 建議下一批 Task（尚未建立，需擁有者同意範圍）：工作進度查詢與手動續跑操作（D21）；授權集合／匯入暫存／供應商狀態／Claude 已驗證版本的持久化；ProjectEvidence 產生來源；分析流程接進 helper（commitUnit 要在同一交易寫 claimUpdates）。
+5. 只有擁有者說「推」才 push；本機 `refs/original` 待擁有者同意後清除。
 
 ## 主樹基準
 
