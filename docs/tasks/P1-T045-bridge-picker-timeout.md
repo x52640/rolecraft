@@ -62,16 +62,22 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：
-- 已通過驗證：
-- 下一步：
+- 最後完成：選取器操作改用較長逾時，contracts 加常數，osascript 對話框上限改取自 contracts
+- 已通過驗證：`npm run verify`；新回歸測試在舊 client.ts 上 8 項失敗、修正後全過
+- 下一步：協調者照 E3 跑對抗驗證後收官
 - Blocker：無
 
 ## 完成結果
+
+- contracts（`packages/contracts/src/bridge/protocol.ts`，只新增）：`PICKER_DIALOG_TIMEOUT_MS`（5 分鐘）、`BRIDGE_PICKER_OPERATIONS`（`import.pick_pdf`、`sources.pick_folders`）、`BRIDGE_PICKER_TIMEOUT_MS`（對話框上限＋60 秒讀檔／解析餘裕＝6 分鐘）。放在已被 index 轉出的檔案，沒有改 index。
+- 擴充功能 `client.ts`：每個請求依操作決定逾時，選取器操作用 `BRIDGE_PICKER_TIMEOUT_MS`（可用 `pickerTimeoutMs` 注入），其他操作維持 `DEFAULT_TIMEOUT_MS` 30 秒；逾時訊息顯示該請求實際的毫秒數。排隊、名額、晚到回覆丟棄的行為不變。
+- sources `osascript.ts`：`DIALOG_TIMEOUT_MS` 改為取自 contracts 的 `PICKER_DIALOG_TIMEOUT_MS`（architecture.md 允許 sources 依賴 contracts），兩邊不會各改各的。
+- 回歸測試：`client.test.ts` 新增 8 項（兩個選取器操作 31 秒仍在等、接近對話框上限才回覆照樣收到、超過選取器逾時仍回 timeout；一般操作仍 30 秒逾時且不受在途選取器影響；覆寫注入）；`folder-picker.test.ts` 新增 1 項確認 osascript 逾時等於 contracts 常數且小於橋接選取器逾時。
+- 殘餘：`docs/specs/bridge.md` 尚未寫明選取器操作的較長逾時（不在本 Task write_paths），建議後續補一句。
 

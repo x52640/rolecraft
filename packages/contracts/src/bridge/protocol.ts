@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { BridgeRequest } from './envelope.ts';
+import type { BridgeOperation } from './operations.ts';
 
 /**
  * 橋接共用常數與 Native Messaging 信封（ADR-0003、bridge.md）。
@@ -15,6 +16,21 @@ export const RELAY_CHANNEL = 'rolecraft.bridge';
 
 /** 同一條 Native Messaging 連線上、helper 尚未回覆的請求上限；客戶端不得超過。 */
 export const BRIDGE_MAX_IN_FLIGHT = 32;
+
+/** 原生選取器對話框最長開多久（helper 執行 osascript 的上限；使用者可能慢慢選）。 */
+export const PICKER_DIALOG_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * 開原生選取器的橋接操作：客戶端改用 BRIDGE_PICKER_TIMEOUT_MS 等回覆，
+ * 不然使用者超過一般逾時才選好，結果會被丟掉（P1-T045）。
+ */
+export const BRIDGE_PICKER_OPERATIONS: readonly BridgeOperation[] = [
+  'import.pick_pdf',
+  'sources.pick_folders',
+];
+
+/** 選取器操作的客戶端逾時：對話框上限加 60 秒讀檔／解析餘裕，必須大於 PICKER_DIALOG_TIMEOUT_MS。 */
+export const BRIDGE_PICKER_TIMEOUT_MS = PICKER_DIALOG_TIMEOUT_MS + 60_000;
 
 /**
  * 請求 id：呼叫端產生的不透明字串，只用來對應回覆，helper 不解讀。

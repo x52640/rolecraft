@@ -1,5 +1,7 @@
 import {
   BRIDGE_MAX_IN_FLIGHT,
+  BRIDGE_PICKER_OPERATIONS,
+  BRIDGE_PICKER_TIMEOUT_MS,
   BRIDGE_SCHEMAS,
   BridgeRequest,
   BridgeResponseEnvelope,
@@ -28,6 +30,8 @@ export interface BridgeClientDeps {
   lastError(): string | undefined;
   /** 單一請求從 send 到收到回覆的上限（含排隊等名額的時間）。 */
   timeoutMs?: number;
+  /** 開原生選取器的操作（BRIDGE_PICKER_OPERATIONS）改用的上限；預設對話框上限加解析餘裕。 */
+  pickerTimeoutMs?: number;
   /** helper 尚未回覆的請求上限（預設 contracts 的 BRIDGE_MAX_IN_FLIGHT）。 */
   maxInFlight?: number;
 }
@@ -48,6 +52,7 @@ interface Call {
   request: BridgeRequest;
   resolve(response: BridgeResponse): void;
   timer: ReturnType<typeof setTimeout> | undefined;
+  timeoutMs: number;
   done: boolean;
 }
 
@@ -55,7 +60,7 @@ interface Call {
  * 橋接客戶端：只由 service worker 持有一條連線（ADR-0003）。
  * 每則請求配一個本客戶端內不重複的 id，包成 { id, request } 送出，回覆依 id 對應，可同時多則在途。
  * - 在途（含已逾時但 helper 還沒回的）達上限時，新請求排隊等名額，不讓 helper 因超量斷線。
- * - 逾時：該請求回 timeout，id 記為「已放棄」，晚到的回覆直接丟棄；不影響其他請求。
+ * - 逾時：該請求回 timeout（選取器操作等較久，見 BRIDGE_PICKER_TIMEOUT_MS），id 記為「已放棄」，晚到的回覆直接丟棄；不影響其他請求。
  *   若所有名額都被已放棄的請求占住（helper 疑似卡死），斷線重來。
  * - 回應不符該操作 schema：該請求回 internal_error，其他請求不受影響（id 對應不會錯）。
  * - 收到未知 id、id 為 null 或信封不合法：協定已不可信，斷線，在途請求全部回 internal_error。
@@ -63,6 +68,9 @@ interface Call {
  */
 export function createBridgeClient(deps: BridgeClientDeps): BridgeClient {
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const pickerTimeoutMs = deps.pickerTimeoutMs ?? BRIDGE_PICKER_TIMEOUT_MS;
+  const timeoutFor = (request: BridgeRequest): number =>
+    BRIDGE_PICKER_OPERATIONS.includes(request.op) ? pickerTimeoutMs : timeoutMs;
   const maxInFlight = deps.maxInFlight ?? BRIDGE_MAX_IN_FLIGHT;
   let port: NativePort | null = null;
   let counter = 0;
@@ -171,7 +179,7 @@ export function createBridgeClient(deps: BridgeClientDeps): BridgeClient {
       pending.delete(id);
       abandoned.add(id);
     }
-    finish(call, bridgeFailure('timeout', `等待本機輔助程式回覆逾時（${timeoutMs} ms）`));
+    finish(call, bridgeFailure('timeout', `等待本機輔助程式回覆逾時（${call.timeoutMs} ms）`));
     if (abandoned.size >= maxInFlight) {
       dropPort('helper_unavailable', '本機輔助程式長時間沒有回應，已斷線重來');
     }
@@ -184,8 +192,15 @@ export function createBridgeClient(deps: BridgeClientDeps): BridgeClient {
         return Promise.resolve(bridgeFailure('invalid_request', '請求不符橋接 schema，未送出'));
       }
       return new Promise<BridgeResponse>((resolve) => {
-        const call: Call = { request: parsed.data, resolve, timer: undefined, done: false };
-        call.timer = setTimeout(() => onTimeout(call), timeoutMs);
+        const request = parsed.data;
+        const call: Call = {
+          request,
+          resolve,
+          timer: undefined,
+          timeoutMs: timeoutFor(request),
+          done: false,
+        };
+        call.timer = setTimeout(() => onTimeout(call), call.timeoutMs);
         waiting.push(call);
         pump();
       });

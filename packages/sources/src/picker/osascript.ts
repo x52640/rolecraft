@@ -2,11 +2,13 @@
 // 指令固定為 /usr/bin/osascript、參數只有寫死的 -e 腳本行；不經 shell、不帶任何請求內容。
 import { execFile } from 'node:child_process';
 
+import { PICKER_DIALOG_TIMEOUT_MS } from '@rolecraft/contracts';
+
 /** osascript 絕對路徑：不靠 PATH 找（從 Dock 啟動的瀏覽器 PATH 不可信）。 */
 export const OSASCRIPT = '/usr/bin/osascript';
 
-/** 對話框最長等待時間（使用者可能慢慢選）。 */
-export const DIALOG_TIMEOUT_MS = 5 * 60 * 1000;
+/** 對話框最長等待時間：取自 contracts，橋接客戶端的選取器逾時以它為基準再加餘裕（P1-T045）。 */
+export const DIALOG_TIMEOUT_MS = PICKER_DIALOG_TIMEOUT_MS;
 
 const MAX_OUTPUT_BYTES = 1024 * 1024;
 

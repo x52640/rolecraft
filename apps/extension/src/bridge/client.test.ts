@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  BRIDGE_PICKER_OPERATIONS,
+  BRIDGE_PICKER_TIMEOUT_MS,
+  PICKER_DIALOG_TIMEOUT_MS,
+} from '@rolecraft/contracts';
+
 import { createBridgeClient, type NativePort } from './client.ts';
+import { DEFAULT_TIMEOUT_MS } from './host.ts';
 
 interface Sent {
   id: string;
@@ -316,5 +323,95 @@ describe('bridge client：helper_unavailable 與 timeout', () => {
     await expect(queued).resolves.toEqual(MSG_OK);
     ports[0]?.answer(0, DRAFT_OK); // 舊連線晚到：忽略
     expect(ports[1]?.disconnected).toBe(false);
+  });
+});
+
+describe('bridge client：選取器操作的逾時配合原生對話框（P1-T045）', () => {
+  const PICK_PDF = { op: 'import.pick_pdf', payload: {} };
+  const PICK_FOLDERS = { op: 'sources.pick_folders', payload: {} };
+  const PICKED = { ok: true, selection: { status: 'cancelled' } };
+
+  /** 不覆寫逾時，測正式預設值。 */
+  function setupDefaults() {
+    const ports: FakePort[] = [];
+    const client = createBridgeClient({
+      connect: () => {
+        const p = new FakePort();
+        ports.push(p);
+        return p;
+      },
+      lastError: () => undefined,
+    });
+    return { client, ports };
+  }
+
+  async function isSettled(promise: Promise<unknown>): Promise<boolean> {
+    let settled = false;
+    void promise.then(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(0);
+    return settled;
+  }
+
+  it('選取器逾時大於對話框上限，一般操作維持 30 秒', () => {
+    expect(BRIDGE_PICKER_OPERATIONS).toEqual(['import.pick_pdf', 'sources.pick_folders']);
+    expect(BRIDGE_PICKER_TIMEOUT_MS).toBeGreaterThan(PICKER_DIALOG_TIMEOUT_MS);
+    expect(DEFAULT_TIMEOUT_MS).toBe(30_000);
+  });
+
+  it.each([PICK_PDF, PICK_FOLDERS])('$op：31 秒時仍在等', async (req) => {
+    vi.useFakeTimers();
+    const { client } = setupDefaults();
+    const result = client.send(req);
+    await vi.advanceTimersByTimeAsync(31_000);
+    expect(await isSettled(result)).toBe(false);
+  });
+
+  it.each([PICK_PDF, PICK_FOLDERS])('$op：接近對話框上限才選好，結果照樣送回', async (req) => {
+    vi.useFakeTimers();
+    const { client, ports } = setupDefaults();
+    const result = client.send(req);
+    await vi.advanceTimersByTimeAsync(PICKER_DIALOG_TIMEOUT_MS - 1000);
+    ports[0]?.answer(0, PICKED);
+    await expect(result).resolves.toEqual(PICKED);
+  });
+
+  it.each([PICK_PDF, PICK_FOLDERS])('$op：超過選取器逾時仍回 timeout', async (req) => {
+    vi.useFakeTimers();
+    const { client } = setupDefaults();
+    const result = client.send(req);
+    await vi.advanceTimersByTimeAsync(BRIDGE_PICKER_TIMEOUT_MS - 1);
+    expect(await isSettled(result)).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await result).toEqual(code('timeout'));
+  });
+
+  it('一般操作仍在 30 秒逾時，不受在途選取器影響', async () => {
+    vi.useFakeTimers();
+    const { client } = setupDefaults();
+    const picker = client.send(PICK_PDF);
+    const normal = client.send(DRAFT);
+    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS);
+    expect(await normal).toEqual(code('timeout'));
+    expect(await isSettled(picker)).toBe(false);
+  });
+
+  it('timeoutMs 覆寫只影響一般操作，選取器操作另用 pickerTimeoutMs', async () => {
+    vi.useFakeTimers();
+    const ports: FakePort[] = [];
+    const client = createBridgeClient({
+      connect: () => {
+        const p = new FakePort();
+        ports.push(p);
+        return p;
+      },
+      lastError: () => undefined,
+      timeoutMs: 1000,
+      pickerTimeoutMs: 5000,
+    });
+    const picker = client.send(PICK_FOLDERS);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await isSettled(picker)).toBe(false);
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(await picker).toEqual(code('timeout'));
   });
 });

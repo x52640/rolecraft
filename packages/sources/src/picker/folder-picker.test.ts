@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
+import { BRIDGE_PICKER_TIMEOUT_MS, PICKER_DIALOG_TIMEOUT_MS } from '@rolecraft/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createMacFolderPicker, FOLDER_SCRIPT, parseFolderOutput } from './folder-picker.ts';
@@ -38,6 +39,14 @@ describe('資料夾選取器：命令固定', () => {
     expect(args).toEqual(FOLDER_SCRIPT.flatMap((line) => ['-e', line]));
     expect(options).toMatchObject({ shell: false });
     expect(options?.timeout).toBeGreaterThan(0);
+  });
+
+  it('對話框上限取自 contracts，且小於橋接客戶端的選取器逾時（P1-T045）', async () => {
+    const exec = fakeExec({ stdout: '1\n/a/\n' });
+    await createMacFolderPicker({ execFile: exec, ...darwin })();
+    const timeout = exec.mock.calls[0]?.[2].timeout;
+    expect(timeout).toBe(PICKER_DIALOG_TIMEOUT_MS);
+    expect(timeout).toBeLessThan(BRIDGE_PICKER_TIMEOUT_MS);
   });
 
   it('每次呼叫的參數完全相同（沒有任何外部輸入）', async () => {
