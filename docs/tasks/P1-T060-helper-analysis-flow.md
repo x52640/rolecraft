@@ -1,7 +1,7 @@
 ---
 id: P1-T060
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T058"]
 specs: ["bridge.md", "runtime-and-budget.md", "evidence-model.md", "sources-and-authorization.md", "providers.md"]
 track: helper
@@ -93,13 +93,13 @@ npm run verify
 ## 中斷／接手紀錄
 
 - 最後完成：對抗驗證屬實項 2 則＋codex 1 則修正（基準 a941488）
-- 已通過驗證：worktree 內 `npm run verify` 綠
+- 已通過驗證：worktree 內 `npm run verify` 綠；協調者對抗驗證（2 個角度）屬實 2 項＋codex 1 項已在 670439e 修正；codex 複審來源關卡效能 1 項由協調者修正
 - 下一步：協調者收官
 - Blocker：無
 
 ## 完成結果
 
-- `analysis.start`：先同步授權集合（重新列舉、只讀已授權且仍在的文件、讀檔留紀錄），`planAnalysis` 依 R2 重新判定既有事實項（撤銷→來源已移除＋保存恢復依據；同 hash 重新授權→恢復），來源文件與判定結果同一交易寫回；再對新增或變更文件建計畫並在背景執行。已在跑回同一工作 id；最近一次未完成就先 `recheck`（R6）通過才以 `resumeJob` 從第一個未完成單元續跑；暫停期間待跑單元的文件變了則改建新計畫，舊工作標「來源已變更」。
+- `analysis.start`：先同步授權集合（重新列舉、只讀已授權且仍在的文件、讀檔留紀錄），`planAnalysis` 依 R2 重新判定既有事實項（撤銷→來源已移除＋保存恢復依據；同 hash 重新授權→恢復），來源文件與判定結果同一交易寫回；再對新增或變更文件建計畫並在背景執行。已在跑回同一工作 id；最近一次尚未跑完就先 `recheck`（R6）通過才以 `resumeJob` 從第一個尚未跑完的單元續跑；暫停期間待跑單元的文件變了則改建新計畫，舊工作標「來源已變更」。
 - `commitUnit`：新事實項、`claimUpdates`、工作狀態、計數、該文件摘要與已分析版本同一交易（RESIDUALS P1-T046）；中途失敗整筆回滾、工作改為已暫停（interrupted）。
 - 被擋（R6 不通過、供應商不可重試錯誤、計畫過期）與暫停原因寫進資料區，`analysis.status` 重開後仍查得到；重開時執行中的工作由既有 `pauseInterruptedJobs` 改為已暫停，不自動續跑。
 - 模型與執行端沿用履歷生成的選定 Claude 模型＋`ClaudeService.run`（R5、R6 每次送出重做）；未選定或不可用回 `no_model`，不讀檔、不呼叫模型。

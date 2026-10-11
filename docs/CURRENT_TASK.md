@@ -5,7 +5,7 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T060 helper：分析授權資料夾產生事實項、查詢進度與手動續跑（`docs/tasks/P1-T060-helper-analysis-flow.md`）
+- 無
 
 ## ready
 
