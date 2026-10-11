@@ -6,7 +6,6 @@
 ## 進行中
 
 - P1-T052 helper：一個資料區只准一個 helper、孤兒 PDF 刪不掉不擋啟動（`docs/tasks/P1-T052-helper-single-instance-sweep.md`）
-- P1-T054 編輯器：helper 被另一個瀏覽器占用時顯示提示（`docs/tasks/P1-T054-editor-helper-busy-notice.md`）
 
 ## ready
 
