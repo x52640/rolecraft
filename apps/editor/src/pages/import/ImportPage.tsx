@@ -2,6 +2,7 @@ import type { BridgeFailure, ImportResult } from '@rolecraft/contracts';
 import { useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
+import { helperUnavailableText } from '../../bridge/helper-busy.ts';
 import {
   emptyForm,
   FAILURE_TEXT,
@@ -20,7 +21,7 @@ type Phase =
 
 const failureText = (failure: BridgeFailure): string =>
   failure.error.code === 'helper_unavailable'
-    ? '連不到本機輔助程式，請確認已安裝並啟動。'
+    ? helperUnavailableText(failure, '連不到本機輔助程式，請確認已安裝並啟動。')
     : failure.error.message;
 
 /**

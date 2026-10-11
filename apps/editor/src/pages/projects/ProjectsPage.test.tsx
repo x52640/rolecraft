@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { BridgeProvider } from '../../bridge/BridgeProvider.tsx';
+import { HELPER_BUSY_MESSAGE } from '../../bridge/helper-busy.ts';
 import type { BridgeTransport } from '../../bridge/transport.ts';
 import { ProjectsPage } from './ProjectsPage.tsx';
 
@@ -216,5 +217,14 @@ describe('<ProjectsPage />', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toContain('尚未支援');
     });
+  });
+
+  it.each([
+    [HELPER_BUSY_MESSAGE, HELPER_BUSY_MESSAGE],
+    ['送不出去', '連不到本機輔助程式，請確認已安裝並啟動。'],
+  ])('helper_unavailable（%s）：占用訊息照原文，其餘維持原文字', async (message, shown) => {
+    const failure = { ok: false, error: { code: 'helper_unavailable', message } };
+    renderPage({ send: () => Promise.resolve(failure) });
+    expect((await screen.findByRole('alert')).textContent).toBe(shown);
   });
 });

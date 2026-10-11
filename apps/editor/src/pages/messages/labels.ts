@@ -1,5 +1,7 @@
 import type { BridgeFailure } from '@rolecraft/contracts';
 
+import { helperUnavailableText } from '../../bridge/helper-busy.ts';
+
 /** 訊息頁顯示用文字（繁體中文）。 */
 
 export type ReplyIntent = 'accept' | 'inquire' | 'decline';
@@ -26,7 +28,7 @@ export function failureText(failure: BridgeFailure): string {
     case 'not_implemented':
       return '本機輔助程式尚未支援招募訊息（服務尚未接上）。';
     case 'helper_unavailable':
-      return '連不到本機輔助程式：請確認已安裝並啟動。';
+      return helperUnavailableText(failure, '連不到本機輔助程式：請確認已安裝並啟動。');
     case 'timeout':
       return '本機輔助程式沒有及時回應，請稍後再試。';
     default:

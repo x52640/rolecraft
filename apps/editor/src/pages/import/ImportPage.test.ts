@@ -5,6 +5,7 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BridgeProvider } from '../../bridge/BridgeProvider.tsx';
+import { HELPER_BUSY_MESSAGE } from '../../bridge/helper-busy.ts';
 import type { BridgeTransport } from '../../bridge/transport.ts';
 import { ImportPage } from './ImportPage.tsx';
 
@@ -192,6 +193,13 @@ describe('<ImportPage />（P1-T020）', () => {
     fireEvent.click(screen.getByRole('button', { name: '確認並寫入個人資料' }));
     expect((await screen.findByText('找不到這筆匯入')).getAttribute('role')).toBe('alert');
     expect(screen.getByLabelText<HTMLInputElement>('姓名').value).toBe('王小明');
+  });
+
+  it('helper 被另一個瀏覽器占用：照原文顯示占用訊息', async () => {
+    const busy = { ok: false, error: { code: 'helper_unavailable', message: HELPER_BUSY_MESSAGE } };
+    setup(null, { 'import.pick_pdf': busy });
+    fireEvent.click(screen.getByRole('button', { name: '選擇履歷 PDF' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(HELPER_BUSY_MESSAGE);
   });
 
   it('在核對畫面改選檔案後取消或失敗：回到原本的核對畫面，保留已改內容', async () => {

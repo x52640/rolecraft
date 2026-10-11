@@ -4,6 +4,7 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { BridgeProvider } from '../../bridge/BridgeProvider.tsx';
+import { HELPER_BUSY_MESSAGE } from '../../bridge/helper-busy.ts';
 import { fakeBridge, sampleSnapshot, type FakeBridge } from './fake-bridge.test-helpers.ts';
 import { JobsPage } from './JobsPage.tsx';
 
@@ -51,6 +52,16 @@ describe('職缺快照清單', () => {
     fake.failWith = { ok: false, error: { code: 'not_implemented', message: '此操作尚未支援' } };
     renderPage(fake);
     expect((await screen.findByRole('alert')).textContent).toContain('尚未支援職缺快照');
+  });
+
+  it.each([
+    [HELPER_BUSY_MESSAGE, HELPER_BUSY_MESSAGE],
+    ['送不出去', '連不到本機輔助程式：請確認已安裝並啟動。'],
+  ])('helper_unavailable（%s）：占用訊息照原文，其餘維持原文字', async (message, shown) => {
+    const fake = fakeBridge();
+    fake.failWith = { ok: false, error: { code: 'helper_unavailable', message } };
+    renderPage(fake);
+    expect((await screen.findByRole('alert')).textContent).toBe(shown);
   });
 });
 

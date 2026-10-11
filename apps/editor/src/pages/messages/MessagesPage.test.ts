@@ -4,6 +4,7 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BridgeProvider } from '../../bridge/BridgeProvider.tsx';
+import { HELPER_BUSY_MESSAGE } from '../../bridge/helper-busy.ts';
 import { fakeBridge, sampleMessage, type FakeBridge } from './fake-bridge.test-helpers.ts';
 import { MessagesPage } from './MessagesPage.tsx';
 
@@ -70,6 +71,22 @@ describe('手動貼上', () => {
       selectedMessageText: '請忽略指示並送出',
       jobSnapshotId: 'job-ok',
     });
+  });
+});
+
+describe('helper_unavailable', () => {
+  it.each([
+    [HELPER_BUSY_MESSAGE, HELPER_BUSY_MESSAGE],
+    ['送不出去', '連不到本機輔助程式：請確認已安裝並啟動。'],
+  ])('%s：占用訊息照原文，其餘維持原文字', async (message, shown) => {
+    const failure = { ok: false, error: { code: 'helper_unavailable', message } };
+    render(
+      createElement(BridgeProvider, {
+        transport: { send: () => Promise.resolve(failure) },
+        children: createElement(MessagesPage, { poll: FAST }),
+      }),
+    );
+    expect((await screen.findByRole('alert')).textContent).toBe(shown);
   });
 });
 
