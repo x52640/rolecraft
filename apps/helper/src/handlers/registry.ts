@@ -1,6 +1,10 @@
 // 分派表（R7）：contracts 的每個操作對應一個 handler 檔，一次註冊到位（P1-T041）。
 // 後續 Task 只改自己群組目錄（handlers/<群組>/）裡的 handler 與 service.ts，不需要改本檔。
 // 新增操作要先改 bridge.md 與 contracts，再在這裡加一列（HandlerTable 型別會擋漏列）。
+// 每個 handler 外包一層資料區閘門（裁定 #13）：資料區被另一個 helper 占用時，需要儲存的操作回固定錯誤。
+import type { BridgeOperation } from '@rolecraft/contracts';
+
+import { resolveServices } from '../services/data-dir.ts';
 import { applicationsCreate } from './applications/create.ts';
 import { applicationsDelete } from './applications/delete.ts';
 import { applicationsList } from './applications/list.ts';
@@ -48,9 +52,9 @@ import { sourcesPickFolders } from './sources/pick-folders.ts';
 import { sourcesPreview } from './sources/preview.ts';
 import { sourcesRemoveFolder } from './sources/remove-folder.ts';
 import { sourcesUpdateAuthorization } from './sources/update-authorization.ts';
-import type { HandlerTable } from './handler.ts';
+import type { HandlerTable, OpHandler } from './handler.ts';
 
-export const HANDLERS: HandlerTable = {
+const RAW_HANDLERS: HandlerTable = {
   submit_job_capture: submitJobCapture,
   submit_message_capture: submitMessageCapture,
   request_draft: requestDraft,
@@ -99,3 +103,19 @@ export const HANDLERS: HandlerTable = {
   'messages.get': messagesGet,
   'messages.update_draft': messagesUpdateDraft,
 };
+
+function gated<Op extends BridgeOperation>(op: Op, handler: OpHandler<Op>): OpHandler<Op> {
+  return (payload, services) => {
+    const resolved = resolveServices(op, services);
+    // BridgeFailure 符合每個操作的回應 schema（失敗分支共用）
+    if ('ok' in resolved) return Promise.resolve(resolved as Awaited<ReturnType<OpHandler<Op>>>);
+    return handler(payload, resolved);
+  };
+}
+
+export const HANDLERS = Object.fromEntries(
+  (Object.keys(RAW_HANDLERS) as BridgeOperation[]).map((op) => [
+    op,
+    gated(op, RAW_HANDLERS[op] as OpHandler<typeof op>),
+  ]),
+) as unknown as HandlerTable;

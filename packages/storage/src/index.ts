@@ -28,6 +28,17 @@ export {
   type ApplicationRecordRepository,
 } from './application/application-record-repository.ts';
 export { deleteMaterial, type MaterialDeletion } from './application/material-deletion.ts';
-export { sweepStorage, type StorageSweep } from './application/storage-sweep.ts';
+export {
+  OrphanPdfSweepError,
+  sweepStorage,
+  type StorageSweep,
+  type StorageSweepOptions,
+} from './application/storage-sweep.ts';
+export {
+  DATA_DIR_LOCK_FILE,
+  tryAcquireDataDirLock,
+  type AcquireDataDirLockOptions,
+  type DataDirLock,
+} from './lock/data-dir-lock.ts';
 export { type MaterialKind, type MaterialRef } from './application/materials.ts';
 export { readInterviewInput, type InterviewInput } from './application/interview-input.ts';

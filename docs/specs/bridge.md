@@ -27,6 +27,8 @@
 - 職缺網址只收 http／https（`file:`、`javascript:`、`data:` 等一律拒）。
 - 檔案、資料夾只能經 helper 開系統選取器進入（ADR-0003）；請求沒有任何路徑欄位，回應只給不透明 ID 與名稱（不含上層路徑）。
 - 時間戳記（確認時間等）由 helper 決定，不由呼叫端給。
+- 一個資料區同時只准一個 helper（P1-T052，擁有者裁定 #13）：helper 開資料區前先取得資料區鎖（作業系統檔案鎖，持有的行程結束即自動放掉，不靠 pid 判斷）。鎖被另一個仍在執行的 helper 持有時，helper 不退出、不開資料庫也不清掃；`providers.*`、`sources.*` 照沒有資料區時運作，其餘操作回 `helper_unavailable`（固定訊息見錯誤碼表），且每次收到這類操作都再試一次取得鎖，對方結束後就接手。啟動時最多等 2 秒讓對方放鎖（同一瀏覽器重連時舊 helper 可能正在結束）。
+- 啟動清掃（P1-T052，擁有者裁定 #14）：已清除素材（D19）的 PDF 刪不掉仍擋啟動；一般孤兒 PDF 刪不掉只記不含路徑的固定日誌、照常啟動，下次清掃再試。
 - 編輯器操作以「群組.動作」命名；群組對應 helper `src/handlers/<群組>/`，每個操作一個 handler 檔。尚未實作的回 `not_implemented`。
 
 擷取（P1-T034）：
@@ -98,7 +100,7 @@
 | `invalid_request` | 頁面、service worker、helper | 請求不符 schema、發送者不允許該操作，或違反信封協定 |
 | `internal_error` | 頁面、service worker、helper | helper 內部錯誤、回應不符 schema、協定錯誤，或編輯器頁連不到 service worker |
 | `not_implemented` | helper | 該操作的服務尚未接上；不偽造成功 |
-| `helper_unavailable` | service worker | 本機輔助程式未安裝、未啟動、連線中斷或送不出去 |
+| `helper_unavailable` | service worker、helper | service worker：本機輔助程式未安裝、未啟動、連線中斷或送不出去。helper（P1-T052，擁有者裁定 #13）：資料區正由另一個 helper 使用時，需要本機儲存的操作（`providers.*`、`sources.*` 以外的全部操作）回固定訊息「RoleCraft 正在另一個瀏覽器使用中，請先關閉該瀏覽器的 RoleCraft」 |
 | `timeout` | service worker | 等待 helper 回覆逾時；不影響同一連線上的其他請求 |
 
 錯誤訊息是給人看的固定文字，不回填請求內容；程式判斷只看代碼。

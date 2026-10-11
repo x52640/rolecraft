@@ -24,7 +24,9 @@ import { createProvidersService } from './handlers/providers/providers-service.t
 import { createResumeWithClaude, pauseInterruptedJobs } from './handlers/resume/assemble.ts';
 import type { HelperServices } from './handlers/services.ts';
 import { createSourcesService, type FolderPicker } from './handlers/sources/local-sources.ts';
-import { openHelperRuntime, runtimeConfigFromEnv, type HelperRuntime } from './services/runtime.ts';
+import { connectDataDir } from './services/data-dir.ts';
+import { writeNotice } from './services/notice.ts';
+import { runtimeConfigFromEnv, type HelperRuntime } from './services/runtime.ts';
 
 /** 完整 runtime（含字型、匯出版本庫）；只有 db／fileStore 的儲存不能接匯出。 */
 function isRuntime(storage: HelperStorage): storage is HelperRuntime {
@@ -51,13 +53,15 @@ export function nativePickers(platform: NodeJS.Platform = process.platform): Nat
 export function createServices(
   storage: HelperStorage | null = null,
   pickers: NativePickers = nativePickers(),
+  base: HelperServices = {},
 ): HelperServices {
   const repositories = storage && createRepositories(storage.db);
   const { folder, pdf } = pickers;
-  const providers = createProvidersService();
+  // base：資料區被占用期間已在用的服務；接手後沿用，選定的模型與資料夾不會消失（裁定 #13）
+  const providers = base.providers ?? createProvidersService();
   return {
     providers,
-    sources: createSourcesService(folder ? { picker: folder } : {}),
+    sources: base.sources ?? createSourcesService(folder ? { picker: folder } : {}),
     ...(repositories && { jobs: createJobsService(repositories.jobSnapshots) }),
     ...(repositories &&
       pdf && {
@@ -87,11 +91,20 @@ export function main(): void {
     return;
   }
   // 資料區設定錯、資料庫打不開或啟動清掃（sweepStorage）失敗：不帶著未清掃的資料區上線。
-  let runtime: HelperRuntime | null;
+  // 資料區被另一個 helper 占用：不退出、不開儲存（connectDataDir，裁定 #13）。
+  let services: HelperServices;
   try {
     const config = runtimeConfigFromEnv(process.env);
-    runtime = config && openHelperRuntime(config);
-    if (runtime) pauseInterruptedJobs(runtime.db);
+    services = config
+      ? connectDataDir(config, {
+          assemble: (runtime: HelperRuntime, base?: HelperServices) => {
+            pauseInterruptedJobs(runtime.db);
+            return createServices(runtime, nativePickers(), base);
+          },
+          withoutStorage: () => createServices(null),
+          notice: (event) => writeNotice((line) => process.stderr.write(line), event),
+        })
+      : createServices(null);
   } catch {
     logger.log({ event: 'config_invalid' });
     process.exitCode = EXIT_CODES.config;
@@ -102,7 +115,7 @@ export function main(): void {
     output: process.stdout,
     origin: process.argv[2],
     allowedOrigins,
-    services: createServices(runtime),
+    services,
     logger,
     // 用 exitCode 而非 process.exit，讓 stdout 緩衝寫完再結束。
     exit: (code) => {

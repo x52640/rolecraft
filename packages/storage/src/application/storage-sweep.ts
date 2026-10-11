@@ -21,6 +21,28 @@ export interface StorageSweep {
   releasedPdfHashes: string[];
 }
 
+/**
+ * 只有「一般孤兒 PDF」刪不掉（擁有者裁定 #14）：補刪版本（D19）都成功，只有第 2 步的孤兒檔刪除失敗。
+ * 呼叫端可記錄後照常啟動，下次清掃再試；`sweep` 是這次清掃已完成的部分（孤兒雜湊不含在內）。
+ * 仍是 StorageError 的子類：沒有特別處理它的呼叫端行為不變（照樣視為清掃失敗）。
+ */
+export class OrphanPdfSweepError extends StorageError {
+  readonly sweep: StorageSweep;
+
+  constructor(sweep: StorageSweep, options: { cause: unknown }) {
+    super('有孤兒 PDF 檔刪除失敗；下次清掃會再試', options);
+    this.sweep = sweep;
+  }
+}
+
+/**
+ * 孤兒清掃的失敗是否只是「刪檔失敗」：releasePdfs 把每個刪檔失敗收成 AggregateError 包在 StorageError 裡。
+ * 列舉檔案區失敗（讀不到資料夾等）是原始例外，不算：照樣擋啟動（保守）。
+ */
+function isOrphanDeleteFailure(error: unknown): boolean {
+  return error instanceof StorageError && error.cause instanceof AggregateError;
+}
+
 /** 啟動清掃的孤兒 PDF 寬限期：必須大於最長匯出時間（列印逾時 30 秒＋檢查），留足餘裕。 */
 export const ORPHAN_PDF_GRACE_MS = 15 * 60 * 1000;
 
@@ -40,7 +62,8 @@ export interface StorageSweepOptions {
  *    0003 觸發器仍會記入 deleted_materials，這裡補做 D19）。
  * 2. 清掉孤兒 PDF（刪檔失敗、程序中斷留下的檔案）。
  * 第 1 步補刪版本的 PDF 刪除失敗時，該版本資料列保留（下次清掃立即重試），第 2 步仍照跑；
- * 兩步都跑完才拋合併的 StorageError。
+ * 兩步都跑完才拋合併的 StorageError（已清除素材的 PDF 刪不掉仍擋啟動，裁定 #14）。
+ * 只有第 2 步的孤兒檔刪不掉時改拋 OrphanPdfSweepError（帶已完成的結果），讓啟動流程記錄後照常上線。
  * deleteMaterial 與投遞紀錄 delete 結束時也會做第 2 步。不能在外層交易中呼叫。
  */
 export function sweepStorage(
@@ -52,11 +75,11 @@ export function sweepStorage(
   assertNotInTransaction(db, '清掃儲存區');
   // 兩段都要跑：補刪版本的 PDF 刪失敗時，孤兒清掃仍要繼續；最後再一起拋。
   const failures: unknown[] = [];
-  const attempt = (stage: () => string[]): string[] => {
+  const attempt = (stage: () => string[], into: unknown[] = failures): string[] => {
     try {
       return stage();
     } catch (error) {
-      failures.push(error);
+      into.push(error);
       return [];
     }
   };
@@ -71,21 +94,26 @@ export function sweepStorage(
     });
     released.push(...hashes);
   }
-  const orphans = attempt(() =>
-    sweepOrphanPdfs(db, fileStore, {
-      graceMs: options.orphanGrace === true ? ORPHAN_PDF_GRACE_MS : 0,
-      ...(options.now === undefined ? {} : { now: options.now }),
-    }),
+  const orphanFailures: unknown[] = [];
+  const orphans = attempt(
+    () =>
+      sweepOrphanPdfs(db, fileStore, {
+        graceMs: options.orphanGrace === true ? ORPHAN_PDF_GRACE_MS : 0,
+        ...(options.now === undefined ? {} : { now: options.now }),
+      }),
+    orphanFailures,
   );
-  if (failures.length > 0) {
-    throw new StorageError('清掃儲存區時有 PDF 檔刪除失敗；下次清掃會再試', {
-      cause: new AggregateError(failures),
-    });
-  }
-  return {
+  const result: StorageSweep = {
     purgedExportVersionIds: purgedIds,
     releasedPdfHashes: [...new Set([...released, ...orphans])].sort(),
   };
+  const all = [...failures, ...orphanFailures];
+  if (all.length === 0) return result;
+  const cause = new AggregateError(all);
+  if (failures.length === 0 && orphanFailures.every(isOrphanDeleteFailure)) {
+    throw new OrphanPdfSweepError(result, { cause });
+  }
+  throw new StorageError('清掃儲存區時有 PDF 檔刪除失敗；下次清掃會再試', { cause });
 }
 
 /**
