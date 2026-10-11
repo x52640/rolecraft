@@ -1,7 +1,7 @@
 ---
 id: P1-T056
 phase: 1
-status: in_progress
+status: done
 depends_on: []
 specs: ["evidence-model.md"]
 track: review
@@ -79,7 +79,7 @@ npm run verify
 ## 中斷／接手紀錄
 
 - 最後完成：原五項＋對抗驗證屬實四項的修正與回歸測試（新測試都先在修正前確認失敗）
-- 已通過驗證：`npm run verify` 全綠
+- 已通過驗證：`npm run verify` 全綠；協調者對抗驗證（2 個角度）屬實 7 項已在 cd8a569 修正
 - 下一步：協調者審查與合併
 - Blocker：無
 

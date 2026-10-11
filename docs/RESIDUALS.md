@@ -50,3 +50,8 @@
   - 舊 helper 斷線後仍在跑背景工作時會持有鎖，同一瀏覽器新開的 helper 暫時顯示占用；資料區放網路磁碟不支援（P1-T052）。
   - `claims.reject` 對從未存在的 ID 回 `invalid_request`，只有曾刪過的才回成功；`applications.delete` 重試對已不存在的紀錄回 `application_not_found`（P1-T052）。
   - 重新授權恢復流程（`planAnalysis`）尚未接進 helper（P1-T053）。
+- 第三輪 codex review 修正（2026-10-11）殘餘：
+  - 網址結尾的全形方括號群組、後面不再接網址字元時當註記去掉：`?filter［admin］` 與 `?filter［user］` 比成相同（為了不誤拒 `［GitHub］` 註記；半形 `[admin]` 會保留）（P1-T056）。
+  - 逗號、驚嘆號後面只接普通字、沒有 `= & ? # /` 時不算截斷（`alice，-fake` 截成 `alice`）；罕見寫法會被多擋（`https://a.com，詳見第3/4頁`）（P1-T056）。
+  - 「參天」等未列入一般詞的寫法算 3（寧可多抽）（P1-T056）。
+  - 事實項存檔中「取消」仍可按：只關閉編輯框，存檔照常送出（P1-T057）。

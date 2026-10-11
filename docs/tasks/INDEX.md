@@ -62,7 +62,7 @@
 | [P1-T053](P1-T053-reauthorize-restore-claims.md) | 事實項：重新授權且內容未變時恢復原狀態 | done | 1 | domain | — |
 | [P1-T054](P1-T054-editor-helper-busy-notice.md) | 編輯器：helper 被另一個瀏覽器占用時顯示提示 | done | 1 | editor | — |
 | [P1-T055](P1-T055-providers-stale-refresh.md) | providers：逾時後的過期驗證不再覆寫狀態 | done | 1 | review | — |
-| [P1-T056](P1-T056-grounding-url-numeral-fixes.md) | 事實檢查：網址查詢參數方括號、零寬字元點、參字數量詞 | in_progress | 1 | review | — |
+| [P1-T056](P1-T056-grounding-url-numeral-fixes.md) | 事實檢查：網址查詢參數方括號、零寬字元點、參字數量詞 | done | 1 | review | — |
 | [P1-T057](P1-T057-editor-resume-claim-races.md) | 編輯器：履歷過期載入清空畫面、事實項存檔中繼續編輯被丟掉 | done | 1 | review | — |
 
 ## 依賴清單
