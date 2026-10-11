@@ -84,5 +84,11 @@ npm run verify
 4. **額度狀態不被蓋掉**（`helper/handlers/providers/providers-service.ts`）：Claude 同一時間只允許一個短驗證；同一候選的並行請求仍合併成一次，不同候選在進行中回 `not_available`（handler 對應 `invalid_request`），不呼叫模型。
 
 保守選擇：
-- 重新驗證前的版本讀取（`service.ts` 的 `readVersion`）沒有加逾時，仍沿用原行為；該處卡住只會讓該次執行等待，不會把閘門卡在「重新驗證中」。
+- 重新驗證前的版本讀取（`service.ts` 的 `readVersion`）原本沒有加逾時；對抗驗證發現它會卡住驗證槽位，已在下方修正補上。
 - 逾時常數取 120 秒（版本、auth 指令與 haiku 極短提示都遠低於此）。
+
+對抗驗證修正（E3，2026-10-11）：
+1. **驗證槽位必定釋放**（`helper/handlers/providers/claude-probe.ts`、`providers-service.ts`、`claude/service.ts`）：模型短驗證帶 `CLAUDE_MODEL_VERIFY_TIMEOUT_MS = 120_000` 的 signal 傳進 `verifyClaudeModel`（逾時取消回「無法確認」，不記為失敗）；`readVersion` 加 `CLAUDE_VERSION_READ_TIMEOUT_MS = 30_000`，卡住視為讀不到版本 → blocked。單一槽位另有硬期限 `CLAUDE_VERIFY_SLOT_DEADLINE_MS`（20 分鐘，大於自動重新驗證最壞耗時）：到期釋放槽位、回 `unknown`，那次驗證之後才回來的結果一律丟棄，不寫狀態、不記選定。回歸：verifyModel 永不結束，推進假計時器過硬期限後可選另一候選，且晚到的 quota_exhausted 不蓋掉狀態。
+2. **逾時不等 close**（`claude/reverify.ts`、`constants.ts`）：`timeoutLaunch` 逾時先中止，再等 `CLAUDE_LAUNCH_HARD_DEADLINE_EXTRA_MS = 10_000`（涵蓋 launcher 的 SIGTERM→SIGKILL 寬限），仍沒結束就直接拋 `ReverifyTimeoutError`，不再等永遠不來的 close。`readVersion` 共用同一包裝。回歸：SIGKILL 後永不 close 的假子程序，重新驗證照樣結束並停用；`--version` 卡住時 `ensureVersion` 回 blocked、不進入重新驗證。
+3. **清除 PDF 失敗可重試**（`storage/application/storage-sweep.ts`）：補刪改為一個版本一個交易，在交易內先刪資料列、再刪不再被引用的 PDF；刪檔失敗整個回滾、資料列保留，下次清掃仍走補刪路徑（不套孤兒寬限期）立即重試。仍被其他版本共用的 PDF 不刪。回歸：寬限期內連續兩次啟動清掃在刪檔失敗時都拋錯，故障排除後第三次刪掉；共用 PDF 的版本補刪後檔案保留。
+4. 手動重新檢查會清掉 quota_exhausted：確認為設計行為，不改。

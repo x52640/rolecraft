@@ -24,6 +24,13 @@ const CLAUDE_LABELS: Readonly<Record<string, string>> = {
   fable: 'Claude Fable',
 };
 
+/**
+ * 單一驗證槽位的硬期限（P1-T044 對抗驗證）。正常情況下 probe 自己就有逾時（版本讀取、重新驗證每次
+ * 啟動、模型短驗證），最壞約十幾分鐘（自動重新驗證 6 次啟動）；這裡是最後防線：超過就釋放槽位、
+ * 回「無法確認」，之後那次驗證的結果一律丟棄，不寫狀態、不記選定。
+ */
+export const CLAUDE_VERIFY_SLOT_DEADLINE_MS = 20 * 60 * 1000;
+
 interface CandidateEntry {
   readonly candidate: ServiceCandidate;
   /** 只來自 helper 自己的常數清單 */
@@ -79,8 +86,10 @@ export function createProvidersService(
   let inFlight: { readonly candidateId: string; readonly task: Promise<SelectResult> } | null =
     null;
 
-  const verify = async (entry: CandidateEntry): Promise<SelectResult> => {
+  const verify = async (entry: CandidateEntry, stale: () => boolean): Promise<SelectResult> => {
     const result = await probe.verifyModel(entry.model);
+    // 槽位已因硬期限釋放：結果過期，不寫任何狀態（避免蓋掉之後其他候選的結果）。
+    if (stale()) return { kind: 'verified', verification: 'unknown' };
     if (result.record) lastRunCheck = result.record;
     if (result.quotaExhausted) update('claude', { state: 'quota_exhausted' });
     if (result.blocked) {
@@ -129,8 +138,19 @@ export function createProvidersService(
       if (current('claude').state !== 'available') {
         return Promise.resolve({ kind: 'not_available' });
       }
-      const task = verify(entry).finally(() => {
-        inFlight = null;
+      // 槽位必定釋放：verify 結束或硬期限到（先到者），不會因 probe 卡住而永遠回 not_available。
+      let released = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const deadline = new Promise<SelectResult>((resolve) => {
+        timer = setTimeout(
+          () => resolve({ kind: 'verified', verification: 'unknown' }),
+          CLAUDE_VERIFY_SLOT_DEADLINE_MS,
+        );
+      });
+      const task = Promise.race([verify(entry, () => released), deadline]).finally(() => {
+        released = true;
+        clearTimeout(timer);
+        if (inFlight?.task === task) inFlight = null;
       });
       inFlight = { candidateId: entry.candidate.candidateId, task };
       return task;

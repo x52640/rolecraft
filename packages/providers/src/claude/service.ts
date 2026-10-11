@@ -9,10 +9,14 @@ import {
 import { withEmptyWorkDir } from '../core/workdir.ts';
 import { type ClaudeAdapter, type ClaudeAdapterOptions, createClaudeAdapter } from './adapter.ts';
 import { parseVersion } from './auth.ts';
-import { CLAUDE_ENVIRONMENT, CLAUDE_VERSION_COMMAND } from './constants.ts';
+import {
+  CLAUDE_ENVIRONMENT,
+  CLAUDE_VERSION_COMMAND,
+  CLAUDE_VERSION_READ_TIMEOUT_MS,
+} from './constants.ts';
 import { claudeRunDeps } from './guard.ts';
 import { findManagedSettings, locateClaude } from './locate.ts';
-import { type ReverifyDeps, runClaudeReverification } from './reverify.ts';
+import { type ReverifyDeps, runClaudeReverification, timeoutLaunch } from './reverify.ts';
 import {
   type ClaudeVersionRecord,
   ClaudeVersionGate,
@@ -78,9 +82,9 @@ export function createClaudeService(options: ClaudeServiceOptions = {}): ClaudeS
           cwd,
           ...(deps.spawn ? { spawn: deps.spawn } : {}),
         });
-        return parseVersion(
-          await launch({ executablePath: path, command: CLAUDE_VERSION_COMMAND }),
-        );
+        // 有執行逾時：卡住的 --version 視為讀不到版本（→ blocked），不讓呼叫端永遠等待。
+        const timed = timeoutLaunch(launch, CLAUDE_VERSION_READ_TIMEOUT_MS);
+        return parseVersion(await timed({ executablePath: path, command: CLAUDE_VERSION_COMMAND }));
       });
     } catch {
       return null;

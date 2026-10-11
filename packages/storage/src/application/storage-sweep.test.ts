@@ -82,8 +82,40 @@ describe('sweepStorage 刪檔失敗', () => {
     expect((thrown as StorageError).cause).toBeInstanceOf(AggregateError);
     expect(t.files.has(orphan.hash)).toBe(false);
     expect(t.files.has(unapplied.pdfHash)).toBe(true);
-    expect(t.db.prepare('SELECT 1 FROM export_versions WHERE id = ?').get(unapplied.id)).toBe(
-      undefined,
+    // 刪檔失敗 → 資料列保留，下次清掃仍視為待補刪（P1-T044 對抗驗證）
+    expect(t.db.prepare('SELECT 1 FROM export_versions WHERE id = ?').get(unapplied.id)).toEqual(
+      expect.anything(),
     );
+  });
+
+  it('刪檔失敗後，寬限期內的下次啟動清掃仍立即重試：失敗照拋、恢復後刪掉（D19）', () => {
+    const unapplied = t.exportNow();
+    t.db.prepare('DELETE FROM claims WHERE id = ?').run(t.fact.id);
+    const internals = fileStoreInternals(t.files);
+    const original = internals.delete.bind(internals);
+    const spy = vi.spyOn(internals, 'delete').mockImplementation((hash) => {
+      if (hash === unapplied.pdfHash) throw new Error('EBUSY');
+      return original(hash);
+    });
+    expect(() => sweepStorage(t.db, t.files, { orphanGrace: true })).toThrow(StorageError);
+    expect(() => sweepStorage(t.db, t.files, { orphanGrace: true })).toThrow(StorageError);
+    expect(t.files.has(unapplied.pdfHash)).toBe(true);
+    spy.mockRestore();
+    expect(sweepStorage(t.db, t.files, { orphanGrace: true })).toEqual({
+      purgedExportVersionIds: [unapplied.id],
+      releasedPdfHashes: [unapplied.pdfHash],
+    });
+    expect(t.files.has(unapplied.pdfHash)).toBe(false);
+  });
+
+  it('補刪版本與其他版本共用同一 PDF：仍被引用就不刪檔', () => {
+    const unapplied = t.exportNow('same');
+    const applied = t.exportNow('same');
+    expect(unapplied.pdfHash).toBe(applied.pdfHash);
+    t.apply(applied);
+    t.db.prepare('DELETE FROM claims WHERE id = ?').run(t.fact.id);
+    const result = sweepStorage(t.db, t.files);
+    expect(result).toEqual({ purgedExportVersionIds: [unapplied.id], releasedPdfHashes: [] });
+    expect(t.files.has(applied.pdfHash)).toBe(true);
   });
 });

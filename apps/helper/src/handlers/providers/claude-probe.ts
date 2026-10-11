@@ -46,6 +46,12 @@ export interface ClaudeProbe {
   readonly candidates: readonly string[];
 }
 
+/**
+ * 模型短驗證（一次極短提示）的執行逾時（P1-T044 對抗驗證）：逾時中止 CLI 行程群組，
+ * 不讓 providers-service 的單一驗證槽位被卡住。
+ */
+export const CLAUDE_MODEL_VERIFY_TIMEOUT_MS = 120_000;
+
 export interface ClaudeProbeOptions {
   /** 共用的 Claude 服務（版本閘門要與一般執行共用同一個才互斥）；預設自己建一個、不接保存介面 */
   readonly service?: ClaudeService;
@@ -95,12 +101,25 @@ export function createClaudeProbe(options: ClaudeProbeOptions = {}): ClaudeProbe
       if (version.status === 'blocked') {
         return { verification: 'unknown', quotaExhausted: false, blocked: true, record: null };
       }
-      const probe = await verifyClaudeModel(service.adapter, model, d);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), CLAUDE_MODEL_VERIFY_TIMEOUT_MS);
+      const probe = await verifyClaudeModel(service.adapter, model, d, controller.signal).finally(
+        () => clearTimeout(timer),
+      );
       if (!probe.record.executed) {
         return {
           verification: 'unknown',
           quotaExhausted: false,
           blocked: true,
+          record: probe.record,
+        };
+      }
+      if (probe.error?.kind === 'cancelled') {
+        // 只有自己的逾時會取消：無法確認，不記為失敗。
+        return {
+          verification: 'unknown',
+          quotaExhausted: false,
+          blocked: false,
           record: probe.record,
         };
       }

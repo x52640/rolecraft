@@ -6,7 +6,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { Launch, SpawnFn } from '../core/process.ts';
 import {
+  CLAUDE_LAUNCH_HARD_DEADLINE_EXTRA_MS,
   CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS,
+  CLAUDE_VERSION_READ_TIMEOUT_MS,
   CLAUDE_RUN_COMMAND,
   CLAUDE_VERSION_COMMAND,
 } from './constants.ts';
@@ -156,7 +158,8 @@ describe('保存介面', () => {
 });
 
 /** 假子程序：永遠不結束、忽略 SIGTERM，只有 SIGKILL 才以 exitCode null 結束。 */
-function hangingChild(signals: string[]): ChildProcess {
+/** closeOnKill=false：SIGKILL 後 close 也不來（逃出群組的孫行程握著 stdout）。 */
+function hangingChild(signals: string[], closeOnKill = true): ChildProcess {
   const child = new EventEmitter() as ChildProcess & EventEmitter;
   const stdout = new PassThrough();
   const stderr = new PassThrough();
@@ -166,7 +169,7 @@ function hangingChild(signals: string[]): ChildProcess {
     stdin: new PassThrough(),
     kill: (signal: string) => {
       signals.push(signal);
-      if (signal === 'SIGKILL') {
+      if (signal === 'SIGKILL' && closeOnKill) {
         stdout.end();
         stderr.end();
         process.nextTick(() => child.emit('close', null));
@@ -207,6 +210,65 @@ describe('重新驗證執行逾時', () => {
       expect(saved.at(-1)?.reason).toContain('ReverifyTimeoutError');
       expect(svc.gate.state.kind).toBe('disabled');
       expect(spawned).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('SIGKILL 後 close 永遠不來 → 硬期限到就不再等，記為失敗並停用', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const fake = versionedFake({ version: NEW });
+      const signals: string[] = [];
+      let hung!: () => void;
+      const started = new Promise<void>((r) => (hung = r));
+      let spawned = 0;
+      const spawn: SpawnFn = (file, args, options) => {
+        spawned += 1;
+        if (spawned === 1) return fake.spawn(file, args, options);
+        hung();
+        return hangingChild(signals, false);
+      };
+      const { store, saved } = memoryStore();
+      const svc = service(store);
+      const pending = svc.run(REQ, runDeps(spawn));
+      await started;
+      await vi.advanceTimersByTimeAsync(
+        CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS + CLAUDE_LAUNCH_HARD_DEADLINE_EXTRA_MS + 1000,
+      );
+      // 修正前：launch 只在 close 時結束，這裡永遠等不到（測試逾時）
+      const res = await pending;
+      expect(signals).toEqual(['SIGTERM', 'SIGKILL']);
+      expect(res.version).toMatchObject({ status: 'blocked' });
+      expect(saved.at(-1)?.reason).toContain('ReverifyTimeoutError');
+      expect(svc.gate.state.kind).toBe('disabled');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('重新驗證前讀版本（--version）卡住 → 逾時視為讀不到版本，blocked、不重新驗證', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const signals: string[] = [];
+      let hung!: () => void;
+      const started = new Promise<void>((r) => (hung = r));
+      const { store, saved } = memoryStore();
+      const svc = service(store);
+      const pending = svc.ensureVersion(
+        runDeps(() => {
+          hung();
+          return hangingChild(signals, false);
+        }),
+      );
+      await started;
+      await vi.advanceTimersByTimeAsync(
+        CLAUDE_VERSION_READ_TIMEOUT_MS + CLAUDE_LAUNCH_HARD_DEADLINE_EXTRA_MS + 1000,
+      );
+      // 修正前：--version 沒有逾時，這裡永遠等不到（測試逾時）
+      expect(await pending).toMatchObject({ status: 'blocked', record: null });
+      expect(saved).toEqual([]);
+      expect(svc.gate.state.kind).not.toBe('reverifying');
     } finally {
       vi.useRealTimers();
     }

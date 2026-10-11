@@ -39,7 +39,8 @@ export interface StorageSweepOptions {
  * 1. 未投遞、卻保存了已刪素材副本的匯出版本整份刪除（素材若被繞過 deleteMaterial 刪掉，
  *    0003 觸發器仍會記入 deleted_materials，這裡補做 D19）。
  * 2. 清掉孤兒 PDF（刪檔失敗、程序中斷留下的檔案）。
- * 第 1 步補刪版本的 PDF 刪除失敗時，第 2 步仍照跑；兩步都跑完才拋合併的 StorageError。
+ * 第 1 步補刪版本的 PDF 刪除失敗時，該版本資料列保留（下次清掃立即重試），第 2 步仍照跑；
+ * 兩步都跑完才拋合併的 StorageError。
  * deleteMaterial 與投遞紀錄 delete 結束時也會做第 2 步。不能在外層交易中呼叫。
  */
 export function sweepStorage(
@@ -49,19 +50,6 @@ export function sweepStorage(
 ): StorageSweep {
   assertImmutabilityGuards(db);
   assertNotInTransaction(db, '清掃儲存區');
-  const purged = transaction(db, () => {
-    const found: { id: string; pdfHash: string | null }[] = [];
-    const rows = db.prepare('SELECT id, data FROM export_versions ORDER BY exported_at, id').all();
-    for (const row of rows) {
-      const version = decode(ExportVersion, row.data, `export_versions[${String(row.id)}]`);
-      if (isExportVersionApplied(db, version.id)) continue;
-      if (deletedMaterialsHeldBy(db, version).length === 0) continue;
-      found.push({ id: version.id, pdfHash: deleteUnappliedExportVersion(db, version.id) });
-    }
-    return found;
-  });
-  // 補刪版本的 PDF 含已刪素材：不套寬限期，提交後立即刪（仍被其他版本共用的不刪）
-  const purgedHashes = purged.flatMap((p) => (p.pdfHash === null ? [] : [p.pdfHash]));
   // 兩段都要跑：補刪版本的 PDF 刪失敗時，孤兒清掃仍要繼續；最後再一起拋。
   const failures: unknown[] = [];
   const attempt = (stage: () => string[]): string[] => {
@@ -72,7 +60,17 @@ export function sweepStorage(
       return [];
     }
   };
-  const released = attempt(() => releasePdfs(db, fileStore, purgedHashes));
+  const purgedIds: string[] = [];
+  const released: string[] = [];
+  const candidates = db.prepare('SELECT id FROM export_versions ORDER BY exported_at, id').all();
+  for (const { id } of candidates) {
+    const hashes = attempt(() => {
+      const purged = purgeIfHoldsDeleted(db, fileStore, String(id));
+      if (purged) purgedIds.push(String(id));
+      return purged ?? [];
+    });
+    released.push(...hashes);
+  }
   const orphans = attempt(() =>
     sweepOrphanPdfs(db, fileStore, {
       graceMs: options.orphanGrace === true ? ORPHAN_PDF_GRACE_MS : 0,
@@ -85,7 +83,25 @@ export function sweepStorage(
     });
   }
   return {
-    purgedExportVersionIds: purged.map((p) => p.id),
+    purgedExportVersionIds: purgedIds,
     releasedPdfHashes: [...new Set([...released, ...orphans])].sort(),
   };
+}
+
+/**
+ * 一個版本一個交易：未投遞且含已刪素材 → 刪資料列，並在「提交前」刪掉不再被引用的 PDF。
+ * 刪檔失敗就整個回滾、資料列保留，下次清掃仍走這條路（不套孤兒寬限期）立即重試，
+ * 不會變成「列已刪、檔還在、又被寬限期跳過」（D19）。仍被其他版本共用的 PDF 不刪。
+ * 回傳刪掉的 PDF 雜湊；不需補刪回 null。
+ */
+function purgeIfHoldsDeleted(db: DatabaseSync, fileStore: FileStore, id: string): string[] | null {
+  return transaction(db, () => {
+    const row = db.prepare('SELECT data FROM export_versions WHERE id = ?').get(id);
+    if (!row) return null;
+    const version = decode(ExportVersion, row.data, `export_versions[${id}]`);
+    if (isExportVersionApplied(db, version.id)) return null;
+    if (deletedMaterialsHeldBy(db, version).length === 0) return null;
+    const pdfHash = deleteUnappliedExportVersion(db, version.id);
+    return pdfHash === null ? [] : releasePdfs(db, fileStore, [pdfHash]);
+  });
 }

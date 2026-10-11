@@ -5,9 +5,9 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 
 import { createClaudeService, type RunDeps } from '@rolecraft/providers';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { createClaudeProbe } from './claude-probe.ts';
+import { CLAUDE_MODEL_VERIFY_TIMEOUT_MS, createClaudeProbe } from './claude-probe.ts';
 import { createProvidersService } from './providers-service.ts';
 
 /**
@@ -27,6 +27,8 @@ interface Script {
   version?: string;
   auth?: string;
   run?: string;
+  /** 正式執行輸出完就卡住（不結束），直到被 kill */
+  hangRun?: boolean;
 }
 
 function fakeClaude(script: Script = {}) {
@@ -51,6 +53,7 @@ function fakeClaude(script: Script = {}) {
     const lines = out.split(/(?<=\n)/);
     const step = (i: number) => {
       const line = lines[i];
+      if (!killed && line === undefined && script.hangRun && args[0] === '-p') return;
       if (killed || line === undefined) {
         stdout.end();
         setImmediate(() => child.emit('close', killed ? null : 0));
@@ -174,5 +177,23 @@ describe('Claude 檢查（假 spawn）', () => {
     const model = run?.args[run.args.indexOf('--model') + 1];
     expect(model).toBe('haiku');
     expect(run?.args).not.toContain('cand0');
+  });
+
+  it('模型短驗證卡住 → 逾時中止行程、回無法確認（P1-T044 對抗驗證）', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { probe, fake } = probeWith({ run: '', hangRun: true });
+      const pending = probe.verifyModel('haiku');
+      const running = () => fake.calls.some((c) => c.args[0] === '-p');
+      for (let i = 0; i < 1000 && !running(); i += 1) {
+        await new Promise((r) => setImmediate(r));
+      }
+      expect(running()).toBe(true);
+      await vi.advanceTimersByTimeAsync(CLAUDE_MODEL_VERIFY_TIMEOUT_MS + 1);
+      // 修正前：沒有逾時，這裡永遠等不到（測試逾時）
+      expect(await pending).toMatchObject({ verification: 'unknown', blocked: false });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

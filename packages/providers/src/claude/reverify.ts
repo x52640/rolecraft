@@ -6,6 +6,7 @@ import { cliConfigItem, parseAuthStatus, parseVersion, subscriptionLoginItem } f
 import {
   CLAUDE_AUTH_STATUS_COMMAND,
   CLAUDE_ENVIRONMENT,
+  CLAUDE_LAUNCH_HARD_DEADLINE_EXTRA_MS,
   CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS,
   CLAUDE_RUN_COMMAND,
   CLAUDE_VERSION_COMMAND,
@@ -80,22 +81,37 @@ export class ReverifyTimeoutError extends Error {
   override readonly name = 'ReverifyTimeoutError';
 }
 
-/** 包住 launch：每次啟動各自一個逾時；逾時就中止（launcher 終止整個行程群組）並拋錯。 */
+/**
+ * 包住 launch：每次啟動各自一個逾時；逾時就中止（launcher 終止整個行程群組）並拋錯。
+ * 中止後最多再等 hardExtraMs：子程序的 close 可能永遠不來（逃出群組的孫行程握著 stdout），
+ * 超過就不再等 launch、直接拋 ReverifyTimeoutError，呼叫端不會卡住。
+ */
 export function timeoutLaunch(
   launch: Launch,
   ms: number = CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS,
+  hardExtraMs: number = CLAUDE_LAUNCH_HARD_DEADLINE_EXTRA_MS,
 ): Launch {
   return async (request) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ms);
+    const timeoutError = () => new ReverifyTimeoutError(`單次執行超過 ${ms} 毫秒未結束，已終止`);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let hardTimer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        hardTimer = setTimeout(() => reject(timeoutError()), hardExtraMs);
+      }, ms);
+    });
     try {
-      const output = await launch({ ...request, signal: controller.signal });
-      if (controller.signal.aborted) {
-        throw new ReverifyTimeoutError(`單次執行超過 ${ms} 毫秒未結束，已終止`);
-      }
+      const output = await Promise.race([
+        launch({ ...request, signal: controller.signal }),
+        deadline,
+      ]);
+      if (controller.signal.aborted) throw timeoutError();
       return output;
     } finally {
       clearTimeout(timer);
+      clearTimeout(hardTimer);
     }
   };
 }

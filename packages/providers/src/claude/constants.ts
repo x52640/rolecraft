@@ -148,3 +148,12 @@ export const CLAUDE_RATE_LIMIT_OK: readonly string[] = ['allowed', 'allowed_warn
  * 該次重新驗證記為失敗，避免卡在「重新驗證中」。
  */
 export const CLAUDE_REVERIFY_LAUNCH_TIMEOUT_MS = 120_000;
+
+/**
+ * 逾時中止後的硬期限餘裕：launcher 送 SIGTERM、寬限 2 秒後 SIGKILL，但只在子程序 close 時才結束；
+ * 逃出行程群組的孫行程握著 stdout 時 close 永遠不來。超過「逾時＋此餘裕」就不再等，直接拋逾時。
+ */
+export const CLAUDE_LAUNCH_HARD_DEADLINE_EXTRA_MS = 10_000;
+
+/** 讀 CLI 版本（`--version`）的執行逾時；逾時視為讀不到版本 → 不視為已驗證、該次被擋下。 */
+export const CLAUDE_VERSION_READ_TIMEOUT_MS = 30_000;
