@@ -62,16 +62,20 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：
-- 已通過驗證：
-- 下一步：
-- Blocker：
+- 最後完成：`verify()` 被擋後的自動重新檢查回來先檢查 `stale()`，過期整次不寫狀態
+- 已通過驗證：`npm run verify` 綠（2764 測試通過）
+- 下一步：協調者審查、合併
+- Blocker：無
 
 ## 完成結果
 
+1. **過期的自動重新檢查不寫狀態**（`apps/helper/src/handlers/providers/providers-service.ts`）：把 `refresh()` 拆成 `probe.check()` 與 `applyCheck()`；`verify()` 被擋時改成先等 `probe.check()`，回來後先檢查 `stale()`，已過硬期限就直接回 `unknown`，不套用檢查結果、不寫 `eligibility_unknown`、不記選定。檢查之後到 return 之間沒有 `await`，其後的寫入都落在同一個未過期時點。使用者主動 `recheck` 仍走 `refresh()`，行為不變。
+2. **回歸測試**（`providers-slot.test.ts`）：候選 A 驗證被擋、重新檢查卡住過硬期限；候選 B 接著寫入 `quota_exhausted`；卡住的檢查晚到「成功」或「失敗」兩種情況都不能蓋掉 `quota_exhausted`。修正前兩案都失敗（狀態被蓋成 `eligibility_unknown`）。
+
+對抗驗證：只做了自我檢查（逐一確認 `verify()` 內每個 `await` 之後的寫入都有 `stale()` 把關），沒有另開 agent。

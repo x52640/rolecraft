@@ -5,7 +5,12 @@ import { randomUUID } from 'node:crypto';
 
 import type { Provider, RunCheckRecord } from '@rolecraft/contracts';
 
-import { type ClaudeProbe, type ClaudeProbeOptions, createClaudeProbe } from './claude-probe.ts';
+import {
+  type ClaudeCheck,
+  type ClaudeProbe,
+  type ClaudeProbeOptions,
+  createClaudeProbe,
+} from './claude-probe.ts';
 import type { ProvidersService, SelectResult, ServiceCandidate, ServiceStatus } from './service.ts';
 import { ALL_SERVICES, claudeState, initialStatus } from './state.ts';
 
@@ -69,17 +74,17 @@ export function createProvidersService(
     return next;
   };
 
-  const refresh = async (): Promise<ServiceStatus> => {
-    const check = await probe.check();
-    // 重新檢查不呼叫模型，無法得知額度；清掉舊的額度不足標記，下次執行再由工具回報。
-    return update('claude', {
+  // 重新檢查不呼叫模型，無法得知額度；清掉舊的額度不足標記，下次執行再由工具回報。
+  const applyCheck = (check: ClaudeCheck): ServiceStatus =>
+    update('claude', {
       state: claudeState(check, false),
       login: check.login,
       eligibility: check.eligibility,
       subscriptionOnly: check.subscriptionOnly,
       checkedAt: check.checkedAt,
     });
-  };
+
+  const refresh = async (): Promise<ServiceStatus> => applyCheck(await probe.check());
 
   // Claude 同一時間只跑一個短驗證：被擋時的自動重新檢查會覆寫狀態，
   // 兩個候選並行時可能蓋掉另一個剛設的 quota_exhausted（P1-T044）。
@@ -94,7 +99,11 @@ export function createProvidersService(
     if (result.quotaExhausted) update('claude', { state: 'quota_exhausted' });
     if (result.blocked) {
       // 執行前被擋：先前的「可用」已不可信。重新檢查更新狀態；檢查仍說可用（例如閘門暫時擋下）也不保留可用。
-      const fresh = await refresh().catch(() => null);
+      const check = await probe.check().catch(() => null);
+      // 重新檢查可能卡過硬期限（P1-T055）：期間其他候選已寫入狀態，過期就整次不寫。
+      // 以下到 return 之間沒有 await，這次檢查之後的寫入都在同一個未過期的時點完成。
+      if (stale()) return { kind: 'verified', verification: 'unknown' };
+      const fresh = check ? applyCheck(check) : null;
       if (!fresh || fresh.state === 'available') {
         update('claude', { state: 'eligibility_unknown', checkedAt: new Date().toISOString() });
       }
