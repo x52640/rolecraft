@@ -6,3 +6,6 @@ coverage/
 *.sqlite
 *.db
 .claude/worktrees/
+
+# 擁有者提供的原始樣本（含個資，去識別化後才可進 repo）
+local-samples/
