@@ -39,6 +39,11 @@ export interface DraftContext {
 
 export interface DraftConversion {
   readonly claims: readonly Claim[];
+  /**
+   * 既有事實項的更新：模型把某草稿列入矛盾，而該草稿與既有（或本次執行已提交的）事實項重複時，
+   * 改把那個既有事實項升為「來源矛盾」。呼叫端要與新事實項同一交易寫入。
+   */
+  readonly claimUpdates: readonly Claim[];
   readonly conflicts: readonly SourceConflictMark[];
   readonly dropped: readonly DroppedDraft[];
 }
@@ -106,14 +111,23 @@ function dedupeKey(claim: Claim, excerpt: SourceExcerpt): string {
   ]);
 }
 
-function existingKeys(claims: readonly Claim[]): Set<string> {
-  const keys = new Set<string>();
+function existingKeys(claims: readonly Claim[]): Map<string, Claim> {
+  const keys = new Map<string, Claim>();
   for (const claim of claims) {
     // 只對「正常」的既有事實項去重：待複核、矛盾、已移除的不能代替新分析的結果。
     if (claim.reviewStatus !== 'normal') continue;
-    for (const excerpt of claim.basis.sourceExcerpts) keys.add(dedupeKey(claim, excerpt));
+    for (const excerpt of claim.basis.sourceExcerpts) {
+      const key = dedupeKey(claim, excerpt);
+      if (!keys.has(key)) keys.set(key, claim);
+    }
   }
   return keys;
+}
+
+/** 被判為重複的草稿實際指向的事實項，以及草稿在本次文件中定位到的片段。 */
+interface Alias {
+  readonly claim: Claim;
+  readonly excerpt: SourceExcerpt;
 }
 
 /** 把通過格式驗證的模型輸出轉成事實項；不合格的草稿逐項丟棄並記錄原因。 */
@@ -121,6 +135,7 @@ export function convertDrafts(output: AnalysisOutput, ctx: DraftContext): DraftC
   const seen = existingKeys(ctx.existingClaims);
   const dropped: DroppedDraft[] = [];
   const byIndex = new Map<number, Claim>();
+  const aliases = new Map<number, Alias>();
 
   output.claims.forEach((draft, index) => {
     const excerpt = locate(draft, ctx);
@@ -146,49 +161,69 @@ export function convertDrafts(output: AnalysisOutput, ctx: DraftContext): DraftC
       return;
     }
     const key = dedupeKey(parsed.data, excerpt);
-    if (seen.has(key)) {
+    const known = seen.get(key);
+    if (known) {
+      // 重複仍保留對應關係：模型若把這項列入矛盾，改標到原本那個事實項上（不吃掉更正）。
+      aliases.set(index, { claim: known, excerpt });
       dropped.push({ index, reason: 'duplicate' });
       return;
     }
-    seen.add(key);
+    seen.set(key, parsed.data);
     byIndex.set(index, parsed.data);
   });
 
-  return applyDraftConflicts(output, byIndex, dropped);
+  return applyDraftConflicts(output, byIndex, aliases, dropped);
 }
 
 /**
  * 模型指出的同文件矛盾：涉及且留下來的事實項一律升為「來源矛盾」（只會更嚴格）。
+ * 涉及的草稿若因重複被丟棄，改指向它重複的事實項；那是既有事實項時以 claimUpdates 回傳。
  * 有至少兩個不同原文時另產生矛盾標記供畫面並列顯示。
  */
 function applyDraftConflicts(
   output: AnalysisOutput,
   byIndex: ReadonlyMap<number, Claim>,
+  aliases: ReadonlyMap<number, Alias>,
   dropped: readonly DroppedDraft[],
 ): DraftConversion {
-  let claims = [...byIndex.values()];
+  const fresh = [...byIndex.values()];
+  const freshIds = new Set(fresh.map((c) => c.id));
+  const touchedKnown = new Map<Id, Claim>();
   const marks: SourceConflictMark[] = [];
   const flagged = new Set<Id>();
   for (const conflict of output.conflicts) {
-    const involved = conflict.claims.flatMap((i) => byIndex.get(i) ?? []);
-    for (const claim of involved) flagged.add(claim.id);
+    const involved = conflict.claims.flatMap((i): Alias[] => {
+      const claim = byIndex.get(i);
+      if (claim) return claim.basis.sourceExcerpts.map((excerpt) => ({ claim, excerpt }));
+      const alias = aliases.get(i);
+      return alias ? [alias] : [];
+    });
+    const ids = new Set<Id>();
     const excerpts = new Map<string, SourceExcerpt>();
-    for (const claim of involved) {
-      for (const e of claim.basis.sourceExcerpts) excerpts.set(`${e.location}\n${e.text}`, e);
+    for (const { claim, excerpt } of involved) {
+      ids.add(claim.id);
+      flagged.add(claim.id);
+      if (!freshIds.has(claim.id)) touchedKnown.set(claim.id, claim);
+      excerpts.set(`${excerpt.location}\n${excerpt.text}`, excerpt);
     }
     if (excerpts.size >= 2) {
       marks.push({
         scope: 'same_document',
-        claimIds: involved.map((c) => c.id),
+        claimIds: [...ids],
         excerpts: [...excerpts.values()],
         summary: conflict.summary,
       });
     }
   }
-  claims = applyConflictMarks(claims, marks).map((claim) =>
+  const all = applyConflictMarks([...fresh, ...touchedKnown.values()], marks).map((claim) =>
     flagged.has(claim.id)
       ? { ...claim, reviewStatus: escalateReviewStatus(claim.reviewStatus, 'source_conflict') }
       : claim,
   );
-  return { claims, conflicts: marks, dropped };
+  return {
+    claims: all.filter((c) => freshIds.has(c.id)),
+    claimUpdates: all.filter((c) => !freshIds.has(c.id)),
+    conflicts: marks,
+    dropped,
+  };
 }

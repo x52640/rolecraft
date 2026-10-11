@@ -67,7 +67,7 @@ function makePlan(globalSummary: readonly DocumentSummary[] = []): AnalysisPlan 
 
 interface Harness {
   readonly deps: AnalysisRunnerDeps<string>;
-  readonly commits: { job: WorkJob; result: UnitAnalysisResult }[];
+  readonly commits: { job: WorkJob; result: UnitAnalysisResult; claimUpdates: readonly Claim[] }[];
   readonly saved: WorkJob[];
   readonly records: RunCheckRecord[];
   readonly sleeps: number[];
@@ -79,6 +79,7 @@ function harness(
   options: {
     fake?: FakeAdapterOptions;
     docs?: ReadonlyMap<string, AnalysisDocument>;
+    loadDocument?: AnalysisRunnerDeps<string>['loadDocument'];
     execute?: (prompt: string) => Promise<RunOutcome>;
   } = {},
 ): Harness {
@@ -101,10 +102,12 @@ function harness(
           { parentEnv: { PATH: '/usr/bin' }, now: () => new Date(0), newId: () => 'run-check' },
         ),
       cancellation: { signal: 'signal', abort: () => (aborted = true), aborted: () => aborted },
-      loadDocument: (id) => Promise.resolve((options.docs ?? DOCS).get(id) ?? null),
+      loadDocument:
+        options.loadDocument ?? ((id) => Promise.resolve((options.docs ?? DOCS).get(id) ?? null)),
       existingClaims: [],
-      commitUnit: ({ job, written }) => {
-        h.commits.push({ job, result: written.output });
+      commitUnit: ({ job, written, claimUpdates }) => {
+        // 呼叫端在同一交易寫入既有事實項的更新
+        h.commits.push({ job, result: written.output, claimUpdates });
         return Promise.resolve();
       },
       saveJob: (job) => {
@@ -320,6 +323,83 @@ describe('analysis runner（fake provider 完整流程）', () => {
     expect(h.commits[0]?.result.claims.map((c) => c.text)).toEqual(['登入功能']);
     expect(h.commits[1]?.result.claims).toEqual([]);
     expect(h.commits[1]?.result.dropped).toContainEqual({ index: 0, reason: 'duplicate' });
+  });
+
+  it('escalates a claim committed by an earlier unit when a later unit reports it contradicted', async () => {
+    const text = '# A\n\n完成匯出功能。\n\n# B\n\n完成匯出功能。\n\n先前記載有誤，匯出已撤下。';
+    const d = doc('a', text);
+    const docs = new Map([['a', d]]);
+    const planned = planAnalysis({
+      documents: [d],
+      deletedDocumentIds: [],
+      analyzed: [],
+      existingClaims: [],
+      globalSummary: [],
+      budget: budget(200_000),
+      newId: idSource('e'),
+    });
+    const unit = planned.ok ? planned.plan?.units[0] : undefined;
+    if (!planned.ok || !planned.plan || !unit) throw new Error('plan failed');
+    const at = text.indexOf('# B');
+    const seg = (start: number, end: number) => [{ start, end, estimatedTokens: 1, split: true }];
+    const plan: AnalysisPlan = {
+      ...planned.plan,
+      units: [
+        { ...unit, segments: seg(0, at) },
+        { ...unit, unitId: 'unit-a-2', segments: seg(at, text.length) },
+      ],
+    };
+    const done = {
+      segment: 'S1',
+      type: 'feature',
+      text: '匯出功能',
+      completionStatus: 'documented_done',
+      excerpt: '完成匯出功能。',
+    };
+    const revoked = {
+      segment: 'S1',
+      type: 'feature',
+      text: '匯出已撤下',
+      completionStatus: 'unknown',
+      excerpt: '先前記載有誤，匯出已撤下。',
+    };
+    const second = modelOutput([done, revoked], '摘要', [{ claims: [0, 1], summary: '更正' }]);
+    // 第三個單元再抽一次同一事實項：已升為矛盾的不再拿來去重
+    const third = { ...unit, unitId: 'unit-a-3', segments: seg(0, at) };
+    const h = harness(
+      [{ text: modelOutput([done]) }, { text: second }, { text: modelOutput([done]) }],
+      { docs },
+    );
+    const report = await createAnalysisRunner(
+      { ...plan, units: [...plan.units, third] },
+      newRun({ ...plan, units: [...plan.units, third] }),
+      h.deps,
+    ).run();
+    expect(report.status).toBe('completed');
+    const first = h.commits[0]?.result.claims[0];
+    expect(h.commits[0]?.claimUpdates).toEqual([]);
+    expect(h.commits[1]?.claimUpdates.map((c) => [c.id, c.reviewStatus])).toEqual([
+      [first?.id, 'source_conflict'],
+    ]);
+    expect(h.commits[1]?.result.conflicts).toHaveLength(1);
+    expect(h.commits[1]?.result.conflicts[0]?.claimIds).toContain(first?.id);
+    expect(h.commits[2]?.result.claims.map((c) => c.text)).toEqual(['匯出功能']);
+  });
+
+  it('saves the paused state when cancelled while loading a document that then fails to prepare', async () => {
+    const plan = makePlan();
+    const ref: { runner?: ReturnType<typeof createAnalysisRunner> } = {};
+    const h = harness([], {
+      loadDocument: () => {
+        ref.runner?.cancel();
+        return Promise.resolve(null);
+      },
+    });
+    ref.runner = createAnalysisRunner(plan, newRun(plan), h.deps);
+    const report = await ref.runner.run();
+    expect(report.status).toBe('paused');
+    expect(h.saved.at(-1)?.pauseReason).toBe('user_cancelled');
+    expect(h.prompts).toHaveLength(0);
   });
 
   it('refuses to send when the document changed or lost authorization since planning', async () => {

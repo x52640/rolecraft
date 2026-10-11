@@ -40,10 +40,14 @@ export interface AnalysisRunnerDeps<S> {
   readonly loadDocument: (id: Id) => Promise<AnalysisDocument | null>;
   /** 既有事實項（去重用） */
   readonly existingClaims: readonly Claim[];
-  /** 單元結果＋新的工作狀態，必須在同一個交易內寫入（不半套寫入） */
+  /**
+   * 單元結果＋新的工作狀態＋既有事實項的更新（同文件矛盾升為來源矛盾），
+   * 必須在同一個交易內寫入（不半套寫入）
+   */
   readonly commitUnit: (commit: {
     readonly job: WorkJob;
     readonly written: WrittenOutput<UnitAnalysisResult>;
+    readonly claimUpdates: readonly Claim[];
   }) => Promise<void>;
   /** 保存工作狀態（暫停、重試次數） */
   readonly saveJob: (job: WorkJob) => Promise<void>;
@@ -160,10 +164,11 @@ export function createAnalysisRunner<S>(
     if (!unit) throw new Error(`計畫中找不到單元：${pending?.id ?? '（無）'}`);
 
     const prepared = await prepareUnit(unit, plan.globalSummary, deps.loadDocument, deps.newId);
+    // 讀文件期間被取消：先保存暫停狀態，不論準備結果
+    if (run.job.status !== 'running') return paused(null);
     if (!prepared.ok) {
       return { status: 'not_sent', job: run.job, unitId: unit.unitId, reason: prepared.reason };
     }
-    if (run.job.status !== 'running') return paused(null);
 
     const before = run;
     const attemptId = deps.newId();
@@ -204,9 +209,11 @@ export function createAnalysisRunner<S>(
     const completed = completeUnit(run, attemptId, result);
     if (!completed.ok) return paused(null); // 取消後才回來的結果：丟棄，不寫入
     // 先寫入成功才採用新狀態；寫入失敗時錯誤往外丟，單元仍是未完成。
-    await deps.commitUnit({ job: completed.run.job, written: completed.written });
+    const { claimUpdates } = converted;
+    await deps.commitUnit({ job: completed.run.job, written: completed.written, claimUpdates });
     run = completed.run;
-    knownClaims = [...knownClaims, ...converted.claims];
+    const updated = new Map(claimUpdates.map((c) => [c.id, c]));
+    knownClaims = [...knownClaims.map((c) => updated.get(c.id) ?? c), ...converted.claims];
     return null;
   };
 

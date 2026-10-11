@@ -219,6 +219,68 @@ describe('convertDrafts（R1：每個事實項都有可驗證的來源片段）'
   });
 });
 
+describe('convertDrafts：重複的草稿仍套用同文件矛盾（對抗驗證修正）', () => {
+  // 同一文件兩個區塊都有「完成匯出功能。」；B 區塊緊接著更正
+  const text = '# A\n\n完成匯出功能。\n\n# B\n\n完成匯出功能。\n\n先前記載有誤，匯出已撤下。';
+  const source = doc('d1', text);
+  const splitAt = text.indexOf('# B');
+  const unitOf = (start: number, end: number): AnalysisUnitSpec => ({
+    unitId: `u-${String(start)}`,
+    sourceDocumentId: 'd1',
+    contentVersion: 1,
+    contentHash: source.document.contentHash,
+    segments: [{ start, end, estimatedTokens: 1, split: true }],
+    estimatedTokens: 1,
+    budget: budget(1000),
+  });
+  const done = draft({ text: '匯出功能', excerpt: '完成匯出功能。' });
+  const base = { document: source.document, normalizedText: text, newId: idSource('k') };
+  const known = convertDrafts(
+    { claims: [done], conflicts: [], summary: '' },
+    { ...base, unit: unitOf(0, splitAt), existingClaims: [] },
+  ).claims;
+  const correction: AnalysisOutput = {
+    claims: [
+      done,
+      draft({
+        text: '匯出已撤下',
+        completionStatus: 'unknown',
+        excerpt: '先前記載有誤，匯出已撤下。',
+      }),
+    ],
+    conflicts: [{ claims: [0, 1], summary: '同文件更正' }],
+    summary: '',
+  };
+
+  it('escalates the known claim and marks the conflict against it', () => {
+    expect(known.map((c) => c.reviewStatus)).toEqual(['normal']);
+    const result = convertDrafts(correction, {
+      ...base,
+      unit: unitOf(splitAt, text.length),
+      existingClaims: known,
+    });
+    expect(result.dropped).toEqual([{ index: 0, reason: 'duplicate' }]);
+    expect(result.claims.map((c) => [c.text, c.reviewStatus])).toEqual([
+      ['匯出已撤下', 'source_conflict'],
+    ]);
+    expect(result.claimUpdates.map((c) => [c.id, c.reviewStatus])).toEqual([
+      [known[0]?.id, 'source_conflict'],
+    ]);
+    expect(result.conflicts).toHaveLength(1);
+    expect(result.conflicts[0]?.claimIds).toEqual([known[0]?.id, result.claims[0]?.id]);
+    expect(result.conflicts[0]?.excerpts).toHaveLength(2);
+  });
+
+  it('returns no updates when the duplicate is not part of a conflict', () => {
+    const result = convertDrafts(
+      { ...correction, conflicts: [] },
+      { ...base, unit: unitOf(splitAt, text.length), existingClaims: known },
+    );
+    expect(result.claimUpdates).toEqual([]);
+    expect(result.claims.map((c) => c.reviewStatus)).toEqual(['normal']);
+  });
+});
+
 function withoutCompletion(d: ClaimDraft): ClaimDraft {
   if (d.type === 'feature' || d.type === 'deliverable') return d;
   return { segment: d.segment, type: d.type, text: d.text, excerpt: d.excerpt };
