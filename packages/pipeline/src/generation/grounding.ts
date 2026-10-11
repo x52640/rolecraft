@@ -1,8 +1,8 @@
 /**
  * 段落文字的依據檢查（R1 檢查 3 的生成端加嚴）：段落中的網址、網域、數字、倍數／比例詞
  * 都必須出現在所引用事實項的內容（或使用者確認文字）中；段落也不得出現職缺快照的公司或職稱
- * （這些由系統帶入，不由模型寫）。比對前一律正規化（normalizeForGrounding），避免全形、隱藏字元
- * 或「[.]」「 dot 」之類寫法繞過。
+ * （這些由系統帶入，不由模型寫）。比對前一律正規化（normalizeForGrounding：NFKC＋去隱形字元），
+ * 寬鬆網域另把「。」「[.]」「 dot 」之類點的變體轉成「.」（normalizeLooseDots），避免繞過。
  * 寧可多丟，不放行。
  */
 import type { Claim } from '@rolecraft/contracts';
@@ -21,16 +21,34 @@ const BRACKET_DOT = /\s*[[(]\s*(?:\.|dot)\s*[\])]\s*/giu;
 const SPACED_DOT = /\s+dot\s+/giu;
 
 /**
- * NFKC＋去隱形字元＋點的變體一律轉成「.」。寧可多丟：中文句號也會變成點，
- * 所以「TypeScript。Next」這種寫法可能被當成網域而丟段。
+ * 抽完整網址前當成分隔的全形／CJK 標點（NFKC 後會變成半形 , ! ; ? 括號引號等而黏進網址）。
+ * 冒號、斜線、點、@ 等網址結構字元不在內，全形寫的網址仍抽得到。
+ */
+const URL_SEPARATORS =
+  /[\uFF01\uFF02\uFF07-\uFF09\uFF0C\uFF1B\uFF1C\uFF1E\uFF1F\uFF3B\uFF3D\uFF40\uFF5B\uFF5D\uFE10\uFE14-\uFE18\uFE35-\uFE44\uFE50\uFE51\uFE54\uFE56\uFE57\uFE59-\uFE5E]/gu;
+
+/**
+ * 數字、完整網址、倍數詞、職缺名稱比對用：只做 NFKC＋去隱形字元。
+ * 句點變體不在這裡轉，否則「3。14 位」會變成 3.14。
  */
 export function normalizeForGrounding(text: string): string {
-  return text
-    .normalize('NFKC')
-    .replace(INVISIBLE, '')
+  return text.normalize('NFKC').replace(INVISIBLE, '');
+}
+
+/**
+ * 寬鬆網域與 email 辨識用：再把點的變體一律轉成「.」。寧可多丟：中文句號也會變成點，
+ * 所以「TypeScript。Next」這種寫法可能被當成網域而丟段。
+ */
+export function normalizeLooseDots(text: string): string {
+  return normalizeForGrounding(text)
     .replace(IDEOGRAPHIC_DOTS, '.')
     .replace(BRACKET_DOT, '.')
     .replace(SPACED_DOT, '.');
+}
+
+/** 完整網址抽取：先把全形／CJK 標點換成空白，再正規化。 */
+function fullUrls(text: string): string[] {
+  return extractUrls(normalizeForGrounding(text.replace(URL_SEPARATORS, ' ')));
 }
 
 /** 常見檔名副檔名：`README.md`、`Node.js` 之類不當成網域。 */
@@ -58,7 +76,7 @@ const TRAILING_PUNCTUATION = /[.,;:!?)\]}]+$/u;
  */
 export function extractLooseUrls(text: string): string[] {
   const tokens: string[] = [];
-  for (const match of normalizeForGrounding(text).matchAll(LOOSE_URL)) {
+  for (const match of normalizeLooseDots(text).matchAll(LOOSE_URL)) {
     const tld = (match[1] ?? '').toLowerCase();
     if (FILE_EXTENSIONS.has(tld)) continue;
     const path = (match[2] ?? '').replace(TRAILING_PUNCTUATION, '');
@@ -101,6 +119,21 @@ function compact(text: string): string {
   return normalizeForGrounding(text).toLowerCase().replace(/\s+/gu, '');
 }
 
+const escapeRegExp = (char: string) => char.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+
+/**
+ * 段落是否寫到職缺公司或職稱。純 ASCII 名稱要求前後不是英數字（LINE 不命中 pipeline），
+ * 字母之間容許空白（「L I N E」「at LINE now」都命中）；含中文等其他字元的名稱維持去空白後的子字串比對。
+ */
+function mentionsName(text: string, name: string): boolean {
+  const needle = compact(name);
+  if (needle.length === 0) return false;
+  if (!/^[\x20-\x7E]+$/u.test(needle)) return compact(text).includes(needle);
+  const body = [...needle].map(escapeRegExp).join(String.raw`\s*`);
+  const pattern = new RegExp(String.raw`(?<![a-z0-9])${body}(?![a-z0-9])`, 'u');
+  return pattern.test(normalizeForGrounding(text).toLowerCase());
+}
+
 export interface JobIdentity {
   readonly company: string;
   readonly title: string;
@@ -112,24 +145,21 @@ export function groundingProblem(
   cited: readonly Claim[],
   job: JobIdentity,
 ): SectionDropReason | null {
+  const raw = cited.flatMap((c) => [c.text, c.basis.userConfirmation?.text ?? '']);
+  const urls = new Set(raw.flatMap(fullUrls));
+  if (fullUrls(rawText).some((url) => !urls.has(url))) return 'link_not_in_claims';
+  const loose = new Set(raw.flatMap(extractLooseUrls));
+  if (extractLooseUrls(rawText).some((url) => !loose.has(url))) return 'link_not_in_claims';
   const text = normalizeForGrounding(rawText);
-  const sources = cited
-    .flatMap((c) => [c.text, c.basis.userConfirmation?.text ?? ''])
-    .map(normalizeForGrounding);
-  const urls = new Set(sources.flatMap(extractUrls));
-  if (extractUrls(text).some((url) => !urls.has(url))) return 'link_not_in_claims';
-  const loose = new Set(sources.flatMap(extractLooseUrls));
-  if (extractLooseUrls(text).some((url) => !loose.has(url))) return 'link_not_in_claims';
+  const sources = raw.map(normalizeForGrounding);
   const keys = numberKeys(sources.join('\n'));
   for (const token of extractNumbers(text)) {
     if (token.key === null || !keys.has(token.key)) return 'number_not_in_claims';
   }
   const multipliers = new Set(sources.flatMap(extractMultipliers));
   if (extractMultipliers(text).some((m) => !multipliers.has(m))) return 'multiplier_not_in_claims';
-  const section = compact(text);
-  for (const name of [job.company, job.title]) {
-    const needle = compact(name);
-    if (needle.length > 0 && section.includes(needle)) return 'mentions_job_identity';
+  if ([job.company, job.title].some((name) => mentionsName(text, name))) {
+    return 'mentions_job_identity';
   }
   return null;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { CLAIMS } from '../generation/fixtures.test-helpers.ts';
-import { checkDraft } from './check.ts';
+import { CLAIMS, claim } from '../generation/fixtures.test-helpers.ts';
+import { checkDraft, draftGroundingProblem } from './check.ts';
 import { commitmentProblem } from './commitments.ts';
 import { parseDraftOutput } from './output.ts';
 import type { DraftOutput } from './types.ts';
@@ -177,4 +177,26 @@ describe('對抗驗證補強：承諾字眼、隱形字元、聯絡方式', () =
       expect(check(draft)).toEqual({ ok: false, problem: 'link_not_in_claims' });
     },
   );
+});
+
+describe('P1-T047：句點變體只用在網域與 email 辨識', () => {
+  it.each([
+    'me@example。org',
+    'me＠ｅｘａｍｐｌｅ．ｏｒｇ',
+    'me (at) example｡org',
+    'me [at] example ［.］ org',
+    'me at example dot org',
+  ])('email 仍被擋：%s', (draft) => {
+    expect(commitmentProblem(draft)).toBe('contact_info');
+  });
+
+  it('中文句號不會把數字黏成小數', () => {
+    const metric = claim('m1', {
+      type: 'outcome_metric',
+      text: '平均評分為 3。14 位成員',
+      completionStatus: null,
+    });
+    expect(draftGroundingProblem('平均評分為 3.14', [metric])).toBe('number_not_in_claims');
+    expect(draftGroundingProblem('平均評分為 3', [metric])).toBeNull();
+  });
 });

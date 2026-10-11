@@ -66,16 +66,23 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：
-- 已通過驗證：
-- 下一步：
+- 最後完成：五項修正與回歸測試（每項先確認測試失敗再修）
+- 已通過驗證：`npm run verify` 全綠（2572 passed／13 skipped）
+- 下一步：協調者安排對抗驗證（R1）後收官
 - Blocker：無
 
 ## 完成結果
+
+- **句號正規化（P1-T029）**：`normalizeForGrounding` 改成只做 NFKC＋去隱形字元；點的變體（「。」「[.]」「 dot 」）移到新的 `normalizeLooseDots`，只給寬鬆網域（`extractLooseUrls`）與承諾檢查（`commitments.ts`，含 email 的 at／dot 寫法）用。「3。14 位成員」不再被當成 3.14：段落寫 3.14 會被擋、寫 3 會通過。訊息草稿的 `draftGroundingProblem` 透過同一個函式一起修正（check.ts 未改動）。承諾檢查對所有規則仍用含點變體的正規化，行為與修正前相同。
+- **全形標點黏進網址（P1-T024）**：段落依據檢查抽完整網址前，把全形／CJK 的逗號、驚嘆號、分號、問號、括號、引號等（NFKC 後會變半形的那些）換成空白；冒號、斜線、點、@ 等網址結構字元不動，全形寫的網址仍抽得到。寬鬆網域照舊吃原文（自己正規化），所以「evil［.］com」仍會被擋。
+- **職缺名稱比對（P1-T024）**：純 ASCII 名稱要求前後不是英數字，字母之間容許空白（「LINE」不命中 pipeline／online，但「at LINE now」「L I N E」「加入LINE團隊」都命中）；含中文的名稱維持去空白後的子字串比對。沒有照字面「在去空白文字上加邊界」，因為去空白會把「at LINE now」黏成 atlinenow 而漏擋。
+- **網址結尾括號與 Markdown（P1-T022）**：`extractUrls` 的結尾「)」只在 token 內括號不成對時才去掉（`…/Software_(engineering)` 保留）；`[`、`]` 列為結束字元，Markdown `[url](url)` 兩段都抽得到，原文寫成 Markdown 連結時連結事實項也能通過。
+- **訊息草稿的完成度上限（P1-T029）**：`messages/prompt.ts` 沿用 `generation/completion.ts` 的 `completionCap`，在資料區塊外的事實項標示加上「，最高可寫：…」（只有功能與交付物），指令也加了「完成程度不能高於最高可寫」。
+- 已知殘餘：純 ASCII 名稱緊貼其他英數字時（例如「LINEPay」）不再算提到職缺名稱，這是字詞邊界的必然取捨；`check.ts` 不在本 Task 寫入範圍，訊息草稿的完整網址抽取沒有加全形標點分隔（只會多丟，不會放行）。
 

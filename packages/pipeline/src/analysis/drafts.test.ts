@@ -131,6 +131,26 @@ describe('convertDrafts（R1：每個事實項都有可驗證的來源片段）'
     ]);
   });
 
+  it('accepts a link written as a Markdown link in the excerpt（P1-T047）', () => {
+    const excerpt = '網站 [https://a.example.com](https://a.example.com) 已公開。';
+    const md = TEXT.replace('網站 https://a.example.com 已公開。', excerpt);
+    const base = context({ normalizedText: md });
+    const segments = [
+      ...base.unit.segments.slice(0, 1),
+      { start: SPLIT, end: md.length, estimatedTokens: 1, split: true },
+    ];
+    const result = convertDrafts(
+      {
+        claims: [{ segment: 'S2', type: 'link', text: 'https://a.example.com', excerpt }],
+        conflicts: [],
+        summary: '',
+      },
+      { ...base, unit: { ...base.unit, segments } },
+    );
+    expect(result.dropped).toEqual([]);
+    expect(result.claims.map((c) => c.text)).toEqual(['https://a.example.com']);
+  });
+
   it('requires every URL in any claim text to be a complete URL from the excerpt', () => {
     const excerpt = '網站 https://a.example.com 已公開。';
     const feature = (text: string): ClaimDraft => draft({ segment: 'S2', text, excerpt });

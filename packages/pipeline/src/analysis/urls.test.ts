@@ -14,4 +14,21 @@ describe('extractUrls', () => {
     ]);
     expect(extractUrls('沒有網址 example.com https://')).toEqual([]);
   });
+
+  it('keeps balanced closing parentheses and strips unbalanced ones（P1-T047）', () => {
+    expect(extractUrls('見 https://en.wikipedia.org/wiki/Software_(engineering)。')).toEqual([
+      'https://en.wikipedia.org/wiki/Software_(engineering)',
+    ]);
+    expect(extractUrls('(see https://x.example.com/a_(b)).')).toEqual([
+      'https://x.example.com/a_(b)',
+    ]);
+  });
+
+  it('splits Markdown links at brackets（P1-T047）', () => {
+    expect(extractUrls('[https://a.example.com/x](https://a.example.com/x)')).toEqual([
+      'https://a.example.com/x',
+      'https://a.example.com/x',
+    ]);
+    expect(extractUrls('[www.b.example.org]')).toEqual(['www.b.example.org']);
+  });
 });

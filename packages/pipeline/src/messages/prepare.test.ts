@@ -91,6 +91,18 @@ describe('prepareDraft', () => {
     for (const claim of UNUSABLE) expect(prepared.prompt).not.toContain(claim.text);
   });
 
+  it('labels the highest completion each claim allows outside the data blocks（P1-T047）', () => {
+    const prompt = buildDraftPrompt(
+      { intent: 'accept', messageText: '您好', job: null, claims: CLAIMS },
+      'BoundaryMarker0123',
+    );
+    expect(prompt).toContain('C1（功能，最高可寫：進行中）：');
+    expect(prompt).toContain('C2（功能，最高可寫：已完成）：');
+    expect(prompt).toContain('C3（成果數字）：');
+    expect(prompt).toContain('C5（功能，最高可寫：規劃中）：');
+    expect(DRAFT_INSTRUCTIONS).toContain('最高可寫');
+  });
+
   it('refuses when the snapshot changed, lost confirmation, or message vanished', () => {
     const p = makePlan();
     const changed = {

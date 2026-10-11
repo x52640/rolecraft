@@ -3,10 +3,10 @@
  * 草稿出現時間／日期、薪資待遇、到職或開始相關字眼就整份丟棄（寧可多丟，不放行）。
  * 連「詢問」也一併擋下：要談這些由使用者自己在草稿裡補寫。
  * 另擋 email 樣式（含 at／dot 寫法）與通訊軟體帳號（LINE、WeChat、Telegram、WhatsApp＋ID）。
- * 比對前一律 normalizeForGrounding（NFKC、去隱形字元、點的變體）並轉小寫；
+ * 比對前一律 normalizeLooseDots（NFKC、去隱形字元、點的變體轉「.」；email 的 dot 寫法靠它）並轉小寫；
  * 中文關鍵字另對「去掉所有空白」的版本再比一次，避免「到 職」之類拆字繞過。
  */
-import { normalizeForGrounding } from '../generation/grounding.ts';
+import { normalizeLooseDots } from '../generation/grounding.ts';
 import type { DraftProblem } from './types.ts';
 
 const any = (parts: readonly string[]) => new RegExp(parts.join('|'), 'u');
@@ -73,7 +73,7 @@ const MESSENGER = any([
 
 /** 草稿中的承諾類或聯絡方式問題（依時間、薪資、到職、聯絡方式順序回第一個）；沒有回 null。 */
 export function commitmentProblem(draft: string): DraftProblem | null {
-  const text = normalizeForGrounding(draft).toLowerCase();
+  const text = normalizeLooseDots(draft).toLowerCase();
   const compact = text.replace(/\s+/gu, '');
   const hit = (pattern: RegExp) => pattern.test(text) || pattern.test(compact);
   if (hit(TIME)) return 'commits_time';
