@@ -35,7 +35,7 @@ function ClaimList({ review, claims }: { review: Review; claims: readonly Claim[
           selected={review.selected.has(claim.id)}
           onSelectChange={(on) => review.setSelectedOne(claim.id, on)}
           onConfirm={() => void review.confirm(claim)}
-          onUpdate={(text) => void review.update(claim, text)}
+          onUpdate={(text) => review.update(claim, text)}
           onReject={() => void review.reject(claim)}
         />
       ))}

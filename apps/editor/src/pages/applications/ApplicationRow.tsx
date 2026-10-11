@@ -43,6 +43,7 @@ export function ApplicationRow({ application, versions, onUpdate, onDelete }: Ap
           }}
           versions={versions}
           versionLocked
+          originalAppliedAt={application.appliedAt}
           submitLabel="儲存"
           onSubmit={async (fields) => {
             const message = await onUpdate(application.id, fields);

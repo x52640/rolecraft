@@ -26,6 +26,8 @@ interface ApplicationFormProps {
   versions: readonly ExportVersionSummary[];
   /** 修改既有紀錄：實際投出版本不能改，只顯示 */
   versionLocked?: boolean;
+  /** 修改既有紀錄：原本的投遞時間戳記；日期欄沒改時原樣送回，避免時區變動讓日期偏移 */
+  originalAppliedAt?: string;
   submitLabel: string;
   onSubmit: (fields: ApplicationFields) => Promise<string | null>;
   onCancel?: () => void;
@@ -42,7 +44,8 @@ export function ApplicationForm(props: ApplicationFormProps) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const appliedAt = dateToTimestamp(values.date);
+    const unchanged = props.originalAppliedAt !== undefined && values.date === initial.date;
+    const appliedAt = unchanged ? props.originalAppliedAt : dateToTimestamp(values.date);
     if (!appliedAt) return setError('請填投遞日期');
     if (!/\S/u.test(values.status)) return setError('請填狀態');
     const known = versions.some((v) => v.exportVersionId === values.exportVersionId);

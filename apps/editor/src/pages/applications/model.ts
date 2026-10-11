@@ -36,11 +36,11 @@ export function today(now = new Date()): string {
   return timestampToDate(now.toISOString());
 }
 
-/** 匯出版本的顯示名稱：公司｜職稱｜匯出時間。 */
+/** 匯出版本的顯示名稱：公司｜職稱｜匯出時間｜短 ID（同一分鐘匯出兩次也能區分）。 */
 export function versionLabel(version: ExportVersionSummary): string {
   const exported = new Date(version.exportedAt);
   const time = `${timestampToDate(version.exportedAt)} ${pad(exported.getHours())}:${pad(exported.getMinutes())}`;
-  return `${version.company}｜${version.title}｜匯出於 ${time}`;
+  return `${version.company}｜${version.title}｜匯出於 ${time}｜${version.exportVersionId.slice(-6)}`;
 }
 
 /** 投遞紀錄指向的匯出版本名稱；清單裡找不到時只顯示「匯出版本」與 ID。 */

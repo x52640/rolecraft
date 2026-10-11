@@ -5,7 +5,7 @@ import type {
   ResumeVersion,
   SectionOriginalView,
 } from '@rolecraft/contracts';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
 import type { ResponseOf } from '../../bridge/client.ts';
@@ -38,6 +38,10 @@ export function useResumeEditor() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [allClaims, setAllClaims] = useState<Claim[] | null>(null);
+  // 目前選的職缺／版本與讀取序號：回應回來時比對，丟掉已切走或被較新讀取取代的結果
+  const currentJob = useRef<string | null>(null);
+  const currentVersion = useRef<string | null>(null);
+  const viewSeq = useRef(0);
 
   useEffect(() => {
     void bridge.send({ op: 'jobs.list', payload: {} }).then((res) => {
@@ -53,16 +57,23 @@ export function useResumeEditor() {
   const loadVersions = useCallback(
     async (id: string) => {
       const res = await bridge.send({ op: 'resume.list', payload: { jobSnapshotId: id } });
+      if (currentJob.current !== id) return undefined;
+      const next = res.ok ? (res.versions[0]?.resumeVersionId ?? null) : null;
       setVersions(res.ok ? res.versions : []);
-      setVersionId(res.ok ? (res.versions[0]?.resumeVersionId ?? null) : null);
+      setVersionId(next);
       if (!res.ok) setNotice(errorOf(res));
+      return next;
     },
     [bridge],
   );
 
   const loadView = useCallback(
     async (id: string) => {
+      viewSeq.current += 1;
+      const seq = viewSeq.current;
+      const stale = () => seq !== viewSeq.current || currentVersion.current !== id;
       const res = await bridge.send({ op: 'resume.get', payload: { resumeVersionId: id } });
+      if (stale()) return;
       if (!res.ok) {
         setView(null);
         setNotice(errorOf(res));
@@ -78,6 +89,7 @@ export function useResumeEditor() {
         op: 'resume.check_export',
         payload: { resumeVersionId: id },
       });
+      if (stale()) return;
       setView({
         version: res.version,
         originals: res.originals,
@@ -89,14 +101,17 @@ export function useResumeEditor() {
   );
 
   useEffect(() => {
+    currentJob.current = jobId;
     setVersions(null);
     setView(null);
     if (jobId !== null) void loadVersions(jobId);
   }, [jobId, loadVersions]);
 
   useEffect(() => {
+    currentVersion.current = versionId;
+    // 切換版本先清掉舊畫面，避免在新版本上操作到舊版本的段落
+    setView(null);
     if (versionId !== null) void loadView(versionId);
-    else setView(null);
   }, [versionId, loadView]);
 
   /** 執行一個寫入，成功時顯示 okText，之後重新讀取。 */
@@ -127,7 +142,13 @@ export function useResumeEditor() {
     busy,
     notice,
     allClaims,
-    refresh: () => (jobId === null ? Promise.resolve() : loadVersions(jobId)),
+    /** 重新讀取版本清單；選到的版本沒變時（effect 不會重跑）也明確重新讀取它的內容。 */
+    refresh: async () => {
+      if (jobId === null) return;
+      const before = currentVersion.current;
+      const next = await loadVersions(jobId);
+      if (next !== undefined && next !== null && next === before) await loadView(next);
+    },
     generate: async () => {
       if (jobId === null) return;
       setBusy(true);

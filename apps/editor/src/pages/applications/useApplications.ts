@@ -5,7 +5,7 @@ import type {
   BridgeRequestOf,
   ExportVersionSummary,
 } from '@rolecraft/contracts';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
 
@@ -32,12 +32,17 @@ export function useApplications(): ApplicationsData {
   const [versions, setVersions] = useState<ExportVersionSummary[]>([]);
   const [applicationsError, setApplicationsError] = useState<string | null>(null);
   const [versionsError, setVersionsError] = useState<string | null>(null);
+  // 讀取世代：多筆操作重疊時，只套用最後一次發出的讀取結果，避免較舊的清單蓋掉較新的
+  const generation = useRef(0);
 
   const reload = useCallback(async () => {
+    generation.current += 1;
+    const mine = generation.current;
     const [apps, vers] = await Promise.all([
       bridge.send({ op: 'applications.list', payload: {} }),
       bridge.send({ op: 'export.list_versions', payload: {} }),
     ]);
+    if (mine !== generation.current) return;
     if (apps.ok) {
       setApplications(apps.applications);
       setApplicationsError(null);

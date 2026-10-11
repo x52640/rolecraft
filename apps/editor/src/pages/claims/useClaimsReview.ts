@@ -1,5 +1,5 @@
 import type { BridgeFailure, Claim, ProjectEvidence } from '@rolecraft/contracts';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
 import type { CompletionChoice } from './ClaimCard.tsx';
@@ -34,6 +34,8 @@ export function useClaimsReview() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // 目前選的專案：讀取回來時比對，丟掉已切走的專案的回應，避免舊清單蓋掉新清單
+  const currentProject = useRef<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -54,6 +56,7 @@ export function useClaimsReview() {
   const reload = useCallback(
     async (id: string) => {
       const res = await bridge.send({ op: 'claims.list', payload: { projectId: id } });
+      if (currentProject.current !== id) return;
       setClaims(
         res.ok ? { state: 'ready', value: res.claims } : { state: 'error', message: errorOf(res) },
       );
@@ -62,6 +65,7 @@ export function useClaimsReview() {
   );
 
   useEffect(() => {
+    currentProject.current = projectId;
     if (projectId === null) return;
     setClaims({ state: 'loading' });
     setChoices({});
@@ -69,18 +73,23 @@ export function useClaimsReview() {
     void reload(projectId);
   }, [projectId, reload]);
 
-  /** 執行一組寫入，完成後重新讀取並清掉相關選擇。 */
-  async function run(ids: string[], action: () => Promise<string | null>) {
-    if (projectId === null) return;
+  /** 執行一組寫入，完成後重新讀取並清掉相關選擇；回傳寫入是否成功。 */
+  async function run(
+    ids: string[],
+    action: () => Promise<{ ok: boolean; notice: string | null }>,
+  ): Promise<boolean> {
+    if (projectId === null) return false;
     setBusy(true);
     setNotice(null);
     try {
-      setNotice(await action());
+      const result = await action();
+      setNotice(result.notice);
       setChoices((prev) =>
         Object.fromEntries(Object.entries(prev).filter(([k]) => !ids.includes(k))),
       );
       setSelected((prev) => new Set([...prev].filter((k) => !ids.includes(k))));
       await reload(projectId);
+      return result.ok;
     } finally {
       setBusy(false);
     }
@@ -112,7 +121,7 @@ export function useClaimsReview() {
           op: 'claims.confirm',
           payload: confirmPayload(claim, choiceOf(claim.id)),
         });
-        return res.ok ? '已確認。' : errorOf(res);
+        return { ok: res.ok, notice: res.ok ? '已確認。' : errorOf(res) };
       }),
     update: (claim: Claim, text: string) =>
       run([claim.id], async () => {
@@ -120,22 +129,25 @@ export function useClaimsReview() {
           op: 'claims.update',
           payload: { claimId: claim.id, text },
         });
-        return res.ok
-          ? '已修改；原本的確認已失效，舊來源不再替新內容背書，請對照原文重新確認。'
-          : errorOf(res);
+        return {
+          ok: res.ok,
+          notice: res.ok
+            ? '已修改；原本的確認已失效，舊來源不再替新內容背書，請對照原文重新確認。'
+            : errorOf(res),
+        };
       }),
     reject: (claim: Claim) =>
       run([claim.id], async () => {
         const res = await bridge.send({ op: 'claims.reject', payload: { claimId: claim.id } });
-        return res.ok ? '已刪除，之後不會用於生成。' : errorOf(res);
+        return { ok: res.ok, notice: res.ok ? '已刪除，之後不會用於生成。' : errorOf(res) };
       }),
     /** 批次確認：只送勾選且複核狀態正常的項目；功能／交付物都要先選好完成狀態，否則一項都不送。 */
     confirmSelected: (list: readonly Claim[]) => {
       const targets = list.filter((c) => selected.has(c.id) && c.reviewStatus === 'normal');
-      if (targets.length === 0) return Promise.resolve();
+      if (targets.length === 0) return Promise.resolve(false);
       if (targets.some((c) => needsCompletion(c) && choiceOf(c.id) === '')) {
         setNotice('所選的功能／交付物要先選擇「確認為」已完成或計畫中，才能批次確認。');
-        return Promise.resolve();
+        return Promise.resolve(false);
       }
       return run(
         targets.map((c) => c.id),
@@ -149,9 +161,13 @@ export function useClaimsReview() {
             if (!res.ok) failed += 1;
           }
           const done = targets.length - failed;
-          return failed === 0
-            ? `已確認 ${String(done)} 項。`
-            : `已確認 ${String(done)} 項，${String(failed)} 項失敗。`;
+          return {
+            ok: failed === 0,
+            notice:
+              failed === 0
+                ? `已確認 ${String(done)} 項。`
+                : `已確認 ${String(done)} 項，${String(failed)} 項失敗。`,
+          };
         },
       );
     },

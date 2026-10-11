@@ -23,7 +23,8 @@ export interface ClaimCardProps {
   selected: boolean;
   onSelectChange: (selected: boolean) => void;
   onConfirm: () => void;
-  onUpdate: (text: string) => void;
+  /** 回傳是否存檔成功；失敗時保留編輯框與草稿，讓使用者修正後再存。 */
+  onUpdate: (text: string) => Promise<boolean>;
   onReject: () => void;
 }
 
@@ -76,8 +77,9 @@ export function ClaimCard(props: ClaimCardProps) {
               type="button"
               disabled={busy || draft.trim() === ''}
               onClick={() => {
-                props.onUpdate(draft);
-                setEditing(false);
+                void props.onUpdate(draft).then((ok) => {
+                  if (ok) setEditing(false);
+                });
               }}
             >
               儲存修改
