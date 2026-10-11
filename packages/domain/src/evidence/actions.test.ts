@@ -83,6 +83,25 @@ describe('確認事實項', () => {
   });
 });
 
+describe('撤銷保存值（擁有者裁定 #15）', () => {
+  it('確認事實項會清掉撤銷保存值，之後重新授權不再自動恢復', () => {
+    const claim = feature('c1', '搜尋功能', {
+      completionStatus: 'documented_done',
+      reviewStatus: 'source_removed',
+      revocationHold: {
+        previousStatus: 'normal',
+        sources: [{ sourceDocumentId: 'd1', contentHash: 'd1-h1' }],
+        claimText: '搜尋功能',
+        completionStatus: 'documented_done',
+      },
+    });
+    const r = confirmClaim(claim, { confirmedAt: T, completion: 'user_confirmed_done' });
+    if (!r.ok) throw new Error(r.reason);
+    expect(r.value.reviewStatus).toBe('source_removed');
+    expect(r.value.revocationHold).toBeUndefined();
+  });
+});
+
 describe('逐段確認', () => {
   it('記錄時間與該段全文', () => {
     const r = confirmSection(section({ text: '帶領團隊' }), T);

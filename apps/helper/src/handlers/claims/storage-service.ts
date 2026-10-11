@@ -42,6 +42,8 @@ export function withEditedText(claim: Claim, text: string): Claim {
     reviewStatus: claim.reviewStatus === 'source_removed' ? 'source_removed' : 'needs_review',
   };
   if (claim.completionStatus !== undefined) next.completionStatus = 'unknown';
+  // 內容改過就不再自動恢復，改回原文也一樣（evidence-model R2 擁有者裁定 #15）
+  delete next.revocationHold;
   return Claim.parse(next);
 }
 

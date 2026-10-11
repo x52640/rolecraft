@@ -63,6 +63,8 @@ export function confirmClaim(claim: Claim, input: ConfirmClaimInput): ActionResu
     reviewStatus: claim.reviewStatus === 'source_removed' ? 'source_removed' : 'normal',
   };
   if (input.completion !== undefined) next.completionStatus = input.completion;
+  // 使用者確認過就不再自動恢復（evidence-model R2 擁有者裁定 #15）
+  delete next.revocationHold;
   const parsed = Claim.safeParse(next);
   return parsed.success ? { ok: true, value: parsed.data } : fail('確認後的事實項不符格式');
 }

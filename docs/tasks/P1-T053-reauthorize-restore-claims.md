@@ -6,7 +6,7 @@ depends_on: []
 specs: ["evidence-model.md", "sources-and-authorization.md"]
 track: domain
 primary_repo: rolecraft
-write_paths: ["docs/specs/evidence-model.md", "packages/domain/src/source-change/", "packages/pipeline/src/analysis/plan.ts", "packages/pipeline/src/analysis/plan.test.ts", "packages/contracts/src/entities/claim.ts", "packages/contracts/src/entities/entities.test.ts", "packages/storage/src/repositories/", "packages/storage/src/migrations/", "packages/storage/src/migrate.test.ts"]
+write_paths: ["docs/specs/evidence-model.md", "packages/domain/src/source-change/", "packages/pipeline/src/analysis/plan.ts", "packages/pipeline/src/analysis/plan.test.ts", "packages/contracts/src/entities/claim.ts", "packages/contracts/src/entities/entities.test.ts", "packages/storage/src/repositories/", "packages/storage/src/migrations/", "packages/storage/src/migrate.test.ts", "packages/domain/src/evidence/actions.ts", "packages/domain/src/evidence/actions.test.ts", "apps/helper/src/handlers/claims/storage-service.ts", "apps/helper/src/handlers/claims/edited-text.test.ts"]
 contract_change: additive
 expected_commit: "feat(P1-T053): 事實項：重新授權且內容未變時恢復原狀態"
 ---
@@ -87,4 +87,4 @@ npm run verify
   - 綁事實項內容是因為 helper 的修改內容動作（`withEditedText`，不在本 Task 範圍）會讓來源已移除的事實項維持原狀態；不綁的話改過的文字會在重新授權後被恢復成正常。
 - 需擁有者裁定：已確認事實項重新授權後是否也要拿掉「來源已移除」標示（目前不動）；撤銷期間只有非引用區塊改變時是否允許恢復（目前不恢復）。
 - 未改 ADR-0006（verify 不需要）；如要記錄此暫行欄位，需另開 Task。
-
+- 對抗驗證修正（協調者）：撤銷期間確認或修改事實項（含改了又改回原文）原本仍保留保存值、重新授權後會恢復；改為 `confirmClaim` 與 helper `withEditedText` 一律清掉保存值，回歸測試在 `actions.test.ts`、`edited-text.test.ts`。
