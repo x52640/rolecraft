@@ -1,7 +1,7 @@
 ---
 id: P1-T050
 phase: 1
-status: in_progress
+status: done
 depends_on: []
 specs: ["bridge.md"]
 track: review

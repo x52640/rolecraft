@@ -56,7 +56,7 @@
 | [P1-T047](P1-T047-grounding-review-fixes.md) | pipeline 事實檢查：句號正規化、網址邊界、職缺名稱比對、訊息草稿的完成度上限 | in_progress | 1 | review | — |
 | [P1-T048](P1-T048-helper-review-fixes.md) | helper：訊息意圖不蓋掉並行編輯、刪除失敗可重試、啟動回收原子化 | done | 1 | review | — |
 | [P1-T049](P1-T049-editor-review-fixes-a.md) | 編輯器：匯入、職缺、專案、訊息頁的競態與表單修正 | done | 1 | review | — |
-| [P1-T050](P1-T050-editor-review-fixes-b.md) | 編輯器：事實項、履歷、投遞紀錄頁的競態與顯示修正 | in_progress | 1 | review | — |
+| [P1-T050](P1-T050-editor-review-fixes-b.md) | 編輯器：事實項、履歷、投遞紀錄頁的競態與顯示修正 | done | 1 | review | — |
 
 ## 依賴清單
 
