@@ -6,9 +6,18 @@
  * - 區塊有任何變更、片段消失、位置無法驗證 → 待複核（已確認的也一樣）。
  * - 來源檔被刪除或不是「已授權」→ 該片段視為來源已移除。
  * - 狀態只升不降：判定結果不會把待複核、來源矛盾自動解除，解除要走使用者確認或重新分析。
+ *   唯一例外是擁有者裁定 #15：僅因撤銷授權而變來源已移除、重新授權且內容指紋相同時恢復撤銷前狀態
+ *   （見 revocation.ts）。
  */
 
-import type { Claim, Id, ReviewStatus, SourceDocument, SourceExcerpt } from '@rolecraft/contracts';
+import type {
+  Claim,
+  Id,
+  ReviewStatus,
+  RevocationHold,
+  SourceDocument,
+  SourceExcerpt,
+} from '@rolecraft/contracts';
 
 import { normalizeExcerpt, normalizeText, splitBlocks, type TextBlock } from './blocks.ts';
 import {
@@ -18,6 +27,7 @@ import {
   parseLocation,
   type ExcerptLocation,
 } from './location.ts';
+import { createRevocationHold, resolveRevocationHold } from './revocation.ts';
 
 /** 來源文件的現況。呼叫端必須對每個被引用的文件明確給出，缺漏會丟錯（不預設成已移除）。 */
 export type SourceState =
@@ -130,6 +140,11 @@ export interface ClaimSourceEvaluation {
   readonly previousStatus: ReviewStatus;
   readonly reviewStatus: ReviewStatus;
   readonly checks: readonly ExcerptCheck[];
+  /**
+   * 判定後事實項應帶的撤銷恢復依據（擁有者裁定 #15）：null 表示不帶（清掉）。
+   * 呼叫端保存事實項時必須一併套用。
+   */
+  readonly revocationHold: RevocationHold | null;
   /** 內容版本或雜湊與片段綁定時不同的文件：其他部分有變，需要重新分析整份文件（R2）。 */
   readonly documentsToReanalyze: readonly Id[];
 }
@@ -157,11 +172,19 @@ export function evaluateClaimSources(
       reanalyze.add(excerpt.sourceDocumentId);
     }
   }
+  const escalated = escalateReviewStatus(claim.reviewStatus, statusFromChecks(checks));
+  const resolution = resolveRevocationHold(claim, sources, checks);
   return {
     claimId: claim.id,
     previousStatus: claim.reviewStatus,
-    reviewStatus: escalateReviewStatus(claim.reviewStatus, statusFromChecks(checks)),
+    reviewStatus: resolution.kind === 'restore' ? resolution.status : escalated,
     checks,
+    revocationHold:
+      resolution.kind === 'keep'
+        ? resolution.hold
+        : resolution.kind === 'restore'
+          ? null
+          : createRevocationHold(claim, sources, escalated),
     documentsToReanalyze: [...reanalyze],
   };
 }

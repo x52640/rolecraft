@@ -191,6 +191,27 @@ describe('entity schemas', () => {
     expect(Claim.safeParse({ ...claim, type: 'link' }).success).toBe(false);
   });
 
+  it('Claim revocationHold 選填（P1-T053）：舊資料可讀；previousStatus 不得為來源已移除、來源不可空', () => {
+    const hold = {
+      previousStatus: 'normal',
+      sources: [{ sourceDocumentId: 'doc-1', contentHash: 'h1' }],
+      claimText: '匯出 PDF',
+      completionStatus: 'documented_done',
+    };
+    const held = { ...claim, reviewStatus: 'source_removed', revocationHold: hold };
+    expect(Claim.safeParse(claim).success).toBe(true);
+    expect(Claim.safeParse(held).success).toBe(true);
+    const bads = [
+      { ...hold, previousStatus: 'source_removed' },
+      { ...hold, sources: [] },
+      { ...hold, claimText: ' ' },
+      { ...hold, extra: 1 },
+    ];
+    for (const bad of bads) {
+      expect(Claim.safeParse({ ...held, revocationHold: bad }).success).toBe(false);
+    }
+  });
+
   it('SourceDocument 非法授權狀態被拒', () => {
     const bad = { ...sourceDocument, authorizationStatus: 'unknown' };
     expect(SourceDocument.safeParse(bad).success).toBe(false);

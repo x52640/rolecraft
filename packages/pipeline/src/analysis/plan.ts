@@ -75,12 +75,15 @@ function sourceStates(input: PlanAnalysisInput): Map<Id, SourceState> {
   return states;
 }
 
-/** R2：既有事實項重新判定；區塊沒變且仍正常的換到新版本位置。 */
+/** R2：既有事實項重新判定；區塊沒變且仍正常的換到新版本位置（含撤銷後重新授權的恢復）。 */
 function reviewExisting(input: PlanAnalysisInput, states: Map<Id, SourceState>) {
   const updates: Claim[] = [];
   for (const claim of input.existingClaims) {
     const evaluation = evaluateClaimSources(claim, states);
     let next: Claim = { ...claim, reviewStatus: evaluation.reviewStatus };
+    // 擁有者裁定 #15：撤銷恢復依據跟著判定結果寫入或清掉
+    delete next.revocationHold;
+    if (evaluation.revocationHold) next.revocationHold = evaluation.revocationHold;
     if (evaluation.reviewStatus === 'normal') {
       const excerpts = evaluation.checks.map((c) => c.rebased ?? c.excerpt);
       next = { ...next, basis: { ...claim.basis, sourceExcerpts: excerpts } };

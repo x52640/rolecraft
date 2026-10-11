@@ -58,6 +58,21 @@ export const ClaimBasis = z.strictObject({
 });
 export type ClaimBasis = z.infer<typeof ClaimBasis>;
 
+/**
+ * 撤銷授權時保存的恢復依據（evidence-model R2 擁有者裁定 #15）。
+ * 由 domain 在「僅因撤銷授權」升為來源已移除時寫入；重新授權且內容指紋相同才恢復。
+ */
+export const RevocationHold = z.strictObject({
+  /** 撤銷前的複核狀態 */
+  previousStatus: ReviewStatus.exclude(['source_removed']),
+  /** 每份來源文件撤銷當下的內容指紋 */
+  sources: z.array(z.strictObject({ sourceDocumentId: Id, contentHash: ContentHash })).min(1),
+  /** 保存當下的事實項內容；內容被改過就不恢復 */
+  claimText: NonEmptyText,
+  completionStatus: CompletionStatus.optional(),
+});
+export type RevocationHold = z.infer<typeof RevocationHold>;
+
 /** 事實項（R1）。completionStatus 只在功能、交付物上出現。 */
 export const Claim = z
   .strictObject({
@@ -68,6 +83,8 @@ export const Claim = z
     completionStatus: CompletionStatus.optional(),
     basis: ClaimBasis,
     reviewStatus: ReviewStatus,
+    /** 選填：撤銷授權時保存的恢復依據；舊資料沒有此欄，一律不恢復 */
+    revocationHold: RevocationHold.optional(),
   })
   .superRefine((claim, ctx) => {
     const needsCompletion = CLAIM_TYPES_WITH_COMPLETION.includes(claim.type);

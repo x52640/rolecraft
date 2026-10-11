@@ -170,6 +170,47 @@ describe('planAnalysis（增量、R2、R8）', () => {
     expect(result.ok && result.plan).toBeNull();
   });
 
+  it('restores claims on re-authorization with the same hash, without reanalysis (#15)', () => {
+    const authorized = doc('d', '# A\n\n完成匯出。');
+    const revoked = doc('d', '# A\n\n完成匯出。', { authorizationStatus: 'revoked' });
+    const claim = claimFrom('c', authorized, '完成匯出。');
+    const base = { analyzed: [analyzed(authorized)] };
+
+    const first = planAnalysis(input({ ...base, documents: [revoked], existingClaims: [claim] }));
+    if (!first.ok) throw new Error('plan failed');
+    const [held] = first.claimUpdates;
+    expect(held?.reviewStatus).toBe('source_removed');
+    expect(held?.revocationHold?.previousStatus).toBe('normal');
+    if (!held) throw new Error('missing update');
+
+    const back = planAnalysis(input({ ...base, documents: [authorized], existingClaims: [held] }));
+    expect(back.ok && back.claimUpdates).toEqual([claim]);
+    expect(back.ok && back.documentsToAnalyze).toEqual([]);
+    expect(back.ok && back.plan).toBeNull();
+  });
+
+  it('does not restore when the hash changed during revocation (#15)', () => {
+    const authorized = doc('d', '# A\n\n完成匯出。\n\n其他。');
+    const revoked = doc('d', '# A\n\n完成匯出。\n\n其他。', { authorizationStatus: 'revoked' });
+    const changed = doc('d', '# A\n\n完成匯出。\n\n其他（新）。', {
+      contentVersion: 2,
+      contentHash: 'hash-d-2',
+    });
+    const claim = claimFrom('c', authorized, '完成匯出。');
+    const first = planAnalysis(
+      input({ documents: [revoked], analyzed: [analyzed(authorized)], existingClaims: [claim] }),
+    );
+    const held = first.ok ? first.claimUpdates[0] : undefined;
+    if (!held) throw new Error('missing update');
+    const back = planAnalysis(
+      input({ documents: [changed], analyzed: [analyzed(authorized)], existingClaims: [held] }),
+    );
+    const update = back.ok ? back.claimUpdates[0] : undefined;
+    expect(update?.reviewStatus).toBe('source_removed');
+    expect(update?.revocationHold).toBeUndefined();
+    expect(back.ok && back.documentsToAnalyze).toEqual(['d']);
+  });
+
   it('returns no plan when nothing changed', () => {
     const same = doc('same', '沒變');
     const result = planAnalysis(input({ documents: [same], analyzed: [analyzed(same)] }));

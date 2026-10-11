@@ -91,6 +91,26 @@ describe('ClaimRepository', () => {
     expect(repos.claims.listBySourceDocument(other.id)).toEqual([]);
   });
 
+  it('persists and clears the revocation hold inside claim data (P1-T053, no migration)', () => {
+    const doc = sourceDocument();
+    const plain = claim(doc.id);
+    repos.claims.save(plain);
+    const held = {
+      ...plain,
+      reviewStatus: 'source_removed' as const,
+      revocationHold: {
+        previousStatus: 'normal' as const,
+        sources: [{ sourceDocumentId: doc.id, contentHash: doc.contentHash }],
+        claimText: plain.text,
+        ...(plain.completionStatus ? { completionStatus: plain.completionStatus } : {}),
+      },
+    };
+    repos.claims.save(held);
+    expect(repos.claims.get(plain.id)).toEqual(held);
+    repos.claims.save(plain);
+    expect(repos.claims.get(plain.id)?.revocationHold).toBeUndefined();
+  });
+
   it('rejects an invalid claim before writing anything', () => {
     const bad = { ...claim('d'), completionStatus: undefined };
     expect(() => repos.claims.save(bad)).toThrow();
