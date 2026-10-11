@@ -9,7 +9,6 @@
 - P1-T045 橋接：選取器操作的逾時配合原生對話框（`docs/tasks/P1-T045-bridge-picker-timeout.md`）
 - P1-T046 pipeline 分析：預算失敗保留來源更新、避免重複分析、跨單元去重、取消後的錯誤（`docs/tasks/P1-T046-analysis-review-fixes.md`）
 - P1-T047 pipeline 事實檢查：句號正規化、網址邊界、職缺名稱比對、訊息草稿的完成度上限（`docs/tasks/P1-T047-grounding-review-fixes.md`）
-- P1-T049 編輯器：匯入、職缺、專案、訊息頁的競態與表單修正（`docs/tasks/P1-T049-editor-review-fixes-a.md`）
 - P1-T050 編輯器：事實項、履歷、投遞紀錄頁的競態與顯示修正（`docs/tasks/P1-T050-editor-review-fixes-b.md`）
 
 ## ready
