@@ -151,6 +151,7 @@ export default tseslint.config(
       '**/coverage/**',
       '.claude/**',
       'scripts/coordinator/*.workflow.js',
+      'local-samples/**',
     ],
   },
   js.configs.recommended,
