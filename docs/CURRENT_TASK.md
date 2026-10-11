@@ -6,7 +6,6 @@
 ## 進行中
 
 - P1-T052 helper：一個資料區只准一個 helper、孤兒 PDF 刪不掉不擋啟動（`docs/tasks/P1-T052-helper-single-instance-sweep.md`）
-- P1-T053 事實項：重新授權且內容未變時恢復原狀態（`docs/tasks/P1-T053-reauthorize-restore-claims.md`）
 
 ## ready
 
