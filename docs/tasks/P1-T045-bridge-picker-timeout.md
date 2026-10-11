@@ -80,4 +80,8 @@ npm run verify
 - sources `osascript.ts`：`DIALOG_TIMEOUT_MS` 改為取自 contracts 的 `PICKER_DIALOG_TIMEOUT_MS`（architecture.md 允許 sources 依賴 contracts），兩邊不會各改各的。
 - 回歸測試：`client.test.ts` 新增 8 項（兩個選取器操作 31 秒仍在等、接近對話框上限才回覆照樣收到、超過選取器逾時仍回 timeout；一般操作仍 30 秒逾時且不受在途選取器影響；覆寫注入）；`folder-picker.test.ts` 新增 1 項確認 osascript 逾時等於 contracts 常數且小於橋接選取器逾時。
 - 殘餘：`docs/specs/bridge.md` 尚未寫明選取器操作的較長逾時（不在本 Task write_paths），建議後續補一句。
+- 對抗驗證修正：
+  - 卡死偵測被選取器拖延（major）：1 個選取器在途＋其餘名額全被已逾時請求占住時，名額滿卻不會重連，後續請求只能在佇列裡逾時，最久 6 分鐘。`client.ts` 加一條規則：排隊請求等到逾時都沒送出、且名額裡有已放棄的請求，就視為 helper 卡死、斷線重來（符合 bridge.md「名額全被占住時斷線重來」）。名額全是在途選取器、沒有已放棄請求時不斷線，避免打斷使用者正在操作的對話框。
+  - 選取器計時含排隊時間（minor）：選取器操作排隊時用一般 30 秒上限（超過就未送出回 timeout），實際送出時才換成 `BRIDGE_PICKER_TIMEOUT_MS` 從送出重新起算，排隊不會吃掉解析餘裕。一般操作仍從 send 起算 30 秒（含排隊），不變。
+  - 回歸測試：`client.test.ts` 新增 4 項（選取器在途＋其餘名額已放棄時排隊逾時即重連；只有在途選取器時排隊逾時不斷線；選取器長逾時從送出起算；選取器排隊超過一般上限未送出即逾時）；修正前 3 項失敗、修正後全過。
 

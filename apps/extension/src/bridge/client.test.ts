@@ -415,3 +415,87 @@ describe('bridge client：選取器操作的逾時配合原生對話框（P1-T04
     expect(await picker).toEqual(code('timeout'));
   });
 });
+
+describe('bridge client：選取器不拖延卡死偵測、計時從送出起算（P1-T045 對抗驗證）', () => {
+  const PICK_PDF = { op: 'import.pick_pdf', payload: {} };
+  const PICKED = { ok: true, selection: { status: 'cancelled' } };
+
+  function setupPicker(maxInFlight: number) {
+    const ports: FakePort[] = [];
+    const client = createBridgeClient({
+      connect: () => {
+        const p = new FakePort();
+        ports.push(p);
+        return p;
+      },
+      lastError: () => undefined,
+      timeoutMs: 1000,
+      pickerTimeoutMs: 10_000,
+      maxInFlight,
+    });
+    return { client, ports };
+  }
+
+  it('1 個選取器在途＋其餘名額被逾時請求占住：排隊請求逾時即斷線重來', async () => {
+    vi.useFakeTimers();
+    const { client, ports } = setupPicker(3);
+    const picker = client.send(PICK_PDF);
+    const a = client.send(DRAFT);
+    const b = client.send(DRAFT);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await Promise.all([a, b])).toEqual([code('timeout'), code('timeout')]);
+    expect(ports[0]?.disconnected).toBe(false); // 選取器可能還在合理等待中
+    const queued = client.send(MSG);
+    expect(ports[0]?.sent).toHaveLength(3); // 名額滿，排隊
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await queued).toEqual(code('timeout'));
+    expect(ports[0]?.disconnected).toBe(true);
+    expect(await picker).toEqual(code('helper_unavailable'));
+    const next = client.send(MSG); // 新連線立即送出，不再整整等選取器逾時
+    expect(ports[1]?.sent.map((s) => s.request)).toEqual([MSG]);
+    ports[1]?.answer(0, MSG_OK);
+    await expect(next).resolves.toEqual(MSG_OK);
+  });
+
+  it('名額全是在途選取器（沒有逾時請求）：排隊逾時不斷線', async () => {
+    vi.useFakeTimers();
+    const { client, ports } = setupPicker(1);
+    const picker = client.send(PICK_PDF);
+    const queued = client.send(MSG);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await queued).toEqual(code('timeout'));
+    expect(ports[0]?.disconnected).toBe(false);
+    ports[0]?.answer(0, PICKED);
+    await expect(picker).resolves.toEqual(PICKED);
+  });
+
+  it('選取器的長逾時從實際送出起算，排隊時間不吃掉解析餘裕', async () => {
+    vi.useFakeTimers();
+    const { client, ports } = setupPicker(1);
+    const first = client.send(DRAFT);
+    const picker = client.send(PICK_PDF);
+    await vi.advanceTimersByTimeAsync(900);
+    ports[0]?.answer(0, DRAFT_OK);
+    await expect(first).resolves.toEqual(DRAFT_OK);
+    expect(ports[0]?.sent).toHaveLength(2); // 選取器在 900 ms 才送出
+    await vi.advanceTimersByTimeAsync(10_000 - 1);
+    ports[0]?.answer(1, PICKED);
+    await expect(picker).resolves.toEqual(PICKED);
+  });
+
+  it('選取器排隊超過一般上限：未送出就回 timeout', async () => {
+    vi.useFakeTimers();
+    const { client, ports } = setupPicker(1);
+    const inFlight = client.send(PICK_PDF);
+    const queuedPicker = client.send(PICK_PDF);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await queuedPicker).toEqual({
+      ok: false,
+      error: { code: 'timeout', message: '等待本機輔助程式回覆逾時（1000 ms）' },
+    });
+    expect(ports[0]?.sent).toHaveLength(1);
+    ports[0]?.answer(0, PICKED);
+    await expect(inFlight).resolves.toEqual(PICKED);
+    expect(ports[0]?.sent).toHaveLength(1); // 已逾時的排隊請求不會再送
+  });
+});

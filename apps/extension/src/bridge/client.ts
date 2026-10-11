@@ -28,9 +28,9 @@ export interface BridgeClientDeps {
   connect(): NativePort;
   /** 斷線原因（正式環境為 chrome.runtime.lastError?.message）。 */
   lastError(): string | undefined;
-  /** 單一請求從 send 到收到回覆的上限（含排隊等名額的時間）。 */
+  /** 單一請求從 send 到收到回覆的上限（含排隊等名額的時間）；選取器操作排隊時也用它。 */
   timeoutMs?: number;
-  /** 開原生選取器的操作（BRIDGE_PICKER_OPERATIONS）改用的上限；預設對話框上限加解析餘裕。 */
+  /** 開原生選取器的操作（BRIDGE_PICKER_OPERATIONS）從實際送出起算的上限；預設對話框上限加解析餘裕。 */
   pickerTimeoutMs?: number;
   /** helper 尚未回覆的請求上限（預設 contracts 的 BRIDGE_MAX_IN_FLIGHT）。 */
   maxInFlight?: number;
@@ -52,7 +52,10 @@ interface Call {
   request: BridgeRequest;
   resolve(response: BridgeResponse): void;
   timer: ReturnType<typeof setTimeout> | undefined;
+  /** 目前計時器的上限（逾時訊息用）。 */
   timeoutMs: number;
+  /** 選取器操作：送出時改用較長上限、從送出重新起算。 */
+  picker: boolean;
   done: boolean;
 }
 
@@ -60,8 +63,10 @@ interface Call {
  * 橋接客戶端：只由 service worker 持有一條連線（ADR-0003）。
  * 每則請求配一個本客戶端內不重複的 id，包成 { id, request } 送出，回覆依 id 對應，可同時多則在途。
  * - 在途（含已逾時但 helper 還沒回的）達上限時，新請求排隊等名額，不讓 helper 因超量斷線。
- * - 逾時：該請求回 timeout（選取器操作等較久，見 BRIDGE_PICKER_TIMEOUT_MS），id 記為「已放棄」，晚到的回覆直接丟棄；不影響其他請求。
- *   若所有名額都被已放棄的請求占住（helper 疑似卡死），斷線重來。
+ * - 逾時：該請求回 timeout，id 記為「已放棄」，晚到的回覆直接丟棄；不影響其他請求。
+ *   一般操作從 send 起算（含排隊）；選取器操作排隊時用一般上限，送出後改用 BRIDGE_PICKER_TIMEOUT_MS 從送出重新起算。
+ * - helper 疑似卡死就斷線重來：所有名額都被已放棄的請求占住，或排隊請求等到逾時都沒送出、且名額裡有已放棄的請求
+ *   （例如在途選取器＋其餘名額全已放棄，不必等選取器的長逾時）。
  * - 回應不符該操作 schema：該請求回 internal_error，其他請求不受影響（id 對應不會錯）。
  * - 收到未知 id、id 為 null 或信封不合法：協定已不可信，斷線，在途請求全部回 internal_error。
  * - host 斷線或送不出去：在途請求回 helper_unavailable。
@@ -69,8 +74,6 @@ interface Call {
 export function createBridgeClient(deps: BridgeClientDeps): BridgeClient {
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const pickerTimeoutMs = deps.pickerTimeoutMs ?? BRIDGE_PICKER_TIMEOUT_MS;
-  const timeoutFor = (request: BridgeRequest): number =>
-    BRIDGE_PICKER_OPERATIONS.includes(request.op) ? pickerTimeoutMs : timeoutMs;
   const maxInFlight = deps.maxInFlight ?? BRIDGE_MAX_IN_FLIGHT;
   let port: NativePort | null = null;
   let counter = 0;
@@ -154,6 +157,7 @@ export function createBridgeClient(deps: BridgeClientDeps): BridgeClient {
       return;
     }
     pending.set(id, call);
+    if (call.picker) startTimer(call, pickerTimeoutMs);
     try {
       target.postMessage(envelope);
     } catch (err) {
@@ -171,6 +175,12 @@ export function createBridgeClient(deps: BridgeClientDeps): BridgeClient {
     }
   }
 
+  function startTimer(call: Call, ms: number): void {
+    clearTimeout(call.timer);
+    call.timeoutMs = ms;
+    call.timer = setTimeout(() => onTimeout(call), ms);
+  }
+
   function onTimeout(call: Call): void {
     const queued = waiting.indexOf(call);
     if (queued !== -1) waiting.splice(queued, 1);
@@ -180,7 +190,7 @@ export function createBridgeClient(deps: BridgeClientDeps): BridgeClient {
       abandoned.add(id);
     }
     finish(call, bridgeFailure('timeout', `等待本機輔助程式回覆逾時（${call.timeoutMs} ms）`));
-    if (abandoned.size >= maxInFlight) {
+    if (abandoned.size >= maxInFlight || (queued !== -1 && abandoned.size > 0)) {
       dropPort('helper_unavailable', '本機輔助程式長時間沒有回應，已斷線重來');
     }
   }
@@ -197,10 +207,11 @@ export function createBridgeClient(deps: BridgeClientDeps): BridgeClient {
           request,
           resolve,
           timer: undefined,
-          timeoutMs: timeoutFor(request),
+          timeoutMs,
+          picker: BRIDGE_PICKER_OPERATIONS.includes(request.op),
           done: false,
         };
-        call.timer = setTimeout(() => onTimeout(call), call.timeoutMs);
+        startTimer(call, timeoutMs);
         waiting.push(call);
         pump();
       });
