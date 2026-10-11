@@ -50,6 +50,13 @@
 | [P1-T041](P1-T041-bridge-editor-ops.md) | 橋接：編輯器頁面所需操作清單 | done | 1 | bridge | P1-T034 |
 | [P1-T042](P1-T042-readme.md) | README 與開源說明文件 | done | 1 | readme | — |
 | [P1-T043](P1-T043-helper-native-pickers.md) | helper：macOS 原生選取器與服務組裝 | done | 1 | helper | P1-T020、P1-T021、P1-T028、P1-T040 |
+| [P1-T044](P1-T044-provider-storage-review-fixes.md) | providers／storage：Claude 版本驗證逾時與取消、清理失敗不中斷、額度狀態 | in_progress | 1 | review | — |
+| [P1-T045](P1-T045-bridge-picker-timeout.md) | 橋接：選取器操作的逾時配合原生對話框 | in_progress | 1 | review | — |
+| [P1-T046](P1-T046-analysis-review-fixes.md) | pipeline 分析：預算失敗保留來源更新、避免重複分析、跨單元去重、取消後的錯誤 | in_progress | 1 | review | — |
+| [P1-T047](P1-T047-grounding-review-fixes.md) | pipeline 事實檢查：句號正規化、網址邊界、職缺名稱比對、訊息草稿的完成度上限 | in_progress | 1 | review | — |
+| [P1-T048](P1-T048-helper-review-fixes.md) | helper：訊息意圖不蓋掉並行編輯、刪除失敗可重試、啟動回收原子化 | in_progress | 1 | review | — |
+| [P1-T049](P1-T049-editor-review-fixes-a.md) | 編輯器：匯入、職缺、專案、訊息頁的競態與表單修正 | in_progress | 1 | review | — |
+| [P1-T050](P1-T050-editor-review-fixes-b.md) | 編輯器：事實項、履歷、投遞紀錄頁的競態與顯示修正 | in_progress | 1 | review | — |
 
 ## 依賴清單
 
@@ -101,3 +108,10 @@
 - P1-T041：P1-T034 → P1-T019、P1-T020、P1-T021、P1-T028、P1-T030、P1-T040
 - P1-T042：— → —
 - P1-T043：P1-T020、P1-T021、P1-T028、P1-T040 → —
+- P1-T044：— → —
+- P1-T045：— → —
+- P1-T046：— → —
+- P1-T047：— → —
+- P1-T048：— → —
+- P1-T049：— → —
+- P1-T050：— → —
