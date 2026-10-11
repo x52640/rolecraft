@@ -5,7 +5,6 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T055 providers：逾時後的過期驗證不再覆寫狀態（`docs/tasks/P1-T055-providers-stale-refresh.md`）
 - P1-T056 事實檢查：網址查詢參數方括號、零寬字元點、參字數量詞（`docs/tasks/P1-T056-grounding-url-numeral-fixes.md`）
 
 ## ready
