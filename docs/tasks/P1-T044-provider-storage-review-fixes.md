@@ -6,7 +6,7 @@ depends_on: []
 specs: ["providers.md", "runtime-and-budget.md"]
 track: review
 primary_repo: rolecraft
-write_paths: ["packages/providers/src/claude/service.ts", "packages/providers/src/claude/service.test.ts", "packages/providers/src/claude/reverify.ts", "packages/providers/src/claude/reverify.test.ts", "packages/providers/src/claude/constants.ts", "packages/storage/src/application/storage-sweep.ts", "packages/storage/src/application/storage-sweep.test.ts", "apps/helper/src/handlers/providers/providers-service.ts", "apps/helper/src/handlers/providers/providers.test.ts"]
+write_paths: ["packages/providers/src/claude/service.ts", "packages/providers/src/claude/service.test.ts", "packages/providers/src/claude/reverify.ts", "packages/providers/src/claude/reverify.test.ts", "packages/providers/src/claude/constants.ts", "packages/storage/src/application/", "apps/helper/src/handlers/providers/"]
 contract_change: none
 expected_commit: "fix(P1-T044): providers／storage：Claude 版本驗證逾時與取消、清理失敗不中斷、額度狀態"
 ---
