@@ -6,7 +6,7 @@ depends_on: ["P1-T058"]
 specs: ["bridge.md", "runtime-and-budget.md", "evidence-model.md", "sources-and-authorization.md", "providers.md"]
 track: helper
 primary_repo: rolecraft
-write_paths: ["docs/specs/bridge.md", "packages/contracts/src/bridge/", "packages/contracts/src/index.ts", "apps/helper/src/handlers/analysis/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "packages/storage/src/repositories/", "packages/storage/src/index.ts", "packages/storage/src/migrations/", "packages/storage/src/migrate.test.ts", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "apps/editor/src/pages/projects/", "apps/editor/src/pages/claims/", "apps/editor/src/bridge/", "docs/adr/0006-contracts-interim-fields.md"]
+write_paths: ["docs/specs/bridge.md", "packages/contracts/src/bridge/", "packages/contracts/src/index.ts", "apps/helper/src/handlers/analysis/", "apps/helper/src/handlers/sources/", "apps/helper/src/handlers/resume/", "apps/helper/src/handlers/messages/", "apps/helper/src/handlers/claims/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "packages/storage/src/repositories/", "packages/storage/src/index.ts", "packages/storage/src/migrations/", "packages/storage/src/migrate.test.ts", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "apps/editor/src/pages/projects/", "apps/editor/src/pages/claims/", "apps/editor/src/bridge/", "docs/adr/0006-contracts-interim-fields.md"]
 contract_change: additive
 expected_commit: "feat(P1-T060): helper：分析授權資料夾產生事實項、查詢進度與手動續跑"
 ---
@@ -32,6 +32,10 @@ expected_commit: "feat(P1-T060): helper：分析授權資料夾產生事實項�
   - 工作狀態存資料庫（`work_jobs`、`work_units`），helper 重開後 `analysis.status` 仍查得到；重開後不自動續跑
 - 編輯器：專案頁（資料夾授權所在頁，`pages/projects/`）加「分析資料夾」按鈕與進度／暫停原因顯示（暫停時按鈕變「繼續分析」）；事實項頁完成後重新整理
 - 測試一律用假 provider，不呼叫真實 CLI
+
+- 對抗驗證（2026-10-11）屬實項：
+  - 撤銷授權、移除資料夾、檔案被刪後，只靠該來源的事實項要等下次按「分析資料夾」才失效，期間履歷生成與訊息草稿照樣送進模型（R2、R4）→ 撤銷、移除時在同一交易對受影響事實項套 R2 判定（含 revocationHold）並標 `source_documents` 撤銷，不需模型；生成與草稿讀取事實項時再擋一道：引用的來源不是已授權（或已不在授權集合）就當來源已移除（使用者確認過的除外）
+  - commitUnit 用啟動時的事實項舊快照整筆覆寫：分析期間使用者否決（刪除）的事實項被復活、確認與修改被蓋掉 → 交易內逐筆重讀現況，已刪除（含 deleted_materials）就略過；存在就以現況為底只套審查狀態升級與矛盾標記；runner 的既有事實項也改用現況
 
 ### 不包含
 
