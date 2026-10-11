@@ -6,7 +6,6 @@
 ## 進行中
 
 - P1-T058 helper：授權資料夾、選定模型、已驗證 Claude 版本存進資料區（`docs/tasks/P1-T058-persist-helper-state.md`）
-- P1-T059 開發用安裝腳本：註冊 helper、準備資料區與字型（`docs/tasks/P1-T059-dev-install-script.md`）
 
 ## ready
 
