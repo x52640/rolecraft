@@ -1,7 +1,7 @@
 ---
 id: P1-T048
 phase: 1
-status: in_progress
+status: done
 depends_on: []
 specs: ["jobs-and-messages.md", "evidence-model.md"]
 track: review
