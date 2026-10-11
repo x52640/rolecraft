@@ -115,14 +115,17 @@ describe('確認比對畫面看到的複核狀態（R2）', () => {
 });
 
 describe('否決順序（D19）', () => {
-  it('刪素材失敗時專案引用已移除；重試可完成', async () => {
+  it('刪素材失敗時專案引用加回原位置，清單仍看得到；重試可完成', async () => {
+    const before = project()?.claimIds;
     t.db.exec(
       "CREATE TEMP TRIGGER block_claim_delete BEFORE DELETE ON claims BEGIN SELECT RAISE(ABORT, 'blocked'); END",
     );
     const failed = await t.send({ op: 'claims.reject', payload: { claimId: 'c-role' } });
     expect(failed).toMatchObject({ ok: false, error: { code: 'internal_error' } });
-    expect(project()?.claimIds).not.toContain('c-role');
+    expect(project()?.claimIds).toEqual(before);
     expect(t.stored('c-role')).not.toBeNull();
+    const listed = await t.send({ op: 'claims.list', payload: { projectId: P } });
+    expect(JSON.stringify(listed)).toContain('c-role');
 
     t.db.exec('DROP TRIGGER block_claim_delete');
     expect(await t.send({ op: 'claims.reject', payload: { claimId: 'c-role' } })).toEqual({

@@ -111,7 +111,13 @@ export function createMessagesService(options: MessagesServiceOptions): Required
           return { refused: 'no_service' };
         }
         const { plan } = planned;
-        repos.messageDrafts.save({ ...message, replyIntent: plan.intent });
+        // 等待引擎期間使用者可能另外存了草稿：重新讀取，只更新意圖，不用舊快照蓋掉
+        const fresh = repos.messageDrafts.get(message.id);
+        if (!fresh) {
+          running.delete(message.id);
+          return { refused: 'not_found' };
+        }
+        repos.messageDrafts.save({ ...fresh, replyIntent: plan.intent });
         const job = startDraftJob(plan, {
           db: options.db,
           repos,

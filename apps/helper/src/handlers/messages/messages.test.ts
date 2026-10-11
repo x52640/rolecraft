@@ -24,6 +24,8 @@ let services: HelperServices;
 let prompts: string[];
 let settled: Promise<DraftReport>;
 let engineAvailable: boolean;
+/** 設定時，resolveEngine 會等這個 Promise（模擬等待引擎期間使用者另外存檔） */
+let engineGate: Promise<void> | null;
 
 function setup(script: readonly FakeStep[]) {
   const fake = createFakeAdapter({ script });
@@ -48,7 +50,10 @@ function setup(script: readonly FakeStep[]) {
   services = {
     messages: createMessagesService({
       db,
-      resolveEngine: () => Promise.resolve(engineAvailable ? engine : null),
+      resolveEngine: async () => {
+        await engineGate;
+        return engineAvailable ? engine : null;
+      },
       sleep: () => Promise.resolve(),
       onSettled: (report) => resolve(report),
     }),
@@ -59,6 +64,7 @@ beforeEach(() => {
   db = openDatabase(':memory:').db;
   repos = createRepositories(db);
   engineAvailable = true;
+  engineGate = null;
   setup([{ text: GOOD }]);
 });
 
@@ -228,6 +234,23 @@ describe('request_draft', () => {
     await call({ op: 'messages.update_draft', payload: { messageDraftId: id, draft: '我自己寫' } });
     expect((await settled).status).toBe('completed');
     expect(await get(id)).toMatchObject({ message: { draft: '我自己寫' } });
+  });
+
+  it('等待 AI 服務期間使用者存了草稿：記錄意圖時不蓋掉', async () => {
+    let open: () => void = () => undefined;
+    engineGate = new Promise((r) => (open = r));
+    const id = await paste();
+    const pending = request(id, 'accept');
+    await call({
+      op: 'messages.update_draft',
+      payload: { messageDraftId: id, draft: '等待中寫的' },
+    });
+    open();
+    expect(await pending).toMatchObject({ ok: true });
+    expect((await settled).status).toBe('completed');
+    expect(await get(id)).toMatchObject({
+      message: { replyIntent: 'accept', draft: '等待中寫的' },
+    });
   });
 });
 

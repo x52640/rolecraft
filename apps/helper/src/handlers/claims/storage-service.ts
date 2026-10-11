@@ -65,6 +65,19 @@ export function createClaimsService(options: ClaimsServiceOptions): ClaimsServic
     });
   }
 
+  /** 刪除失敗時把事實項加回原本引用它的專案（專案已不存在或已含它就略過）。 */
+  function restoreLinks(claimId: string, positions: ReadonlyMap<string, number>): void {
+    transaction(db, () => {
+      for (const [projectId, index] of positions) {
+        const project = projects.get(projectId);
+        if (project === null || project.claimIds.includes(claimId)) continue;
+        const claimIds = [...project.claimIds];
+        claimIds.splice(Math.min(index, claimIds.length), 0, claimId);
+        projects.save({ ...project, claimIds });
+      }
+    });
+  }
+
   return {
     listProjects: () => Promise.resolve(projects.list()),
 
@@ -103,19 +116,26 @@ export function createClaimsService(options: ClaimsServiceOptions): ClaimsServic
     },
 
     reject(claimId) {
-      // 先在自己的交易移除各專案的引用，再刪素材；第二步失敗時重試仍能完成（D19）。
-      const unlinked = transaction(db, () => {
-        let count = 0;
+      // 先在自己的交易移除各專案的引用，再刪素材（D19）。deleteMaterial 不能放進外層交易，
+      // 所以刪除失敗而事實項仍在時，要把引用加回原位置，清單仍看得到、可以重試。
+      const removed = transaction(db, () => {
+        const positions = new Map<string, number>();
         for (const project of projects.list()) {
-          if (!project.claimIds.includes(claimId)) continue;
+          const index = project.claimIds.indexOf(claimId);
+          if (index === -1) continue;
           projects.save({ ...project, claimIds: project.claimIds.filter((id) => id !== claimId) });
-          count += 1;
+          positions.set(project.id, index);
         }
-        return count;
+        return positions;
       });
-      if (claims.get(claimId) === null) return Promise.resolve(unlinked > 0 ? OK : NOT_FOUND);
-      // D19：刪除原件並記錄已刪素材；含其副本的未投遞匯出版本一併刪除、已投遞的保留。
-      deleteMaterial(db, fileStore, { kind: 'claim', id: claimId });
+      if (claims.get(claimId) === null) return Promise.resolve(removed.size > 0 ? OK : NOT_FOUND);
+      try {
+        // D19：刪除原件並記錄已刪素材；含其副本的未投遞匯出版本一併刪除、已投遞的保留。
+        deleteMaterial(db, fileStore, { kind: 'claim', id: claimId });
+      } catch (error) {
+        if (claims.get(claimId) !== null) restoreLinks(claimId, removed);
+        throw error;
+      }
       return Promise.resolve(OK);
     },
   };
