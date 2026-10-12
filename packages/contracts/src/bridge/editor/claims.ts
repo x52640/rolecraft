@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { Claim, ReviewStatus } from '../../entities/claim.ts';
-import { NonEmptyText } from '../../entities/common.ts';
+import { Id, NonEmptyText } from '../../entities/common.ts';
 import { ProjectEvidence } from '../../entities/project-evidence.ts';
 import { Ack, EmptyPayload, OpaqueId, bridgeOp } from '../common.ts';
 import { withFailure } from '../operations.ts';
@@ -37,6 +37,24 @@ export type ProjectGroupInput = z.infer<typeof ProjectGroupInput>;
 
 const ProjectRef = z.strictObject({ projectId: OpaqueId });
 
+/**
+ * 事實項來源文件的顯示名稱（P1-T073）：檔名與所屬資料夾名稱都只有最後一段，不含上層路徑（R7）。
+ * 只供顯示；畫面不顯示內部 ID。來源文件已不在清單（例如已刪除）就不列。
+ */
+export const ClaimSourceName = z.strictObject({
+  sourceDocumentId: Id,
+  name: NonEmptyText,
+  rootName: NonEmptyText,
+});
+export type ClaimSourceName = z.infer<typeof ClaimSourceName>;
+
+/** 事實項清單回應（相加 sourceNames，P1-T073）。 */
+const ClaimList = z.strictObject({
+  ok: z.literal(true),
+  claims: z.array(Claim),
+  sourceNames: z.array(ClaimSourceName).optional(),
+});
+
 export const CLAIMS_SCHEMAS = {
   /** 列出專案（摘要不帶確認狀態，R1）。 */
   'claims.list_projects': {
@@ -48,12 +66,12 @@ export const CLAIMS_SCHEMAS = {
   /** 列出某專案的事實項（含狀態與來源片段）。 */
   'claims.list': {
     request: bridgeOp('claims.list', z.strictObject({ projectId: OpaqueId })),
-    response: withFailure(z.strictObject({ ok: z.literal(true), claims: z.array(Claim) })),
+    response: withFailure(ClaimList),
   },
   /** 列出未歸專案的事實項（D23）：不在任何專案 claimIds 裡、未刪除；依建立順序。 */
   'claims.list_unassigned': {
     request: bridgeOp('claims.list_unassigned', EmptyPayload),
-    response: withFailure(z.strictObject({ ok: z.literal(true), claims: z.array(Claim) })),
+    response: withFailure(ClaimList),
   },
   'claims.get': {
     request: bridgeOp('claims.get', ClaimRef),

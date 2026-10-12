@@ -1,5 +1,6 @@
 import type { Claim } from '@rolecraft/contracts';
 
+import { BatchBar } from './BatchBar.tsx';
 import { ClaimCard } from './ClaimCard.tsx';
 import type { MoveTarget } from './ClaimMove.tsx';
 import { ProjectTools } from './ProjectTools.tsx';
@@ -20,27 +21,22 @@ function ClaimList({ review, claims }: { review: Review; claims: readonly Claim[
     ...(review.projectId === UNASSIGNED ? [] : [{ id: null, name: '未歸專案' }]),
     ...projects.filter((p) => p.id !== review.projectId).map((p) => ({ id: p.id, name: p.name })),
   ];
-  const selectedCount = claims.filter(
-    (c) => review.selected.has(c.id) && c.reviewStatus === 'normal',
-  ).length;
   return (
     <>
-      <div className="claims-batch">
-        <button
-          type="button"
-          disabled={review.busy || selectedCount === 0}
-          onClick={() => void review.confirmSelected(claims)}
-        >
-          批次確認所選（{selectedCount}）
-        </button>
-        <span className="claim-hint">
-          批次確認只收複核狀態正常的項目；待複核、來源矛盾、來源已移除的請逐項對照原文確認。
-        </span>
-      </div>
+      <BatchBar
+        claims={claims}
+        selected={review.selected}
+        busy={review.busy}
+        unassigned={review.projectId === UNASSIGNED}
+        onSelectAll={review.selectAll}
+        onClear={review.clearSelected}
+        onConfirm={(targets, completion) => void review.confirmBatch(targets, completion)}
+      />
       {claims.map((claim) => (
         <ClaimCard
           key={claim.id}
           claim={claim}
+          sourceNames={review.sourceNames}
           busy={review.busy}
           completionChoice={review.choiceOf(claim.id)}
           onCompletionChange={(choice) => review.setChoice(claim.id, choice)}

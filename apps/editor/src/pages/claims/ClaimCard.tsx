@@ -2,11 +2,12 @@ import type { Claim, ConfirmableCompletion } from '@rolecraft/contracts';
 import { useState } from 'react';
 
 import { ClaimMove, type MoveTarget } from './ClaimMove.tsx';
-import { ClaimSources } from './ClaimSources.tsx';
+import { ClaimSources, type SourceNames } from './ClaimSources.tsx';
 import {
   COMPLETION_LABELS,
   REVIEW_LABELS,
   TYPE_LABELS,
+  batchBlockReason,
   formatTime,
   isConfirmationCurrent,
   needsCompletion,
@@ -17,10 +18,12 @@ export type CompletionChoice = ConfirmableCompletion | '';
 
 export interface ClaimCardProps {
   claim: Claim;
+  /** 來源文件顯示名稱（P1-T073） */
+  sourceNames: SourceNames;
   busy: boolean;
   completionChoice: CompletionChoice;
   onCompletionChange: (choice: CompletionChoice) => void;
-  /** 只有複核狀態正常的事實項能加入批次；其他要逐項對照原文確認。 */
+  /** 只有尚未確認、複核狀態正常的事實項能加入批次；其他要逐項對照原文確認（batchBlockReason）。 */
   selected: boolean;
   onSelectChange: (selected: boolean) => void;
   onConfirm: () => void;
@@ -50,7 +53,8 @@ export function ClaimCard(props: ClaimCardProps) {
   const [askingDelete, setAskingDelete] = useState(false);
   const withCompletion = needsCompletion(claim);
   const canConfirm = !busy && (!withCompletion || props.completionChoice !== '');
-  const batchable = claim.reviewStatus === 'normal';
+  const blocked = batchBlockReason(claim);
+  const batchable = blocked === null;
   const titleId = `claim-${claim.id}`;
 
   return (
@@ -157,6 +161,7 @@ export function ClaimCard(props: ClaimCardProps) {
               />
               加入批次確認
             </label>
+            {blocked === null ? null : <span className="claim-hint">不能批次：{blocked}</span>}
             {props.onMove && props.moveTargets ? (
               <ClaimMove targets={props.moveTargets} busy={busy} onMove={props.onMove} />
             ) : null}
@@ -164,7 +169,7 @@ export function ClaimCard(props: ClaimCardProps) {
         )}
       </div>
       <div className="claim-side">
-        <ClaimSources claim={claim} />
+        <ClaimSources claim={claim} names={props.sourceNames} />
       </div>
     </article>
   );

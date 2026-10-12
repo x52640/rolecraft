@@ -1,10 +1,17 @@
-import type { BridgeFailure, Claim, ProjectEvidence } from '@rolecraft/contracts';
+import type {
+  BridgeFailure,
+  Claim,
+  ClaimSourceName,
+  ConfirmableCompletion,
+  ProjectEvidence,
+} from '@rolecraft/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
 import { useAnalysis } from '../projects/useAnalysis.ts';
 import type { CompletionChoice } from './ClaimCard.tsx';
-import { needsCompletion } from './labels.ts';
+import type { SourceNames } from './ClaimSources.tsx';
+import { batchBlockReason, needsCompletion } from './labels.ts';
 
 export type Load<T> =
   { state: 'loading' } | { state: 'error'; message: string } | { state: 'ready'; value: T };
@@ -34,6 +41,8 @@ export function useClaimsReview() {
   const [projects, setProjects] = useState<Load<ProjectEvidence[]>>({ state: 'loading' });
   const [projectId, setProjectId] = useState<string | null>(null);
   const [claims, setClaims] = useState<Load<Claim[]> | null>(null);
+  // 來源文件 ID → 顯示名稱（P1-T073）；和事實項清單一起更新
+  const [sourceNames, setSourceNames] = useState<SourceNames>(new Map());
   const [choices, setChoices] = useState<Record<string, CompletionChoice>>({});
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -85,6 +94,8 @@ export function useClaimsReview() {
           ? await bridge.send({ op: 'claims.list_unassigned', payload: {} })
           : await bridge.send({ op: 'claims.list', payload: { projectId: id } });
       if (currentProject.current !== id) return;
+      const names: readonly ClaimSourceName[] = res.ok ? (res.sourceNames ?? []) : [];
+      setSourceNames(new Map(names.map((n) => [n.sourceDocumentId, n])));
       setClaims(
         res.ok ? { state: 'ready', value: res.claims } : { state: 'error', message: errorOf(res) },
       );
@@ -136,9 +147,13 @@ export function useClaimsReview() {
     /** 專案改名、合併、刪除後：重新讀專案清單與目前清單（目前專案不在了就回到自動預設） */
     projectsChanged: () => setGeneration((g) => g + 1),
     claims,
+    sourceNames,
     busy,
     notice,
     selected,
+    /** 勾選這些項目（「全選可批次的項目」）。 */
+    selectAll: (ids: readonly string[]) => setSelected(new Set(ids)),
+    clearSelected: () => setSelected(new Set()),
     choiceOf,
     setChoice: (id: string, choice: CompletionChoice) =>
       setChoices((p) => ({ ...p, [id]: choice })),
@@ -191,14 +206,15 @@ export function useClaimsReview() {
         const res = await bridge.send({ op: 'claims.reject', payload: { claimId: claim.id } });
         return { ok: res.ok, notice: res.ok ? '已刪除，之後不會用於生成。' : errorOf(res) };
       }),
-    /** 批次確認：只送勾選且複核狀態正常的項目；功能／交付物都要先選好完成狀態，否則一項都不送。 */
-    confirmSelected: (list: readonly Claim[]) => {
-      const targets = list.filter((c) => selected.has(c.id) && c.reviewStatus === 'normal');
+    /**
+     * 批次確認（P1-T073）：只送 batchBlockReason 允許的項目（尚未確認、複核狀態正常）；
+     * 功能／交付物一律設為 completion，其他類型只確認內容。逐項送出，失敗的照常留在清單。
+     */
+    confirmBatch: (list: readonly Claim[], completion: ConfirmableCompletion | '') => {
+      // 再篩一次：不可批次的項目即使被傳進來也不送
+      const targets = list.filter((c) => batchBlockReason(c) === null);
       if (targets.length === 0) return Promise.resolve(false);
-      if (targets.some((c) => needsCompletion(c) && choiceOf(c.id) === '')) {
-        setNotice('所選的功能／交付物要先選擇「確認為」已完成或計畫中，才能批次確認。');
-        return Promise.resolve(false);
-      }
+      if (completion === '' && targets.some(needsCompletion)) return Promise.resolve(false);
       return run(
         targets.map((c) => c.id),
         async () => {
@@ -206,7 +222,7 @@ export function useClaimsReview() {
           for (const claim of targets) {
             const res = await bridge.send({
               op: 'claims.confirm',
-              payload: confirmPayload(claim, choiceOf(claim.id)),
+              payload: confirmPayload(claim, completion),
             });
             if (!res.ok) failed += 1;
           }
@@ -216,7 +232,7 @@ export function useClaimsReview() {
             notice:
               failed === 0
                 ? `已確認 ${String(done)} 項。`
-                : `已確認 ${String(done)} 項，${String(failed)} 項失敗。`,
+                : `已確認 ${String(done)} 項，${String(failed)} 項失敗（狀態可能已變更，請看清單重新處理）。`,
           };
         },
       );

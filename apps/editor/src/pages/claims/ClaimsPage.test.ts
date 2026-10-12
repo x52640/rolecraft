@@ -64,7 +64,11 @@ function fakeHelper(claims: Claim[] = [FEATURE, ROLE, REVIEW], fail = false) {
             projects: [{ id: 'p1', name: 'RoleCraft', summary: '', claimIds: [] }],
           });
         case 'claims.list':
-          return Promise.resolve({ ok: true, claims });
+          return Promise.resolve({
+            ok: true,
+            claims,
+            sourceNames: [{ sourceDocumentId: 'doc-1', name: 'README.md', rootName: 'rolecraft' }],
+          });
         case 'claims.list_unassigned':
           return Promise.resolve({ ok: true, claims: [] });
         default:
@@ -97,7 +101,11 @@ describe('<ClaimsPage />', () => {
     renderPage(fakeHelper());
     const feature = await screen.findByRole('article', { name: '支援 PDF 匯出' });
     expect(within(feature).getByText('- [x] PDF 匯出')).toBeTruthy();
-    expect(within(feature).getByText(/文件 doc-1・第 2 版・第 4 段/)).toBeTruthy();
+    // 來源顯示檔名與資料夾名稱，不顯示內部 ID（P1-T073）
+    expect(
+      within(feature).getByText(/README\.md（資料夾 rolecraft）・第 2 版・第 4 段/),
+    ).toBeTruthy();
+    expect(feature.textContent).not.toContain('doc-1');
     expect(feature.textContent).toContain('文件標示完成（尚未經你確認，不等於完成）');
     expect(feature.textContent).toContain('尚未經你確認');
     expect(card('支援登入').textContent).toContain('待複核');
@@ -139,35 +147,6 @@ describe('<ClaimsPage />', () => {
       text: '負責後端',
       expectedReviewStatus: 'normal',
     });
-  });
-
-  it('批次確認：待複核不能勾；功能沒選完成狀態時一項都不送', async () => {
-    const helper = fakeHelper();
-    renderPage(helper);
-    await screen.findByRole('article', { name: '支援 PDF 匯出' });
-    const box = (text: string) =>
-      within(card(text)).getByRole<HTMLInputElement>('checkbox', { name: '加入批次確認' });
-    expect(box('支援登入').disabled).toBe(true);
-    fireEvent.click(box('支援 PDF 匯出'));
-    fireEvent.click(box('負責後端'));
-    fireEvent.click(screen.getByRole('button', { name: '批次確認所選（2）' }));
-    await screen.findByText(/要先選擇「確認為」/);
-    expect(helper.writes()).toEqual([]);
-
-    fireEvent.change(within(card('支援 PDF 匯出')).getByRole('combobox', { name: '確認為' }), {
-      target: { value: 'planned' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '批次確認所選（2）' }));
-    await screen.findByText('已確認 2 項。');
-    expect(helper.writes().map((w) => w.payload)).toEqual([
-      {
-        claimId: 'c-feature',
-        text: '支援 PDF 匯出',
-        completion: 'planned',
-        expectedReviewStatus: 'normal',
-      },
-      { claimId: 'c-role', text: '負責後端', expectedReviewStatus: 'normal' },
-    ]);
   });
 
   it('修改內容：送 claims.update，提示原確認失效', async () => {

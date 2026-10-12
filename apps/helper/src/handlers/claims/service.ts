@@ -4,6 +4,7 @@ import type {
   BridgeOperation,
   BridgeRequestOf,
   Claim,
+  ClaimSourceName,
   ProjectEvidence,
 } from '@rolecraft/contracts';
 
@@ -33,6 +34,8 @@ export interface ClaimsService {
   /** 未歸專案（不在任何專案 claimIds 裡）的事實項，依建立順序；已刪除的不列出（D23）。 */
   listUnassigned(): Promise<Claim[]>;
   getClaim(claimId: string): Promise<Claim | null>;
+  /** 事實項引用到的來源文件顯示名稱（檔名、資料夾名稱的最後一段，P1-T073）；查不到的不列。 */
+  sourceNames(claims: readonly Claim[]): Promise<ClaimSourceName[]>;
   /**
    * 確認事實項（R1、D14）：確認時間由服務決定，記錄確認當下的文字。
    * 「使用者確認完成」只能經由這裡產生。畫面看到的複核狀態與目前不同時回 stale、不寫入（R2）。

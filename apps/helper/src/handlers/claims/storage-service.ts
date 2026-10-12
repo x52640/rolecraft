@@ -15,6 +15,7 @@ import {
 
 import { createProjectOps } from './projects-service.ts';
 import type { ClaimsService, ClaimsWriteResult } from './service.ts';
+import { sourceNamesOf } from './source-names.ts';
 
 /** helper 的本機儲存：SQLite 連線＋檔案儲存區（刪除素材時清 PDF 用）。 */
 export interface HelperStorage {
@@ -52,7 +53,7 @@ export function withEditedText(claim: Claim, text: string): Claim {
 export function createClaimsService(options: ClaimsServiceOptions): ClaimsService {
   const { db, fileStore } = options;
   const now = options.now ?? (() => nowTimestamp());
-  const { claims, projectEvidence: projects } = createRepositories(db);
+  const { claims, projectEvidence: projects, sourceDocuments } = createRepositories(db);
 
   /** 讀出→改→寫回放在同一交易，避免與其他寫入交錯。 */
   function modify(
@@ -109,6 +110,8 @@ export function createClaimsService(options: ClaimsServiceOptions): ClaimsServic
     },
 
     getClaim: (claimId) => Promise.resolve(claims.get(claimId)),
+
+    sourceNames: (list) => Promise.resolve(sourceNamesOf((id) => sourceDocuments.get(id), list)),
 
     confirm(payload) {
       return Promise.resolve(

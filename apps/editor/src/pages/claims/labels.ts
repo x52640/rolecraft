@@ -37,6 +37,24 @@ export function isConfirmationCurrent(claim: Claim): boolean {
 }
 
 /**
+ * 不能加入批次確認的原因（P1-T073）；可以加入時回 null。
+ * 批次只收「尚未確認、複核狀態正常」的項目：待複核、來源矛盾、來源已移除要逐項對照原文確認；
+ * 已確認過（且內容沒改）的不需要再批次確認，要改完成狀態請逐項操作。
+ */
+export function batchBlockReason(claim: Claim): string | null {
+  switch (claim.reviewStatus) {
+    case 'needs_review':
+      return '待複核，請逐項對照原文確認';
+    case 'source_conflict':
+      return '來源矛盾，請逐項對照原文確認';
+    case 'source_removed':
+      return '來源已移除，請逐項確認';
+    case 'normal':
+      return isConfirmationCurrent(claim) ? '已確認過' : null;
+  }
+}
+
+/**
  * 片段位置 `tb2:<起始區塊序號>:…`／`tb1:<起始區塊序號>:…` → 「第 N 段」。
  * 格式不符時不猜，回 null（只顯示文件與版本）。
  */
