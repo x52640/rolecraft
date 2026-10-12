@@ -36,10 +36,12 @@ function bridgeFailureText(failure: BridgeFailure): string {
  * - 每次開始（含自動開始）有自己的 token；切換匯入、元件卸載、StrictMode 重跑 effect 都讓舊 token 作廢
  *   並取消輪詢計時，舊的回應一律不套用。
  * - 整理期間由畫面鎖住表單（running），所以成功時直接套用不會蓋掉使用者正在打的字。
- * importId 為 null（沒有解析成功的匯入）時不開始。
+ * importId 為 null（沒有解析成功的匯入）時不開始。auto 為 false（認出 104 版面，擁有者改裁定 #16）時
+ * 不自動開始，只在使用者按「用 AI 重新整理」（restart）時才呼叫。
  */
 export function useAiParse(
   importId: string | null,
+  auto: boolean,
   poll: AiPollOptions,
   onDraft: (draft: ImportAiDraft) => void,
 ) {
@@ -97,19 +99,20 @@ export function useAiParse(
   };
 
   useEffect(() => {
-    if (importId === null) {
+    if (importId === null || !auto) {
+      cancel();
       setState({ kind: 'idle' });
-      return undefined;
+      return cancel;
     }
     start(importId);
     return cancel;
-    // 只在換一筆匯入時自動開始一次
+    // 只在換一筆匯入時決定一次（auto 跟著匯入一起設定）
   }, [importId]);
 
   return {
     state,
     running: state.kind === 'running',
-    /** 「重新用 AI 整理」：整理中不重送 */
+    /** 「用 AI 重新整理」：整理中不重送 */
     restart: () => {
       if (importId !== null && state.kind !== 'running') start(importId);
     },

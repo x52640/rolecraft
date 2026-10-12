@@ -93,8 +93,8 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：首次實作（pipeline resume-parse、helper import.ai_parse／ai_status、編輯器自動整理與退路、規格）；頁首姓名去標語；main.ts 接上 AI 整理服務（協調者擴充 write_paths 後另一個 commit）
-- 已通過驗證：worktree `npm run verify` 綠（Vitest 3426 通過、13 略過；test:docs 15、test:scripts 30）；全程假 provider
+- 最後完成：首次實作（pipeline resume-parse、helper import.ai_parse／ai_status、編輯器自動整理與退路、規格）；頁首姓名去標語；main.ts 接上 AI 整理服務（協調者擴充 write_paths 後另一個 commit）；第二輪：104 改用規則（擁有者改裁定 #16）、個資遮蔽 8 項與捏造檢查 4 項修正
+- 已通過驗證：worktree `npm run verify` 綠（見完成結果「第二輪」）；第二輪新增的 15 項回歸測試換回舊實作全部失敗；全程假 provider
 - 下一步：協調者收官（對抗驗證、以開發入口用擁有者 PDF 實跑）
 - Blocker：無
 
@@ -113,3 +113,12 @@ npm run verify
 - 保守選擇（待擁有者裁定）：生日、性別、年齡、兵役、婚姻、個人網站也當個資不送；文中網址（非標籤行）照送；其他段落不寫入 Profile；擷取不到中文姓名時英文姓名不切標語；佔位字換回原文後回填（描述裡會出現原本的 email／電話）。
 - 正式 helper 接線：`main.ts` 有資料區且有 PDF 選取器時改用 `createResumeImportWithClaude`（開發入口 harness 走同一個 `main()`）；`main.test.ts` 驗未選模型時 `import.ai_parse` 回原因、不是「尚未支援」。
 - 手動驗證（擁有者 PDF 實跑）需協調者以開發入口進行。
+
+### 第二輪（擁有者改裁定＋對抗驗證／codex 屬實項）
+
+- 擁有者改裁定 #16：有 `structured`（104）時用規則預填、不自動呼叫 AI，畫面標「預填來源：104 版面規則（沒有使用 AI）」，按「用 AI 重新整理」才呼叫（改過欄位要再按一次確認）；其他格式照舊自動整理。`useAiParse` 加 `auto` 參數。
+- 個資遮蔽 8 項（`labels.ts`、`redact.ts`、`personal.ts` 重寫，`hardening.test.ts` 逐項直接檢查提示字串）：標籤比對先 NFKC 去空白；標籤獨占一行（含雙欄標籤列）時下一行值移除、「LINE ID xxx」無冒號也認；英文標籤拆字含關鍵字即算（name、line 只認固定寫法）；頁首「中文名 英文名」的英文名加入遮蔽（`headerNameAlias`，helper `ai-source.ts`；helper 測試檢查提示）；遮蔽在 NFKC 文字上比對、範圍對回原文（全形數字電話、全形 ＠、+886 (0)）；抽到的姓名列一律加入遮蔽；104 已知值依序消耗、不設兩行上限；聯絡區塊用通用規則的標題詞彙加英文變體結束。
+- 捏造檢查 4 項（`match.ts`）：「至今」類結束日期要緊接區間分隔符或獨占一欄且引用行有年份；描述／內文以行為單位比對整行；英數開頭結尾要合詞界；日期要年份或年月格式。提示同步要求描述逐行照抄、日期只放年份或年月。
+- verify：Vitest 3460 通過、13 略過。
+- 回歸測試：pipeline 12 項（個資 7＋捏造 4，第 4 項英文名由 helper 測試驗）＋helper 1 項＋編輯器 2 項（104 不自動呼叫、按鈕確認）；換回舊實作 15 項全部失敗。
+- 保守選擇（待裁定）：中文個資標籤限 8 字內（「負責與客戶聯絡：…」這類 8 字內內文仍會被當成個資行移除，寧可少送）；頁首英文名只認中文名後 1～3 個大寫開頭英文字（「王小明 Product Manager」也會被遮蔽，換回原文後不影響預填）；描述同一條的換行續行可接成一段，但不能只取某行的一部分。

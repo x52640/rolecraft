@@ -33,8 +33,8 @@ const failureText = (failure: BridgeFailure): string =>
 /**
  * 履歷 PDF 匯入（F02、R10、D18）：選檔 → 預覽原文與欄位草稿 → 逐欄校正 → 確認後才寫入個人資料。
  * 檔案由本機輔助程式開系統選取器選（R7）；解析失敗清楚提示並改手動輸入。
- * 解析成功後自動用 AI 整理（P1-T069）：整理中鎖住表單；成功時以逐欄對照過原文的結果預填，
- * 失敗或不可用時保留規則（104 版面或通用）的預填並標明來源。
+ * 解析成功後用 AI 整理（P1-T069）：104 版面用規則預填、按「用 AI 重新整理」才呼叫；其他格式自動開始。
+ * 整理中鎖住表單；成功時以逐欄對照過原文的結果預填，失敗或不可用時保留規則的預填並標明來源。
  */
 export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOptions }) {
   const bridge = useBridge();
@@ -46,12 +46,14 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
   // 每次送出驗證失敗加一：把錯誤清單捲進畫面並聚焦（確認列在視窗底部，清單可能在畫面外）。
   const [failedAttempts, setFailedAttempts] = useState(0);
   const problemsRef = useRef<HTMLUListElement>(null);
-  // AI 整理（P1-T069）：只對解析成功的匯入自動開始；確認失敗回到核對畫面不會重跑
+  // AI 整理（P1-T069）：解析成功、且不是 104 版面時自動開始（104 用規則預填，按鈕才呼叫，擁有者裁定 #16）；
+  // 確認失敗回到核對畫面不會重跑
   const [aiImportId, setAiImportId] = useState<string | null>(null);
+  const [aiAuto, setAiAuto] = useState(false);
   const [source, setSource] = useState<PrefillSource>('manual');
   const [edited, setEdited] = useState(false);
   const [rerunArmed, setRerunArmed] = useState(false);
-  const ai = useAiParse(aiImportId, aiPoll, (draft) => {
+  const ai = useAiParse(aiImportId, aiAuto, aiPoll, (draft) => {
     setForm(formFromAiDraft(draft));
     setSource('ai');
     setEdited(false);
@@ -84,6 +86,7 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
     setChecked(false);
     setProblems([]);
     setPhase({ kind: 'review', importId, result: got.result });
+    setAiAuto(parsed !== null && parsed.draft.structured === undefined);
     setAiImportId(parsed ? importId : null);
   }
 

@@ -287,9 +287,9 @@ describe('逐欄照抄檢查', () => {
     ]);
   });
 
-  it('描述必須用到每個引用行：只取頭尾行中間跳過的內容不算', () => {
-    expect(coversLines('AB', ['xA', 'By'])).toBe(true);
-    expect(coversLines('A', ['xA', 'By'])).toBe(false);
+  it('跨行的值必須用到每個引用行；全半形與空白不影響', () => {
+    expect(coversLines('甲乙', ['丙甲', '乙丁'])).toBe(true);
+    expect(coversLines('甲', ['丙甲', '乙丁'])).toBe(false);
     expect(coversLines('ＡＢ', ['A B'])).toBe(true);
   });
 

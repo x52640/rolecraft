@@ -1,77 +1,20 @@
 /**
  * 姓名與聯絡資料只在本機處理（P1-T069，協調者保守選擇）：送給模型前先抽出並移除。
- * - 「標籤：值」「標籤 ⇥ 值」的個人資料行（手機、電話、E-mail、地址、LINE、生日、性別等）整行移除，
- *   由本機直接預填；104 的值換行續行（依本機規則已知的值）一併移除。
- * - 「聯絡方式」「基本資料」等標題下到下一個段落標題前（最多 8 行）整段移除。
- * - 其餘行裡的姓名、已抽出的個資值、看起來像 email／電話／身分證字號的片段換成佔位字（〔姓名〕、〔個資1〕…），
- *   模型只看得到佔位字；檢查通過的值在本機換回原文後再對原文檢查一次。
+ * - 個資標籤行（labels.ts：「標籤：值」「標籤⇥值」、無冒號的「LINE ID xxx」）整行移除，值由本機預填；
+ *   標籤獨占一行（含雙欄「姓名⇥電話」）時下一行是值，一併移除。
+ * - 104 已知的完整值（本機規則把換行續行接回）依序比對消耗，續行不論幾行都移除。
+ * - 「聯絡方式」「Contact」等標題下到下一個段落標題前（最多 8 行）整段移除。
+ * - 其餘行由 redact.ts 遮蔽姓名（含抽到的姓名列、頁首英文名）、已抽出的個資值與 email／電話／身分證字號。
  */
 import type { ImportDraftField } from '@rolecraft/contracts';
 
+import { isNameLabel, labelOnlyLine, personalLabelLine } from './labels.ts';
+import { createRedactor, type Secret } from './redact.ts';
 import { headingKey, isSectionHeading, normalizeForMatch } from './text.ts';
-import type { PersonalHint, ResumeParseInputs, SentLine } from './types.ts';
+import type { ResumeParseInputs, SentLine } from './types.ts';
 
-const CJK_KEYWORDS = [
-  '姓名',
-  '手機',
-  '電話',
-  '市話',
-  '傳真',
-  '電子郵件',
-  '信箱',
-  '郵件',
-  '地址',
-  '住址',
-  '居住地',
-  '通訊',
-  '聯絡',
-  '聯繫',
-  '網站',
-  '部落格',
-  '微信',
-  '身分證',
-  '身份證',
-  '生日',
-  '出生',
-  '年齡',
-  '性別',
-  '婚姻',
-  '兵役',
-  '國籍',
-  '個人資料',
-  '基本資料',
-];
-
-/** 英文標籤整個相等才算（避免「Company name」被當成姓名）。比對前去空白、連字號、轉小寫。 */
-const ASCII_LABELS = new Set([
-  'email',
-  'mail',
-  'phone',
-  'mobile',
-  'tel',
-  'telephone',
-  'cellphone',
-  'fax',
-  'address',
-  'line',
-  'lineid',
-  'wechat',
-  'skype',
-  'telegram',
-  'whatsapp',
-  'linkedin',
-  'github',
-  'facebook',
-  'instagram',
-  'website',
-  'blog',
-  'birthday',
-  'dateofbirth',
-  'gender',
-  'name',
-  'fullname',
-  'contact',
-]);
+export { isPersonalLabel } from './labels.ts';
+export { unredact } from './redact.ts';
 
 const CONTACT_HEADINGS = new Set([
   '聯絡方式',
@@ -81,23 +24,13 @@ const CONTACT_HEADINGS = new Set([
   '基本資料',
   'contact',
   'contactinformation',
+  'contactinfo',
+  'contactdetails',
   'personalinformation',
   'personaldetails',
+  'personalinfo',
 ]);
 const CONTACT_BLOCK_MAX = 8;
-
-/** 冒號後緊接 // 是網址，不是標籤。 */
-const LABELED = /^\s*([^:：\t]{1,12}?)\s*(?:[:：](?!\/\/)|\t)\s*(.*)$/u;
-const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu;
-const PHONE =
-  /(?<![\d/.:-])(?:\+\d{1,3}[\s-]?\d|\(0\d{1,3}\)[\s-]?\d|0\d)(?:[\s-]?\d){6,11}(?![\d/])/gu;
-const NATIONAL_ID = /(?<![A-Za-z\d])[A-Z][12]\d{8}(?!\d)/gu;
-const TOKEN = /〔(?:姓名|個資)\d*〕/gu;
-
-export function isPersonalLabel(label: string): boolean {
-  const ascii = label.toLowerCase().replace(/[\s_-]/gu, '');
-  return ASCII_LABELS.has(ascii) || CJK_KEYWORDS.some((k) => label.includes(k));
-}
 
 export interface PersonalRow {
   readonly label: string;
@@ -117,126 +50,107 @@ interface Kept {
   original: string;
 }
 
-interface Continuation {
-  hint: string;
-  remaining: number;
-}
+type Row = { label: string; value: ImportDraftField };
 
 /** 第一遍：分出要移除的個資行（記成 rows）與要送出的行。 */
 function split(inputs: ResumeParseInputs) {
-  const rows: { label: string; value: ImportDraftField }[] = [];
+  const rows: Row[] = [];
   const kept: Kept[] = [];
   /** 同一標籤只留第一個；append＝聯絡區塊裡沒有標籤的行，接在同一列後面 */
-  const addRow = (
-    label: string,
-    value: string,
-    pageNumber: number,
-    lineIndex: number,
-    append = false,
-  ) => {
+  const addRow = (label: string, value: string, where: [number, number], append = false) => {
     const clean = value.trim();
     if (label === '' || clean === '') return;
     const existing = rows.find((r) => r.label === label);
-    if (existing && append)
+    if (existing && append) {
       existing.value = { ...existing.value, value: `${existing.value.value}\n${clean}` };
+    }
     if (existing) return;
-    rows.push({ label, value: { value: clean, pageNumber, lineIndex } });
+    rows.push({ label, value: { value: clean, pageNumber: where[0], lineIndex: where[1] } });
   };
   const first = inputs.names[0];
-  if (first) addRow('姓名', first.value, first.pageNumber, first.lineIndex);
-  const hintFor = (label: string, value: string): PersonalHint | undefined => {
+  if (first) addRow('姓名', first.value, [first.pageNumber, first.lineIndex]);
+  /** 104 已知完整值：回傳這一行之後還沒出現的部分（正規化後） */
+  const restOfHint = (label: string, value: string): { value: string; rest: string } | null => {
     const start = normalizeForMatch(value);
-    return inputs.personalHints.find(
+    const hint = inputs.personalHints.find(
       (h) => h.label === label && start !== '' && normalizeForMatch(h.value).startsWith(start),
     );
+    return hint
+      ? { value: hint.value, rest: normalizeForMatch(hint.value).slice(start.length) }
+      : null;
   };
 
   let block: { label: string; remaining: number } | null = null;
-  let continuation: Continuation | null = null;
+  let pending: string[] | null = null;
+  let rest = '';
   for (const page of inputs.pages) {
     page.lines.forEach((original, lineIndex) => {
-      const { pageNumber } = page;
+      const where: [number, number] = [page.pageNumber, lineIndex];
       const norm = normalizeForMatch(original);
       if (norm === '') return;
-      const labeled = LABELED.exec(original);
-      if (block && (isSectionHeading(original) || block.remaining <= 0)) block = null;
+      const heading = isSectionHeading(original);
+      // 先認「整行都是標籤」（雙欄「姓名⇥居住地」不能被當成「姓名＝居住地」）
+      const labelsOnly = labelOnlyLine(original);
+      const labelLine = labelsOnly ? null : personalLabelLine(original);
+      if (pending && !heading && !labelLine && !labelsOnly) {
+        const values = original
+          .split('\t')
+          .map((s) => s.trim())
+          .filter((s) => s !== '');
+        if (values.length === pending.length)
+          pending.forEach((l, i) => addRow(l, values[i] ?? '', where));
+        else addRow(pending[0] ?? '', original, where);
+        pending = null;
+        return;
+      }
+      pending = null;
+      if (rest !== '' && !heading && !labelLine && rest.startsWith(norm)) {
+        rest = rest.slice(norm.length);
+        return;
+      }
+      rest = '';
+      if (block && (heading || block.remaining <= 0)) block = null;
       if (block) {
         block.remaining -= 1;
-        if (labeled) addRow((labeled[1] ?? '').trim(), labeled[2] ?? '', pageNumber, lineIndex);
-        else addRow(block.label, original, pageNumber, lineIndex, true);
+        if (labelLine) addRow(labelLine.label, labelLine.value, where);
+        else addRow(block.label, original, where, true);
         return;
       }
       if (CONTACT_HEADINGS.has(headingKey(original))) {
         block = { label: original.trim().replace(/[:：]+$/u, ''), remaining: CONTACT_BLOCK_MAX };
-        continuation = null;
         return;
       }
-      const label = (labeled?.[1] ?? '').trim();
-      if (labeled && isPersonalLabel(label)) {
-        const value = labeled[2] ?? '';
-        const hint = hintFor(label, value);
-        addRow(label, hint?.value ?? value, pageNumber, lineIndex);
-        continuation = hint ? { hint: normalizeForMatch(hint.value), remaining: 2 } : null;
+      if (labelLine) {
+        if (labelLine.value === '') {
+          pending = [labelLine.label];
+          return;
+        }
+        const hinted = restOfHint(labelLine.label, labelLine.value);
+        addRow(labelLine.label, hinted?.value ?? labelLine.value, where);
+        rest = hinted?.rest ?? '';
         return;
       }
-      if (
-        continuation &&
-        !labeled &&
-        continuation.remaining > 0 &&
-        continuation.hint.includes(norm)
-      ) {
-        continuation.remaining -= 1;
+      if (labelsOnly) {
+        pending = labelsOnly;
         return;
       }
-      continuation = null;
-      kept.push({ pageNumber, lineIndex, original });
+      kept.push({ pageNumber: page.pageNumber, lineIndex, original });
     });
   }
   return { rows, kept };
 }
 
-/** 第二遍：把姓名、已抽出的個資值與 email／電話／身分證字號片段換成佔位字。 */
-function redactor(inputs: ResumeParseInputs, rows: readonly PersonalRow[]) {
-  const tokens = new Map<string, string>();
-  const byValue = new Map<string, string>();
-  const tokenFor = (secret: string, name: boolean): string => {
-    const existing = byValue.get(secret);
-    if (existing) return existing;
-    const count = [...tokens.keys()].filter((t) => t.startsWith(name ? '〔姓名' : '〔個資')).length;
-    const token = name
-      ? `〔姓名${count === 0 ? '' : String(count + 1)}〕`
-      : `〔個資${String(count + 1)}〕`;
-    tokens.set(token, secret);
-    byValue.set(secret, token);
-    return token;
-  };
-  const names = [...new Set(inputs.names.map((n) => n.value.trim()))].filter((n) => n.length >= 2);
-  const values = rows
-    .filter((r) => r.label !== '姓名')
-    .flatMap((r) => r.value.value.split('\n'))
-    .map((v) => v.trim())
-    .filter((v) => [...v].length >= 3);
-  const secrets = [
-    ...names.map((s) => ({ s, name: true })),
-    ...[...new Set(values)].map((s) => ({ s, name: false })),
-  ].sort((a, b) => b.s.length - a.s.length);
-
-  const redact = (text: string): string => {
-    let out = text;
-    for (const { s, name } of secrets) {
-      if (out.includes(s)) out = out.split(s).join(tokenFor(s, name));
-    }
-    for (const pattern of [EMAIL, PHONE, NATIONAL_ID]) {
-      out = out.replace(pattern, (match) => tokenFor(match, false));
-    }
-    return out;
-  };
-  return { redact, tokens };
+function secretsOf(inputs: ResumeParseInputs, rows: readonly Row[]): Secret[] {
+  const names = inputs.names.map((n) => ({ value: n.value, name: true }));
+  const fromRows = rows.flatMap((r) =>
+    r.value.value.split('\n').map((value) => ({ value, name: isNameLabel(r.label) })),
+  );
+  return [...names, ...fromRows];
 }
 
 export function extractPersonal(inputs: ResumeParseInputs): PersonalExtraction {
   const { rows, kept } = split(inputs);
-  const { redact, tokens } = redactor(inputs, rows);
+  const { redact, tokens } = createRedactor(secretsOf(inputs, rows));
   const sent = kept.map((k, order): SentLine => ({
     id: `${String(k.pageNumber)}-${String(k.lineIndex + 1)}`,
     order,
@@ -246,9 +160,4 @@ export function extractPersonal(inputs: ResumeParseInputs): PersonalExtraction {
     original: k.original,
   }));
   return { sent, personalInfo: rows, tokens };
-}
-
-/** 佔位字換回原文；不認得的佔位字原樣保留（之後對原文的檢查會把它擋掉）。 */
-export function unredact(value: string, tokens: ReadonlyMap<string, string>): string {
-  return value.replace(TOKEN, (token) => tokens.get(token) ?? token);
 }

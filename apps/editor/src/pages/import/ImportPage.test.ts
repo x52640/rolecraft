@@ -59,6 +59,8 @@ function setup(result: ImportResult | null, overrides: Record<string, unknown> =
 async function pickFile() {
   fireEvent.click(screen.getByRole('button', { name: '選擇履歷 PDF' }));
   await screen.findByRole('button', { name: '確認並寫入個人資料' });
+  // 非 104 版面會自動 AI 整理（P1-T069，這裡的假通道回失敗）：等整理結束、表單解鎖再操作
+  await waitFor(() => expect(screen.queryByText(/AI 整理中/u)).toBeNull());
 }
 
 afterEach(cleanup);

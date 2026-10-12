@@ -2,7 +2,12 @@
 // 與 104 版面已知的「標籤 ⇥ 值」（值可能接了換行續行）。姓名與聯絡資料之後在本機移除，不送模型。
 import type { ImportDraftField } from '@rolecraft/contracts';
 import type { PersonalHint } from '@rolecraft/pipeline';
-import { headerNameCandidate, type DraftField, type ExtractResult } from '@rolecraft/resume-import';
+import {
+  headerNameAlias,
+  headerNameCandidate,
+  type DraftField,
+  type ExtractResult,
+} from '@rolecraft/resume-import';
 
 import type { AiSource } from './ai-runner.ts';
 
@@ -22,6 +27,12 @@ export function aiSourceOf(extracted: ExtractResult): AiSource | null {
     if (candidate && !names.some((n) => n.value === candidate.value.trim())) {
       names.push({ ...toField(candidate), value: candidate.value.trim() });
     }
+  }
+  // 頁首「中文名 英文名 標語」：英文名也要遮蔽（不當預填，只加在後面）
+  for (const name of [...names]) {
+    const line = pages.find((p) => p.pageNumber === name.pageNumber)?.lines[name.lineIndex];
+    const alias = headerNameAlias(line?.text.split('\t')[0] ?? '');
+    if (alias && !names.some((n) => n.value === alias)) names.push({ ...name, value: alias });
   }
   const hints: PersonalHint[] = (draft.structured?.personalInfo ?? []).map((row) => ({
     label: row.label,

@@ -187,6 +187,24 @@ describe('import.ai_parse（P1-T069）', () => {
     expect(env.fake.prompts).toHaveLength(0);
   });
 
+  it('頁首「中文名 英文名 標語」：英文名也不進提示（對抗驗證）', async () => {
+    const lines = [
+      line('陳範例 Alex Chen 熱愛解決問題', 18),
+      line('工作經驗'),
+      line('Alex Chen 帶領虛構雲端的付款團隊。'),
+    ];
+    const env = setup({
+      extracted: { ...EXTRACTED, pages: [{ ...EXTRACTED.pages[0], lines }] } as ExtractResult,
+    });
+    const importId = await picked(env);
+    const done = env.settled();
+    await env.call('import.ai_parse', { importId });
+    await done;
+    expect(env.fake.prompts[0]).not.toContain('Alex Chen');
+    expect(env.fake.prompts[0]).not.toContain('陳範例');
+    expect(env.fake.prompts[0]).toContain('帶領虛構雲端的付款團隊');
+  });
+
   it('沒接上 AI：回尚未支援（編輯器改用規則預填）', async () => {
     const env = setup({ ai: false });
     const importId = await picked(env);

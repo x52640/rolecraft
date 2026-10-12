@@ -12,7 +12,7 @@ import {
 } from '../__fixtures__/layout104.ts';
 import type { ExtractedPage, TextLine } from '../types.ts';
 import { build104 } from './layout104/build-104.ts';
-import { cleanHeaderName, headerNameCandidate } from './header-name.ts';
+import { cleanHeaderName, headerNameAlias, headerNameCandidate } from './header-name.ts';
 
 const line = (text: string, height: number): TextLine => ({
   pageNumber: 1,
@@ -37,6 +37,10 @@ describe('頁首大字姓名', () => {
     expect(cleanHeaderName('林測試 邏輯清晰')).toBe('林測試');
     expect(cleanHeaderName(' 林測試 ')).toBe('林測試');
     expect(cleanHeaderName('Alex Sample')).toBe('Alex Sample');
+    // 切掉的部分像英文姓名：交給 AI 整理前一併遮蔽（對抗驗證）
+    expect(headerNameAlias('林測試 Alex Lin 邏輯清晰')).toBe('Alex Lin');
+    expect(headerNameAlias('林測試 邏輯清晰')).toBeNull();
+    expect(headerNameAlias('Alex Sample')).toBeNull();
   });
 
   it('104 版面：大字行「姓名 標語⇥…」的姓名欄只有姓名', () => {

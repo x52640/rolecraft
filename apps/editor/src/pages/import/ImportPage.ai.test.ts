@@ -51,7 +51,7 @@ const POLL = { intervalMs: 1, maxPolls: 20 };
 
 type Reply = object | ((payload: { importId?: string }) => unknown);
 
-function setup(replies: Record<string, Reply[]>, strict = false) {
+function setup(replies: Record<string, Reply[]>, strict = false, result: ImportResult = PARSED) {
   const queue = new Map(Object.entries(replies));
   let picks = 0;
   const send = vi.fn<BridgeTransport['send']>((raw) => {
@@ -64,7 +64,7 @@ function setup(replies: Record<string, Reply[]>, strict = false) {
         selection: { status: 'selected', importId, displayName: 'x.pdf' },
       });
     }
-    if (request.op === 'import.get') return Promise.resolve({ ok: true, result: PARSED });
+    if (request.op === 'import.get') return Promise.resolve({ ok: true, result });
     const list = queue.get(request.op) ?? [];
     const next = list.length > 1 ? list.shift() : list[0];
     return Promise.resolve(
@@ -88,7 +88,44 @@ async function pick(label = '選擇履歷 PDF') {
 
 afterEach(cleanup);
 
+const PARSED_104: ImportResult = {
+  ...PARSED,
+  draft: {
+    ...PARSED.draft,
+    structured: {
+      layout: '104',
+      personalInfo: [{ label: '姓名', value: at('林測試', 0) }],
+      experiences: [],
+      skills: [],
+    },
+  },
+};
+
 describe('<ImportPage /> AI 整理（P1-T069）', () => {
+  it('認出 104 版面：用規則預填、不自動呼叫 AI；按「用 AI 重新整理」才呼叫（擁有者裁定 #16）', async () => {
+    const { sent } = setup({ 'import.ai_parse': [SUCCEEDED] }, false, PARSED_104);
+    await pick();
+    expect(await screen.findByText(/預填來源：104 版面規則（沒有使用 AI）/u)).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(sent('import.ai_parse')).toEqual([]);
+    expect(screen.getByRole('group', { name: '校正內容' })).toHaveProperty('disabled', false);
+    fireEvent.click(screen.getByRole('button', { name: '用 AI 重新整理' }));
+    await screen.findByText(/預填來源：AI 整理/u);
+    expect(sent('import.ai_parse')).toEqual([
+      { op: 'import.ai_parse', payload: { importId: 'imp-1' } },
+    ]);
+  });
+
+  it('104 版面改過欄位後按「用 AI 重新整理」：要再按一次確認才呼叫', async () => {
+    const { sent } = setup({ 'import.ai_parse': [SUCCEEDED] }, false, PARSED_104);
+    await pick();
+    fireEvent.change(nameField(), { target: { value: '林改過' } });
+    fireEvent.click(screen.getByRole('button', { name: '用 AI 重新整理' }));
+    expect(sent('import.ai_parse')).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: '確定重新整理（放棄目前的修改）' }));
+    await waitFor(() => expect(sent('import.ai_parse')).toHaveLength(1));
+  });
+
   it('選好 PDF 自動開始；整理中鎖住表單與確認；完成後預填並標示來源與略過的欄位', async () => {
     let release: (value: unknown) => void = () => undefined;
     const pending = new Promise((resolve) => (release = resolve));
@@ -141,12 +178,12 @@ describe('<ImportPage /> AI 整理（P1-T069）', () => {
     expect((await screen.findByText(/AI 整理沒有完成/u)).textContent).toContain('中斷');
   });
 
-  it('改過欄位後「重新用 AI 整理」：要再按一次確認才送出，且會覆蓋', async () => {
+  it('改過欄位後「用 AI 重新整理」：要再按一次確認才送出，且會覆蓋', async () => {
     const { sent } = setup({ 'import.ai_parse': [SUCCEEDED] });
     await pick();
     await screen.findByText(/預填來源：AI 整理/u);
     fireEvent.change(nameField(), { target: { value: '林改過' } });
-    fireEvent.click(screen.getByRole('button', { name: '重新用 AI 整理' }));
+    fireEvent.click(screen.getByRole('button', { name: '用 AI 重新整理' }));
     expect(sent('import.ai_parse')).toHaveLength(1);
     expect(screen.getByRole('note', { name: '覆蓋提醒' }).textContent).toContain('蓋掉');
     fireEvent.click(screen.getByRole('button', { name: '確定重新整理（放棄目前的修改）' }));

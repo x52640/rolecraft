@@ -17,6 +17,19 @@ export function cleanHeaderName(segment: string): string {
   return CJK_NAME_THEN_MORE.exec(text)?.[1] ?? text;
 }
 
+const ENGLISH_NAME = /^([A-Z][A-Za-z'.-]*(?:\s+[A-Z][A-Za-z'.-]*){0,2})(?=\s|$)/u;
+
+/**
+ * 切掉的部分開頭像英文姓名（1～3 個大寫開頭的英文字，例如「林測試 Alex Lin 邏輯清晰」的 Alex Lin）：
+ * 回傳它，供送模型前一併遮蔽（P1-T069 對抗驗證）；不像就回 null。
+ */
+export function headerNameAlias(segment: string): string | null {
+  const text = segment.trim();
+  const name = CJK_NAME_THEN_MORE.exec(text)?.[1];
+  if (!name) return null;
+  return ENGLISH_NAME.exec(text.slice(name.length).trim())?.[1] ?? null;
+}
+
 function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)] ?? 0;

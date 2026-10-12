@@ -1,10 +1,11 @@
 /**
  * 逐欄照抄檢查（P1-T069，R1 不捏造）。每個欄位：
  * 1. 引用的行都必須是這次送出的行（本機已移除的聯絡資料行、不存在的行都不算）。
- * 2. 公司、職稱、日期、學歷、技能、段落標題只能引用連續的行；描述與段落內文可略過中間的行。
- * 3. 值去除空白差異、全半形統一後，必須是引用行（依原文順序接合）的子字串，且每個引用行都要用到。
- *    先對模型看到的（遮蔽後）文字檢查，佔位字換回原文後再對原文檢查一次。
- * 4. 日期只能是含數字的原文片段或「至今」類字眼。
+ * 2. 公司、職稱、日期、學歷、技能、段落標題只能引用連續的行，值是引用行接合後的子字串（英數要合詞界）；
+ *    描述與段落內文以行為單位，每段等於一行或連續幾行引用行的全文（match.ts）。
+ * 3. 先對模型看到的（遮蔽後）文字檢查，佔位字換回原文後再對原文檢查一次。
+ * 4. 日期必須是年份或年月格式；結束日期是「至今」類字眼時，要緊接在區間分隔符後或獨占一欄，
+ *    且引用行含數字年份。
  * 不符的欄位丟棄並記原因（不帶 AI 給的值）；整段經歷所有欄位都被丟棄時整段不收。
  */
 import type {
@@ -15,14 +16,21 @@ import type {
   ImportStructuredExperience,
 } from '@rolecraft/contracts';
 
-import { unredact } from './personal.ts';
+import {
+  CURRENT,
+  coversLines,
+  coversWholeLines,
+  currentWordGrounded,
+  isDateValue,
+} from './match.ts';
+import { unredact } from './redact.ts';
 import { normalizeForMatch } from './text.ts';
 import type { RawField, ResumeParseOutput, SentLine } from './types.ts';
 
-type Kind = 'single' | 'joined' | 'date';
+export { coversLines, coversWholeLines } from './match.ts';
 
-const CURRENT = /^(?:至今|迄今|仍在職|在職中|現職|現在|目前|present|now|current|today)$/iu;
-const HAS_DIGIT = /\d/u;
+/** single：一般欄位；joined：描述與段落內文；start／end：開始與結束日期 */
+type Kind = 'single' | 'joined' | 'start' | 'end';
 
 export interface CheckContext {
   readonly lines: readonly SentLine[];
@@ -33,54 +41,36 @@ type Verified =
   | { readonly ok: true; readonly field: ImportDraftField }
   | { readonly ok: false; readonly reason: ImportAiDiscardReason };
 
-/** value 是否為 parts 依序接合後的子字串，且頭落在第一段、尾落在最後一段（每段都用到）。 */
-export function coversLines(value: string, parts: readonly string[]): boolean {
-  const target = normalizeForMatch(value);
-  const norm = parts.map(normalizeForMatch);
-  const joined = norm.join('');
-  if (target === '' || norm.some((p) => p === '')) return false;
-  const firstEnd = norm[0]?.length ?? 0;
-  const lastStart = joined.length - (norm[norm.length - 1]?.length ?? 0);
-  for (let at = joined.indexOf(target); at !== -1; at = joined.indexOf(target, at + 1)) {
-    if (at < firstEnd && at + target.length > lastStart) return true;
-  }
-  return false;
-}
-
-function verify(raw: RawField, kind: Kind, ctx: CheckContext): Verified {
-  if (normalizeForMatch(raw.value) === '') return { ok: false, reason: 'empty' };
+function citedLines(raw: RawField, kind: Kind, ctx: CheckContext) {
   const byId = new Map(ctx.lines.map((line) => [line.id, line]));
   const cited: SentLine[] = [];
   for (const id of new Set(raw.lines)) {
     const line = byId.get(id);
-    if (!line) return { ok: false, reason: 'unknown_line' };
+    if (!line) return 'unknown_line' as const;
     cited.push(line);
   }
-  if (cited.length === 0) return { ok: false, reason: 'unknown_line' };
+  if (cited.length === 0) return 'unknown_line' as const;
   cited.sort((a, b) => a.order - b.order);
-  if (
-    kind !== 'joined' &&
-    cited.some((line, i) => i > 0 && line.order !== (cited[i - 1]?.order ?? 0) + 1)
-  ) {
-    return { ok: false, reason: 'lines_not_consecutive' };
-  }
-  if (
-    !coversLines(
-      raw.value,
-      cited.map((l) => l.text),
-    )
-  )
-    return { ok: false, reason: 'not_in_source' };
+  const gap = cited.some((line, i) => i > 0 && line.order !== (cited[i - 1]?.order ?? 0) + 1);
+  return kind !== 'joined' && gap ? ('lines_not_consecutive' as const) : cited;
+}
+
+function verify(raw: RawField, kind: Kind, ctx: CheckContext): Verified {
+  if (normalizeForMatch(raw.value) === '') return { ok: false, reason: 'empty' };
+  const cited = citedLines(raw, kind, ctx);
+  if (typeof cited === 'string') return { ok: false, reason: cited };
+  const covers = kind === 'joined' ? coversWholeLines : coversLines;
   const value = unredact(raw.value, ctx.tokens).trim();
-  if (
-    !coversLines(
-      value,
-      cited.map((l) => l.original),
-    )
-  )
+  const sentTexts = cited.map((l) => l.text);
+  const originals = cited.map((l) => l.original);
+  if (!covers(raw.value, sentTexts) || !covers(value, originals)) {
     return { ok: false, reason: 'not_in_source' };
-  if (kind === 'date' && !HAS_DIGIT.test(value) && !CURRENT.test(normalizeForMatch(value))) {
-    return { ok: false, reason: 'not_a_date' };
+  }
+  if (kind === 'start' || kind === 'end') {
+    const current = kind === 'end' && CURRENT.test(normalizeForMatch(value));
+    if (current ? !currentWordGrounded(value, originals) : !isDateValue(value)) {
+      return { ok: false, reason: 'not_a_date' };
+    }
   }
   const first = cited[0] as SentLine;
   return { ok: true, field: { value, pageNumber: first.pageNumber, lineIndex: first.lineIndex } };
@@ -108,12 +98,12 @@ export function checkResumeParse(
   const experiences: ImportStructuredExperience[] = [];
   output.experiences.forEach((raw, i) => {
     const at = `第 ${String(i + 1)} 段經歷`;
-    const end = take(raw.end, 'date', `${at}結束日期`);
+    const end = take(raw.end, 'end', `${at}結束日期`);
     const current = end !== null && CURRENT.test(normalizeForMatch(end.value));
     const experience: ImportStructuredExperience = {
       company: take(raw.company, 'single', `${at}公司`),
       title: take(raw.title, 'single', `${at}職稱`),
-      startDate: take(raw.start, 'date', `${at}開始日期`),
+      startDate: take(raw.start, 'start', `${at}開始日期`),
       endDate: current ? null : end,
       current,
       description: take(raw.description, 'joined', `${at}描述`),

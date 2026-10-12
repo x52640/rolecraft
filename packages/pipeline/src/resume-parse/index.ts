@@ -1,5 +1,5 @@
 /** 履歷 PDF 用 AI 整理欄位（P1-T069；R1、R5、R6、R8、D6）。姓名與聯絡資料只在本機處理。 */
-export { checkResumeParse, coversLines, type CheckContext } from './check.ts';
+export { checkResumeParse, coversLines, coversWholeLines, type CheckContext } from './check.ts';
 export {
   RESUME_PARSE_OUTPUT_LIMITS,
   parseResumeParseOutput,
