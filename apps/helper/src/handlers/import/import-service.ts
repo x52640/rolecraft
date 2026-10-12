@@ -1,11 +1,18 @@
-// 履歷 PDF 匯入服務（F02、R10、D18）：選檔 → 本機解析 → 暫存校正 → 使用者確認後寫入 Profile。
-// 檔案只從注入的系統選取器進來（helper 自己開，請求不帶路徑；R7、ADR-0003），
-// 完整路徑不經過本服務；解析結果只留在記憶體，原始 PDF 內容解析完就丟。
+// 履歷匯入服務（F02、R10、D18；D28 加網頁擷取與手動輸入）：建立工作階段 → 暫存校正 → 使用者確認後寫入 Profile。
+// PDF 只從注入的系統選取器進來（helper 自己開，請求不帶路徑；R7、ADR-0003），完整路徑不經過本服務；
+// 沒有選取器時不提供 pickPdf（回尚未支援），網頁擷取與手動輸入照常可用。
+// 工作階段只留在記憶體（Q11）：三種來源共用最多 maxImports 筆、超過丟最舊；擷取送達不呼叫模型。
 // 有接上 AI（deps.ai）時另提供 AI 整理（P1-T069，ai-runner.ts）；沒接上時這兩個方法不存在（回尚未支援）。
-import type { ImportResult, Profile, ProfileInput } from '@rolecraft/contracts';
+import type {
+  ImportLatestCapture,
+  ImportResult,
+  Profile,
+  ProfileInput,
+} from '@rolecraft/contracts';
 import { extractResumePdf, type ExtractResult } from '@rolecraft/resume-import';
 import { newId as defaultNewId } from '@rolecraft/storage';
 
+import { uniqueProfile } from '../profile/unique.ts';
 import { createAiParser, type AiSource, type ImportAiDeps } from './ai-runner.ts';
 import { aiSourceOf } from './ai-source.ts';
 import type {
@@ -15,6 +22,12 @@ import type {
   SaveOutcome,
 } from './service.ts';
 import { safeDisplayName, toImportResult } from './to-result.ts';
+import {
+  MANUAL_RESULT,
+  webCaptureLocal,
+  webCaptureResult,
+  type WebCaptureLocal,
+} from './web-session.ts';
 
 /** 使用者在系統選取器選到的檔案：只有檔名（不含上層路徑）與內容。 */
 export interface PickedPdf {
@@ -25,17 +38,19 @@ export interface PickedPdf {
 /** 系統檔案選取器（只限 PDF）；使用者取消回 null。 */
 export type PdfFilePicker = () => Promise<PickedPdf | null>;
 
-/** 只需要 Profile repository 的寫入。 */
-export interface ProfileSink {
+/** Profile repository 的讀寫：確認時要先看資料區已有幾份（Q8）。 */
+export interface ProfileStore {
   save(profile: Profile): Profile;
+  list(): Profile[];
 }
 
 export interface ResumeImportDeps {
-  picker: PdfFilePicker;
-  profiles: ProfileSink;
+  /** 沒有就不提供 import.pick_pdf（其他平台或尚未接上選取器） */
+  picker?: PdfFilePicker;
+  profiles: ProfileStore;
   extract?: (bytes: Uint8Array) => Promise<ExtractResult>;
   newId?: () => string;
-  /** 記憶體內最多保留幾筆匯入，超過丟最舊的（預設 20）。 */
+  /** 記憶體內最多保留幾筆匯入（網頁、PDF、手動共用），超過丟最舊的（預設 20）。 */
   maxImports?: number;
   /** AI 整理（P1-T069）：選定模型與 R6 紀錄；沒給就不提供 AI 整理 */
   ai?: ImportAiDeps;
@@ -45,10 +60,10 @@ interface ImportEntry {
   result: ImportResult;
   /** 暫存的校正（未確認） */
   corrections: ProfileInput | null;
-  /** 確認過就記住，同一筆匯入再確認時覆寫同一份 Profile */
-  profileId: string | null;
-  /** AI 整理的輸入（解析失敗為 null）；只在記憶體 */
+  /** AI 整理的輸入（PDF 解析失敗、網頁、手動為 null）；只在記憶體 */
   aiSource: AiSource | null;
+  /** 網頁來源的網址與姓名元素文字：只在 helper 本機（P1-T080 遮蔽與預填用） */
+  capture: WebCaptureLocal | null;
 }
 
 /** 個人資料、經歷、技能全空：沒有可寫入的內容。 */
@@ -63,9 +78,12 @@ export function createResumeImportService(deps: ResumeImportDeps): ResumeImportS
   const maxImports = deps.maxImports ?? 20;
   const imports = new Map<string, ImportEntry>();
   let picking = false;
+  /** 最近一次網頁擷取的 importId；被擠出記憶體後 latestCapture 回 null */
+  let latestWebId: string | null = null;
   const ai = deps.ai ? createAiParser(deps.ai) : null;
+  const { picker } = deps;
 
-  async function parse(picked: PickedPdf): Promise<Omit<ImportEntry, 'corrections' | 'profileId'>> {
+  async function parse(picked: PickedPdf): Promise<Pick<ImportEntry, 'result' | 'aiSource'>> {
     const displayName = safeDisplayName(picked.fileName);
     try {
       const extracted = await extract(picked.bytes);
@@ -89,18 +107,47 @@ export function createResumeImportService(deps: ResumeImportDeps): ResumeImportS
   }
 
   return {
-    async pickPdf(): Promise<PickPdfOutcome> {
-      if (picking) return { status: 'busy' };
-      picking = true;
-      try {
-        const picked = await deps.picker();
-        if (!picked) return { status: 'cancelled' };
-        const parsed = await parse(picked);
-        const importId = remember({ ...parsed, corrections: null, profileId: null });
-        return { status: 'selected', importId, displayName: parsed.result.displayName };
-      } finally {
-        picking = false;
-      }
+    ...(picker && {
+      async pickPdf(): Promise<PickPdfOutcome> {
+        if (picking) return { status: 'busy' };
+        picking = true;
+        try {
+          const picked = await picker();
+          if (!picked) return { status: 'cancelled' };
+          const parsed = await parse(picked);
+          const importId = remember({ ...parsed, corrections: null, capture: null });
+          return { status: 'selected', importId, displayName: parsed.result.displayName };
+        } finally {
+          picking = false;
+        }
+      },
+    }),
+
+    submitResumeCapture(capture) {
+      // 只建立工作階段，不呼叫模型（Q4：網頁來源一律按「用AI整理」才呼叫）
+      latestWebId = remember({
+        result: webCaptureResult(capture),
+        corrections: null,
+        aiSource: null,
+        capture: webCaptureLocal(capture),
+      });
+    },
+
+    latestCapture(): ImportLatestCapture | null {
+      const result = latestWebId === null ? undefined : imports.get(latestWebId)?.result;
+      if (latestWebId === null || result?.status !== 'web_capture') return null;
+      const { platform, capturedAt, truncated } = result;
+      return { importId: latestWebId, platform, capturedAt, truncated };
+    },
+
+    startManual() {
+      const importId = remember({
+        result: MANUAL_RESULT,
+        corrections: null,
+        aiSource: null,
+        capture: null,
+      });
+      return { importId };
     },
 
     get(importId) {
@@ -118,10 +165,12 @@ export function createResumeImportService(deps: ResumeImportDeps): ResumeImportS
       const entry = imports.get(importId);
       if (!entry) return { ok: false, reason: 'unknown_import' };
       if (isEmptyProfile(profile)) return { ok: false, reason: 'empty_profile' };
-      const profileId = entry.profileId ?? newId();
+      // Q8：已有一份就更新那一份（保留 id），沒有才新增；多份（舊資料）不寫入、不代為挑選
+      const existing = uniqueProfile(deps.profiles.list());
+      if (!existing.ok) return existing;
+      const profileId = existing.profile?.id ?? newId();
       // 只寫請求帶來的內容（使用者確認當下看到的），不混入草稿或先前暫存的校正。
       deps.profiles.save({ ...profile, id: profileId, pdfParseConfirmed: true });
-      entry.profileId = profileId;
       entry.corrections = profile;
       return { ok: true, profileId };
     },

@@ -23,6 +23,7 @@ import type { PdfFilePicker } from './handlers/import/import-service.ts';
 import { createIntroWithClaude } from './handlers/intro/assemble.ts';
 import { createJobsService } from './handlers/jobs/storage-service.ts';
 import { createMessagesService } from './handlers/messages/assemble.ts';
+import { createProfileService } from './handlers/profile/profile-service.ts';
 import { persistedProvidersOptions } from './handlers/providers/persistence.ts';
 import {
   createProvidersService,
@@ -80,9 +81,10 @@ export function createServices(
     providers,
     sources,
     ...(repositories && { jobs: createJobsService(repositories.jobSnapshots) }),
-    // 履歷匯入＋AI 整理（P1-T069）：選定的 Claude 模型、R6 紀錄存進資料區
-    ...(storage &&
-      pdf && { resumeImport: createResumeImportWithClaude(storage.db, pdf, providers) }),
+    // 履歷匯入＋AI 整理（P1-T069）：選定的 Claude 模型、R6 紀錄存進資料區。
+    // D28：網頁擷取、手動輸入、profile.get 有資料區就可用；PDF 選取器只決定有沒有 import.pick_pdf
+    ...(storage && { resumeImport: createResumeImportWithClaude(storage.db, pdf, providers) }),
+    ...(repositories && { profile: createProfileService(repositories.profiles) }),
     ...(storage && {
       applications: createApplicationsService({
         applications: createApplicationRecordRepository(storage.db, storage.fileStore),

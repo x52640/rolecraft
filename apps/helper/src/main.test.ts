@@ -20,6 +20,7 @@ import {
   SECRET,
   requests,
 } from './__fixtures__/requests.ts';
+import { editorRequests } from './bridge/__fixtures__/editor-requests.ts';
 import { claudeServiceOf } from './handlers/providers/providers-service.ts';
 import { ALLOWED_ORIGINS_ENV, dispatch, FrameDecoder, encodeFrame } from './index.ts';
 import { ENGLISH_RESUME, makeTextPdf } from './handlers/import/__fixtures__/pdf.ts';
@@ -391,13 +392,33 @@ describe('服務組裝（createServices，P1-T043）', () => {
     expect(s2.providers && claudeServiceOf(s2.providers)?.gate.canReverify).toBe(false);
   });
 
-  it('有 storage 但沒有 PDF 選取器：resumeImport 不接', async () => {
+  it('有 storage 但沒有 PDF 選取器：只有 pick_pdf 不接；網頁擷取、手動輸入、profile.get 可用（D28）', async () => {
     const services = createServices(storage(), {});
     expect(await send(services, 'import.pick_pdf')).toMatchObject({
       ok: false,
       error: { code: 'not_implemented' },
     });
     expect(await send(services, 'applications.list')).toMatchObject({ ok: true });
+    expect(await send(services, 'profile.get')).toEqual({ ok: true, profile: null });
+    expect(await send(services, 'import.latest_capture')).toEqual({ ok: true, capture: null });
+    const capture = editorRequests.submit_resume_capture;
+    const submitted = await dispatch(capture, services, recordingLogger());
+    expect(submitted.response).toEqual({ ok: true });
+    expect(await send(services, 'import.latest_capture')).toMatchObject({
+      ok: true,
+      capture: { platform: '104', truncated: false },
+    });
+    expect(await send(services, 'import.start_manual')).toMatchObject({ ok: true });
+  });
+
+  it('沒有 storage：profile.get、網頁擷取不接', async () => {
+    const services = createServices(null, fakePickers());
+    for (const op of ['profile.get', 'import.latest_capture', 'import.start_manual']) {
+      expect(await send(services, op)).toMatchObject({
+        ok: false,
+        error: { code: 'not_implemented' },
+      });
+    }
   });
 });
 

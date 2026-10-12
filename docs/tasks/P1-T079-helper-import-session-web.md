@@ -1,7 +1,7 @@
 ---
 id: P1-T079
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T074"]
 specs: ["resume-import.md", "bridge.md", "web-resume-capture.md"]
 track: helper
@@ -85,9 +85,17 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等 P1-T074 收官後改 ready
-- Blocker：無（相依 P1-T074 已於 2026-10-12 收官）
+- 最後完成：2026-10-12 實作完成（worker），等協調者收官
+- 已通過驗證：`npm run verify` 綠（Vitest 3832 通過、13 略過）
+- 下一步：協調者範圍稽核、codex review、收官標 done
+- Blocker：無
 
 ## 完成結果
+
+- `import/import-service.ts`：`submitResumeCapture`（建立「網頁：<平台>」工作階段，不呼叫模型）、`latestCapture`（最近一次擷取被擠出即 null）、`startManual`；三種來源共用 `maxImports`（20）只在記憶體；`pickPdf` 只在有選取器時提供；`confirm` 改用 `uniqueProfile`：有一份就更新那份（保留 id）、沒有才新增、多份回 `multiple_profiles` 不寫入。`ProfileSink` 改為 `ProfileStore`（加 `list`）。
+- `import/web-session.ts`：區塊依序配發 b1…、來源名稱、手動結果；網址與 `nameText` 只存 helper 記憶體（`WebCaptureLocal`，P1-T080 用），不進 `import.get`。
+- `import/confirm.ts`：`multiple_profiles` 回固定原因；`import/assemble.ts`：選取器可省略。
+- `profile/unique.ts`（`uniqueProfile`，confirm 與 profile.get 共用）、`profile/profile-service.ts`（`createProfileService`：唯一且已確認才回，未確認當 null）。
+- `main.ts`：有資料區就組 `resumeImport` 與 `profile`，PDF 選取器只決定有沒有 `import.pick_pdf`。
+- 測試：`import/web-session.test.ts`（模型呼叫 0、b1 編號、網址不外流、第 21 筆擠掉、最大擷取 `import.get` < 1 MiB、唯一 Profile 更新、多份不寫、無擷取也能手動確認）、`profile/profile.test.ts`、`main.test.ts`（無 PDF 選取器時網頁擷取與 profile.get 可用）。
+- 殘餘：網頁／手動工作階段按 `import.ai_parse` 目前回 PDF 用語的「沒有可整理的文字」（P1-T080 接網頁來源）；`unknownImport` 訊息仍寫「請重新選擇 PDF」。

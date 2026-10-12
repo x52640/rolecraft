@@ -21,9 +21,13 @@ export type PickPdfOutcome =
 /** 寫入類操作的結果。unknown_import＝不是本服務配發（或已清掉）的 importId。 */
 export type SaveOutcome = { ok: true } | { ok: false; reason: 'unknown_import' };
 
-/** empty_profile＝姓名等個人資料、經歷、技能全空，不寫入。 */
+/**
+ * empty_profile＝姓名等個人資料、經歷、技能全空，不寫入。
+ * multiple_profiles＝資料區已有多份 Profile（舊資料），不寫入（D28／Q8）。
+ */
 export type ConfirmOutcome =
-  { ok: true; profileId: string } | { ok: false; reason: 'unknown_import' | 'empty_profile' };
+  | { ok: true; profileId: string }
+  | { ok: false; reason: 'unknown_import' | 'empty_profile' | 'multiple_profiles' };
 
 /**
  * 不開始 AI 整理的原因（都不呼叫模型；P1-T069）：

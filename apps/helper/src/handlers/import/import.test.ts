@@ -97,7 +97,7 @@ describe('import.*（P1-T020）', () => {
   it('解析器內部錯誤也當成無法解析，不中斷流程', async () => {
     const service = createResumeImportService({
       picker: () => Promise.resolve(pdf('a.pdf', new Uint8Array([1]))),
-      profiles: { save: (p) => p },
+      profiles: { save: (p) => p, list: () => [] },
       extract: () => Promise.reject(new Error('boom')),
       newId: () => 'x1',
     });
@@ -129,7 +129,7 @@ describe('import.*（P1-T020）', () => {
     let release: (value: PickedPdf | null) => void = () => {};
     const service = createResumeImportService({
       picker: () => new Promise((resolve) => (release = resolve)),
-      profiles: { save: (p) => p },
+      profiles: { save: (p) => p, list: () => [] },
     });
     const services: HelperServices = { resumeImport: service };
     const first = HANDLERS['import.pick_pdf']({}, services);
@@ -189,7 +189,7 @@ describe('import.*（P1-T020）', () => {
     let n = 0;
     const service = createResumeImportService({
       picker: () => Promise.resolve(pdf('a.pdf', makeImageOnlyPdf())),
-      profiles: { save: (p) => p },
+      profiles: { save: (p) => p, list: () => [] },
       newId: () => `i${String((n += 1))}`,
       maxImports: 2,
     });

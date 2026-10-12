@@ -1,10 +1,12 @@
 import type { OpHandler } from '../handler.ts';
+import { multipleProfiles } from '../profile/failures.ts';
 import { notImplemented } from '../services.ts';
 import { unknownImport } from './failures.ts';
 
 /**
  * import.confirm：以使用者確認當下的內容寫入 Profile 並標為已確認（R10）；
- * 解析失敗時也可確認手動輸入的內容（D18）。
+ * 解析失敗時也可確認手動輸入的內容（D18）。網頁、PDF、手動共用（D28／Q8）：
+ * 已有一份 Profile 就更新那一份，沒有才新增，已有多份時不寫入、回固定原因 multiple_profiles。
  */
 export const importConfirm: OpHandler<'import.confirm'> = (payload, services) => {
   const service = services.resumeImport;
@@ -12,6 +14,7 @@ export const importConfirm: OpHandler<'import.confirm'> = (payload, services) =>
   const outcome = service.confirm(payload.importId, payload.profile);
   if (outcome.ok) return Promise.resolve({ ok: true, profileId: outcome.profileId });
   if (outcome.reason === 'unknown_import') return Promise.resolve(unknownImport());
+  if (outcome.reason === 'multiple_profiles') return Promise.resolve(multipleProfiles());
   return Promise.resolve({
     ok: false,
     error: { code: 'invalid_request', message: '內容全空，沒有可寫入的個人資料' },
