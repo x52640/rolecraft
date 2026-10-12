@@ -10,9 +10,12 @@ import {
   toProfileInput,
   type ProfileForm,
 } from './form-model.ts';
+import { formFromAiDraft, rulesSource, type PrefillSource } from './ai-form.ts';
+import { AiParsePanel } from './components/AiParsePanel.tsx';
 import { ConfirmBar } from './components/ConfirmBar.tsx';
 import { ParsePreview } from './ParsePreview.tsx';
 import { ProfileFormFields } from './ProfileForm.tsx';
+import { DEFAULT_AI_POLL, useAiParse, type AiPollOptions } from './useAiParse.ts';
 
 import './import.css';
 
@@ -30,8 +33,10 @@ const failureText = (failure: BridgeFailure): string =>
 /**
  * 履歷 PDF 匯入（F02、R10、D18）：選檔 → 預覽原文與欄位草稿 → 逐欄校正 → 確認後才寫入個人資料。
  * 檔案由本機輔助程式開系統選取器選（R7）；解析失敗清楚提示並改手動輸入。
+ * 解析成功後自動用 AI 整理（P1-T069）：整理中鎖住表單；成功時以逐欄對照過原文的結果預填，
+ * 失敗或不可用時保留規則（104 版面或通用）的預填並標明來源。
  */
-export function ImportPage() {
+export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOptions }) {
   const bridge = useBridge();
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [form, setForm] = useState<ProfileForm>(emptyForm);
@@ -41,6 +46,19 @@ export function ImportPage() {
   // 每次送出驗證失敗加一：把錯誤清單捲進畫面並聚焦（確認列在視窗底部，清單可能在畫面外）。
   const [failedAttempts, setFailedAttempts] = useState(0);
   const problemsRef = useRef<HTMLUListElement>(null);
+  // AI 整理（P1-T069）：只對解析成功的匯入自動開始；確認失敗回到核對畫面不會重跑
+  const [aiImportId, setAiImportId] = useState<string | null>(null);
+  const [source, setSource] = useState<PrefillSource>('manual');
+  const [edited, setEdited] = useState(false);
+  const [rerunArmed, setRerunArmed] = useState(false);
+  const ai = useAiParse(aiImportId, aiPoll, (draft) => {
+    setForm(formFromAiDraft(draft));
+    setSource('ai');
+    setEdited(false);
+    setRerunArmed(false);
+    setChecked(false);
+    setProblems([]);
+  });
 
   useEffect(() => {
     if (failedAttempts > 0) problemsRef.current?.focus();
@@ -58,10 +76,15 @@ export function ImportPage() {
     setPhase({ kind: 'busy', what: '讀取解析結果…' });
     const got = await bridge.send({ op: 'import.get', payload: { importId } });
     if (!got.ok) return fail(failureText(got), previous);
-    setForm(got.result.status === 'parsed' ? formFromDraft(got.result.draft) : emptyForm());
+    const parsed = got.result.status === 'parsed' ? got.result : null;
+    setForm(parsed ? formFromDraft(parsed.draft) : emptyForm());
+    setSource(parsed ? rulesSource(parsed.draft) : 'manual');
+    setEdited(false);
+    setRerunArmed(false);
     setChecked(false);
     setProblems([]);
     setPhase({ kind: 'review', importId, result: got.result });
+    setAiImportId(parsed ? importId : null);
   }
 
   function fail(message: string, next: Phase) {
@@ -70,14 +93,27 @@ export function ImportPage() {
   }
 
   function changeForm(next: ProfileForm) {
+    if (ai.running) return; // AI 整理中鎖住表單
     setForm(next);
-    // 內容改了就要重新核對。
+    // 內容改了就要重新核對；重新用 AI 整理前要再確認一次。
     setChecked(false);
+    setEdited(true);
+    setRerunArmed(false);
+  }
+
+  function rerun() {
+    if (edited && !rerunArmed) {
+      setRerunArmed(true);
+      return;
+    }
+    setRerunArmed(false);
+    ai.restart();
   }
 
   // 擁有者裁定 #12（P1-T051）：不提供「暫存校正」；只有確認後才寫入，存入前離開就丟掉修改。
   async function submit(review: Extract<Phase, { kind: 'review' }>) {
     setError(null);
+    if (ai.running) return;
     const input = toProfileInput(form);
     if (!input.ok) {
       setProblems(input.problems);
@@ -164,7 +200,15 @@ export function ImportPage() {
 
           <div className={phase.result.status === 'parsed' ? 'import-layout' : undefined}>
             <div className="import-form-column">
-              <ProfileFormFields form={form} onChange={changeForm} />
+              {phase.result.status === 'parsed' && (
+                <AiParsePanel
+                  state={ai.state}
+                  source={source}
+                  confirmingRerun={rerunArmed}
+                  onRerun={rerun}
+                />
+              )}
+              <ProfileFormFields form={form} onChange={changeForm} disabled={ai.running} />
               {problems.length > 0 && (
                 <ul
                   ref={problemsRef}
@@ -182,7 +226,12 @@ export function ImportPage() {
             {phase.result.status === 'parsed' && <ParsePreview result={phase.result} />}
           </div>
 
-          <ConfirmBar checked={checked} onCheck={setChecked} problemCount={problems.length} />
+          <ConfirmBar
+            checked={checked}
+            onCheck={setChecked}
+            problemCount={problems.length}
+            locked={ai.running}
+          />
         </form>
       )}
     </section>

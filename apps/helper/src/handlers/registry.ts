@@ -29,6 +29,8 @@ import { exportCreate } from './export/create.ts';
 import { exportGetVersion } from './export/get-version.ts';
 import { exportListVersions } from './export/list-versions.ts';
 import { exportReadPdf } from './export/read-pdf.ts';
+import { importAiParse } from './import/ai-parse.ts';
+import { importAiStatus } from './import/ai-status.ts';
 import { importConfirm } from './import/confirm.ts';
 import { importGet } from './import/get.ts';
 import { importPickPdf } from './import/pick-pdf.ts';
@@ -80,6 +82,8 @@ const RAW_HANDLERS: HandlerTable = {
   'import.get': importGet,
   'import.save_corrections': importSaveCorrections,
   'import.confirm': importConfirm,
+  'import.ai_parse': importAiParse,
+  'import.ai_status': importAiStatus,
   'sources.pick_folders': sourcesPickFolders,
   'sources.list_folders': sourcesListFolders,
   'sources.preview': sourcesPreview,

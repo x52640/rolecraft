@@ -3,6 +3,7 @@
  * 認不出回傳 null，由通用規則處理。只整理版面上明確的欄位，找不到就留空，不捏造。
  */
 import type { DraftField, ExtractedPage, StructuredDraft } from '../../types.ts';
+import { cleanHeaderName } from '../header-name.ts';
 import { parseExperience } from './experience.ts';
 import {
   BAND,
@@ -57,7 +58,7 @@ function personalInfo(lines: readonly Located[]): InfoRow[] {
     }
   };
   const nameLine = lines.find((at) => at.line.height >= BAND.nameMin && at.line.text.trim() !== '');
-  const name = nameLine?.line.text.split('\t')[0]?.trim();
+  const name = cleanHeaderName(nameLine?.line.text.split('\t')[0] ?? '');
   if (nameLine && name) add('姓名', fieldAt(name, nameLine));
   let previous: DraftField | null = null;
   for (const at of lines) {

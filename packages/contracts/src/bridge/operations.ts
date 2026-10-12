@@ -22,6 +22,8 @@ export const BridgeOperation = z.enum([
   'import.get',
   'import.save_corrections',
   'import.confirm',
+  'import.ai_parse', // 用選定的 Claude 模型整理已解析文字（P1-T069）；姓名與聯絡資料不送模型
+  'import.ai_status',
   // sources：專案資料夾與授權集合（P1-T021）
   'sources.pick_folders',
   'sources.list_folders',

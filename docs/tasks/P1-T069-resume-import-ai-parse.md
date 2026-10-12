@@ -69,3 +69,31 @@ npm run verify
 ### 手動驗證
 
 - 協調者以開發入口（P1-T068）用擁有者 PDF 實跑一次（擁有者已同意自測用量）
+
+## 完成定義
+
+- [x] 「包含」各項完成（正式 helper 的接線需改 `apps/helper/src/main.ts`，不在 write_paths，見完成結果）
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
+
+## 中斷／接手紀錄
+
+- 最後完成：首次實作（pipeline resume-parse、helper import.ai_parse／ai_status、編輯器自動整理與退路、規格）；協調者補充的頁首姓名去標語
+- 已通過驗證：worktree `npm run verify` 綠（Vitest 3426 通過、13 略過；test:docs 15、test:scripts 30）；全程假 provider
+- 下一步：協調者在 `apps/helper/src/main.ts` 把 `createResumeImportService({ picker: pdf, profiles })` 換成 `createResumeImportWithClaude(storage.db, pdf, providers)`（`handlers/import/assemble.ts`），再收官（對抗驗證）
+- Blocker：無（main.ts 不在本 Task write_paths；未接線前 `import.ai_parse` 回「尚未支援」，編輯器退回規則預填）
+
+## 完成結果
+
+- 橋接相加 `import.ai_parse`（背景整理、立即回狀態、同一匯入不重送）與 `import.ai_status`（輪詢）；contracts 新增 `ImportAiDraft`、`ImportAiParseView`、`ImportAiFailure`、`ImportAiDiscard(Reason)`，ADR-0006 第 15 項；兩份請求 fixture、分派表同步。
+- pipeline `resume-parse/`（prepare／personal／prompt／output／check／run 拆檔）：
+  - 本機處理姓名與聯絡資料：個資標籤行（手機、電話、E-mail、地址、通訊、聯絡、LINE、網站、生日、性別、年齡、兵役、身分證等）整行移除並預填；104 已知值的換行續行一併移除；「聯絡方式」等標題下整段移除；其餘行的姓名、個資值、email／電話／身分證字號片段換成佔位字。測試直接檢查提示字串沒有任何個資。
+  - 提示：整份文字放進隨機界線資料區塊，每行帶「[頁-行]」，要求每欄附來源行。
+  - 照抄檢查：引用行必須是送出的行；非描述欄位只能引用連續行；值去空白、NFKC 後須是引用行依序接合的子字串且每行都用到；對遮蔽文字檢查後，佔位字換回原文再對原文檢查一次；日期須含數字或為「至今」類字眼。不符欄位丟棄並記原因；整份格式不符失敗、不重試。
+  - 執行沿用 intro 模式：`execute`＋R6 紀錄照存，R6 不通過不送出。
+- helper：`ai-runner.ts`（背景執行、記憶體狀態、換代號防舊結果寫回、匯入被清掉時一併清掉）、`ai-source.ts`（姓名來源：104 規則、「姓名：」、頁首大字）、`assemble.ts`（`createClaudeGenerationEngine`＋`runCheckRecords`）。未選模型、解析失敗、移除後沒有文字、超過預算回固定訊息、不呼叫模型。
+- resume-import：`headerNameCandidate`（頁首大字姓名候選）與 `cleanHeaderName`；協調者實測補充：頁首大字段落是「中文姓名＋空白＋標語」時只取姓名（104 結構化草稿的姓名也套用），英文姓名不切。
+- 編輯器匯入頁：解析成功即自動整理；整理中鎖住表單與確認列；成功以 AI 結果預填並標「預填來源：AI 整理」，列出「AI 給的值與原文不符，已略過」的欄位與原因、其他段落（不寫入 Profile）；失敗或不可用顯示原因並保留 104／通用規則預填與來源；「重新用 AI 整理」在改過欄位時要再按一次確認。`useAiParse` 每次整理有自己的 token，換檔與卸載時作廢舊回應、取消輪詢；確認失敗回到核對畫面不會重跑 AI。
+- 測試（全用假 provider）：合格輸出採用；捏造公司、改寫職稱、編造日期、引用聯絡行、不連續行、非日期、空白各自丟棄；模型自己寫出姓名不收；聯絡資料不在提示；未選模型不呼叫；格式錯失敗；R6 不通過不送；同時要求兩次只送一次；編輯器鎖定、預填、退路、重新整理確認、換檔舊回應作廢。
+- 保守選擇（待擁有者裁定）：生日、性別、年齡、兵役、婚姻、個人網站也當個資不送；文中網址（非標籤行）照送；其他段落不寫入 Profile；擷取不到中文姓名時英文姓名不切標語；佔位字換回原文後回填（描述裡會出現原本的 email／電話）。
+- 手動驗證（擁有者 PDF 實跑）需協調者以開發入口進行，且需先完成 main.ts 接線。

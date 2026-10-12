@@ -6,6 +6,7 @@ export * from './generation/index.ts';
 export * from './intro/index.ts';
 export * from './messages/index.ts';
 export * from './projects/index.ts';
+export * from './resume-parse/index.ts';
 export {
   DOCUMENT_NAME_MAX_CHARS,
   PROJECT_GROUPING_INSTRUCTIONS,

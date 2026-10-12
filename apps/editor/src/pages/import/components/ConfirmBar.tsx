@@ -4,8 +4,10 @@ export function ConfirmBar(props: {
   onCheck: (checked: boolean) => void;
   /** 上次送出時的待修正項數；大於 0 時在確認列提示（清單本身可能在畫面外）。 */
   problemCount: number;
+  /** AI 整理中（P1-T069）：不能勾選、不能確認 */
+  locked?: boolean;
 }) {
-  const { checked, onCheck, problemCount } = props;
+  const { checked, onCheck, problemCount, locked = false } = props;
   return (
     <div className="import-confirm-bar" role="group" aria-label="確認列">
       <div className="import-confirm-messages">
@@ -17,10 +19,15 @@ export function ConfirmBar(props: {
         </p>
       </div>
       <label className="import-inline-check">
-        <input type="checkbox" checked={checked} onChange={(e) => onCheck(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={locked}
+          onChange={(e) => onCheck(e.target.checked)}
+        />
         我已逐欄核對，以上內容正確
       </label>
-      <button type="submit" className="import-btn import-btn-primary" disabled={!checked}>
+      <button type="submit" className="import-btn import-btn-primary" disabled={!checked || locked}>
         確認並寫入個人資料
       </button>
     </div>

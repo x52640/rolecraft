@@ -37,6 +37,8 @@ export const editorRequests = {
   'import.get': { op: 'import.get', payload: { importId: ID } },
   'import.save_corrections': { op: 'import.save_corrections', payload: { importId: ID, profile } },
   'import.confirm': { op: 'import.confirm', payload: { importId: ID, profile } },
+  'import.ai_parse': { op: 'import.ai_parse', payload: { importId: ID } },
+  'import.ai_status': { op: 'import.ai_status', payload: { importId: ID } },
   'sources.pick_folders': { op: 'sources.pick_folders', payload: {} },
   'sources.list_folders': { op: 'sources.list_folders', payload: {} },
   'sources.preview': { op: 'sources.preview', payload: { rootId: ID } },

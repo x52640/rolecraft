@@ -80,6 +80,72 @@ export const ImportResult = z.discriminatedUnion('status', [
 ]);
 export type ImportResult = z.infer<typeof ImportResult>;
 
+/**
+ * AI 整理（P1-T069）丟棄某個欄位的原因：
+ * - unknown_line：引用的行號不存在，或是本機已移除（聯絡資料）的行
+ * - lines_not_consecutive：非描述欄位引用的行不連續
+ * - not_in_source：值去除空白與全半形差異後，不是引用行（依序接合）的子字串
+ * - not_a_date：日期欄位的值看起來不是日期（也不是「至今」類字眼）
+ * - empty：值是空白
+ */
+export const ImportAiDiscardReason = z.enum([
+  'unknown_line',
+  'lines_not_consecutive',
+  'not_in_source',
+  'not_a_date',
+  'empty',
+]);
+export type ImportAiDiscardReason = z.infer<typeof ImportAiDiscardReason>;
+
+/** 一個被丟棄的欄位：哪個欄位（給人看的位置，例如「第 2 段經歷職稱」）＋原因。不帶 AI 給的值。 */
+export const ImportAiDiscard = z.strictObject({
+  field: z.string().min(1),
+  reason: ImportAiDiscardReason,
+});
+export type ImportAiDiscard = z.infer<typeof ImportAiDiscard>;
+
+/**
+ * AI 整理後、逐欄照抄檢查通過的草稿（P1-T069）。每個值都能在其出處行找到（出處＝第一個引用行）。
+ * personalInfo 是本機抽出的姓名與聯絡資料（從未送給模型）；otherSections 是求職條件、自傳等段落
+ * （標題原樣保留，不寫入 Profile，只給使用者參考）。
+ */
+export const ImportAiDraft = z.strictObject({
+  personalInfo: z.array(z.strictObject({ label: z.string().min(1), value: ImportDraftField })),
+  education: z.array(ImportDraftField),
+  experiences: z.array(ImportStructuredExperience),
+  skills: z.array(ImportDraftField),
+  otherSections: z.array(z.strictObject({ heading: ImportDraftField, body: ImportDraftField })),
+  discarded: z.array(ImportAiDiscard),
+});
+export type ImportAiDraft = z.infer<typeof ImportAiDraft>;
+
+/** AI 整理失敗原因：輸出格式不符（不自動重試）、R6 不通過、服務錯誤、額度用完、取消。 */
+export const ImportAiFailure = z.enum([
+  'invalid_output',
+  'run_check_failed',
+  'provider_error',
+  'quota_exhausted',
+  'cancelled',
+]);
+export type ImportAiFailure = z.infer<typeof ImportAiFailure>;
+
+/** 最近一次 AI 整理（只存在 helper 記憶體）。成功才有 draft，失敗才有 failure。 */
+export const ImportAiParseView = z
+  .strictObject({
+    state: z.enum(['running', 'succeeded', 'failed']),
+    failure: ImportAiFailure.nullable(),
+    draft: ImportAiDraft.nullable(),
+  })
+  .refine((v) => (v.state === 'failed') === (v.failure !== null), {
+    path: ['failure'],
+    message: '只有失敗有原因',
+  })
+  .refine((v) => (v.state === 'succeeded') === (v.draft !== null), {
+    path: ['draft'],
+    message: '只有成功有草稿',
+  });
+export type ImportAiParseView = z.infer<typeof ImportAiParseView>;
+
 /** 使用者校正後的個人資料（Profile 去掉 id 與確認旗標；確認旗標只由 import.confirm 設定）。 */
 export const ProfileInput = Profile.omit({ id: true, pdfParseConfirmed: true });
 export type ProfileInput = z.infer<typeof ProfileInput>;
@@ -122,5 +188,21 @@ export const IMPORT_SCHEMAS = {
   'import.confirm': {
     request: bridgeOp('import.confirm', WithProfile),
     response: withFailure(z.strictObject({ ok: z.literal(true), profileId: Id })),
+  },
+  /**
+   * 用使用者選定的 Claude 模型整理已解析的文字（P1-T069）：在背景執行、立即回狀態；已有執行中的就回同一個。
+   * 姓名與聯絡資料在本機抽出、不送模型。找不到匯入、解析失敗、沒有選定且可用的模型、超過輸入預算回
+   * invalid_request（固定訊息），不呼叫模型。
+   */
+  'import.ai_parse': {
+    request: bridgeOp('import.ai_parse', ImportRef),
+    response: withFailure(z.strictObject({ ok: z.literal(true), parse: ImportAiParseView })),
+  },
+  /** 最近一次 AI 整理的狀態與（成功時）草稿；沒有整理過（或 helper 重開）為 null。 */
+  'import.ai_status': {
+    request: bridgeOp('import.ai_status', ImportRef),
+    response: withFailure(
+      z.strictObject({ ok: z.literal(true), parse: ImportAiParseView.nullable() }),
+    ),
   },
 } as const;

@@ -1,10 +1,13 @@
 // 履歷 PDF 匯入服務（F02、R10、D18）：選檔 → 本機解析 → 暫存校正 → 使用者確認後寫入 Profile。
 // 檔案只從注入的系統選取器進來（helper 自己開，請求不帶路徑；R7、ADR-0003），
 // 完整路徑不經過本服務；解析結果只留在記憶體，原始 PDF 內容解析完就丟。
+// 有接上 AI（deps.ai）時另提供 AI 整理（P1-T069，ai-runner.ts）；沒接上時這兩個方法不存在（回尚未支援）。
 import type { ImportResult, Profile, ProfileInput } from '@rolecraft/contracts';
 import { extractResumePdf, type ExtractResult } from '@rolecraft/resume-import';
 import { newId as defaultNewId } from '@rolecraft/storage';
 
+import { createAiParser, type AiSource, type ImportAiDeps } from './ai-runner.ts';
+import { aiSourceOf } from './ai-source.ts';
 import type {
   ConfirmOutcome,
   PickPdfOutcome,
@@ -34,6 +37,8 @@ export interface ResumeImportDeps {
   newId?: () => string;
   /** 記憶體內最多保留幾筆匯入，超過丟最舊的（預設 20）。 */
   maxImports?: number;
+  /** AI 整理（P1-T069）：選定模型與 R6 紀錄；沒給就不提供 AI 整理 */
+  ai?: ImportAiDeps;
 }
 
 interface ImportEntry {
@@ -42,6 +47,8 @@ interface ImportEntry {
   corrections: ProfileInput | null;
   /** 確認過就記住，同一筆匯入再確認時覆寫同一份 Profile */
   profileId: string | null;
+  /** AI 整理的輸入（解析失敗為 null）；只在記憶體 */
+  aiSource: AiSource | null;
 }
 
 /** 個人資料、經歷、技能全空：沒有可寫入的內容。 */
@@ -56,14 +63,16 @@ export function createResumeImportService(deps: ResumeImportDeps): ResumeImportS
   const maxImports = deps.maxImports ?? 20;
   const imports = new Map<string, ImportEntry>();
   let picking = false;
+  const ai = deps.ai ? createAiParser(deps.ai) : null;
 
-  async function parse(picked: PickedPdf): Promise<ImportResult> {
+  async function parse(picked: PickedPdf): Promise<Omit<ImportEntry, 'corrections' | 'profileId'>> {
     const displayName = safeDisplayName(picked.fileName);
     try {
-      return toImportResult(displayName, await extract(picked.bytes));
+      const extracted = await extract(picked.bytes);
+      return { result: toImportResult(displayName, extracted), aiSource: aiSourceOf(extracted) };
     } catch {
       // 解析器內部錯誤也當成「無法解析」，讓使用者能改手動輸入（D18），不中斷流程。
-      return { status: 'failed', displayName, reason: 'invalid_pdf' };
+      return { result: { status: 'failed', displayName, reason: 'invalid_pdf' }, aiSource: null };
     }
   }
 
@@ -74,6 +83,7 @@ export function createResumeImportService(deps: ResumeImportDeps): ResumeImportS
       const oldest = imports.keys().next().value;
       if (oldest === undefined) break;
       imports.delete(oldest);
+      ai?.forget(oldest);
     }
     return importId;
   }
@@ -85,9 +95,9 @@ export function createResumeImportService(deps: ResumeImportDeps): ResumeImportS
       try {
         const picked = await deps.picker();
         if (!picked) return { status: 'cancelled' };
-        const result = await parse(picked);
-        const importId = remember({ result, corrections: null, profileId: null });
-        return { status: 'selected', importId, displayName: result.displayName };
+        const parsed = await parse(picked);
+        const importId = remember({ ...parsed, corrections: null, profileId: null });
+        return { status: 'selected', importId, displayName: parsed.result.displayName };
       } finally {
         picking = false;
       }
@@ -115,5 +125,17 @@ export function createResumeImportService(deps: ResumeImportDeps): ResumeImportS
       entry.corrections = profile;
       return { ok: true, profileId };
     },
+
+    ...(ai && {
+      aiParse(importId: string) {
+        const entry = imports.get(importId);
+        if (!entry) return Promise.resolve({ ok: false, reason: 'unknown_import' } as const);
+        return ai.start(importId, entry.aiSource);
+      },
+      aiStatus(importId: string) {
+        if (!imports.has(importId)) return { ok: false, reason: 'unknown_import' } as const;
+        return { ok: true, parse: ai.status(importId) } as const;
+      },
+    }),
   };
 }

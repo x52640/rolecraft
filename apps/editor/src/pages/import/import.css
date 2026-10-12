@@ -229,3 +229,12 @@ html:has(.import-confirm-bar) {
   white-space: nowrap;
   border: 0;
 }
+
+/* AI 整理狀態（P1-T069） */
+.import-ai {
+  margin-bottom: 12px;
+}
+
+.import-pre {
+  white-space: pre-wrap;
+}
