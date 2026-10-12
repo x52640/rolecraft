@@ -9,7 +9,8 @@
 
 ## ready
 
-- 無
+- P1-T088 extension：104 履歷頁介面字樣過濾（D29 (a)）
+- P1-T089 editor：網頁來源核對改版（D29 (b)(c)(d)）
 <!-- index:end -->
 
 ## 下一步（2026-10-11 codex 補審後）
@@ -24,6 +25,8 @@
 6. 只有擁有者說「推」才 push；本機 `refs/original` 待擁有者同意後清除。
 
 ## 交接（2026-10-12 擁有者要求清空對話後重開）
+
+- 2026-10-13 擁有者實跑 104 網頁匯入後裁定 D29（介面字樣過濾、原文收合、欄位出處、網頁來源只看標黃欄位）：開 P1-T088（擴充功能）、P1-T089（編輯器），可平行，皆高風險。
 
 - 2026-10-12 擁有者說「開工」：web-resume-import 已轉正式規格（plan.md D28；`docs/specs/web-resume-capture.md`、`resume-import.md`、`resume-output.md`、`bridge.md`）並拆成 P1-T074～P1-T087；先跑 T074（契約）與 T086（段落複製），T077 等 P1-T017 履歷頁樣本。
 
