@@ -23,7 +23,7 @@
 | [P1-T014](P1-T014-helper-host.md) | helper：橋接端點與操作清單分派 | done | 1 | helper | P1-T013、P1-T006 |
 | [P1-T015](P1-T015-extension-skeleton.md) | extension：MV3 骨架與橋接客戶端 | done | 1 | extension | P1-T013、P1-T001 |
 | [P1-T016](P1-T016-editor-skeleton.md) | editor：React 骨架與路由 | done | 1 | editor | P1-T015 |
-| [P1-T017](P1-T017-spike-104-job.md) | 驗證：104 職缺頁條款與 DOM 樣本 | ready | 1 | extension | P1-T015 |
+| [P1-T017](P1-T017-spike-104-job.md) | 驗證：104 職缺頁條款與 DOM 樣本 | in_progress | 1 | extension | P1-T015 |
 | [P1-T018](P1-T018-extension-104-extractor.md) | extension：104 職缺頁擷取 | blocked | 1 | extension | P1-T017、P1-T014 |
 | [P1-T019](P1-T019-job-snapshot-ui.md) | editor：職缺快照確認與手動貼上 | done | 1 | editor | P1-T016、P1-T014、P1-T041 |
 | [P1-T020](P1-T020-resume-import-ui.md) | editor：履歷 PDF 匯入與校正 | done | 1 | editor | P1-T009、P1-T016、P1-T014、P1-T041 |

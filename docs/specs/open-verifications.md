@@ -9,7 +9,7 @@
 - 三家官方工具是否提供足夠的登入、資格、模型及訂閱計費狀態資訊。
 - OpenAI 第三方應用所需註冊／存取條件，以及 Antigravity 在個人安裝與未來產品分發上的適用界線。
 - Chrome、Arc、Edge 的擴充功能及本機通訊相容性。→ ADR-0003：Chrome 已實測；Arc、Edge 待擁有者手動驗證。
-- 104、Cake、Yourator 的使用規範、登入後 DOM、訊息機制與實際欄位；LinkedIn 適用授權路線。
+- 104、Cake、Yourator 的使用規範、登入後 DOM、訊息機制與實際欄位；LinkedIn 適用授權路線。→ ADR-0004：104 會員規約原文已摘錄（第六條（八）禁止「非本平台提供之自動化操作工具」，未定義；沒有條文明文提到以擴充功能讀取自己已開啟的職缺頁或自己的履歷頁）；`www.104.com.tw/info/terms`、`/privacy` 自動抓取 403，待擁有者手動確認。104 職缺頁 4 份去識別化 DOM 樣本與 R10 欄位定位已完成；104 履歷頁樣本待補；訊息機制、Cake、Yourator、LinkedIn 未驗證。
 - 104 匯出 PDF 的實際樣本、文字層、中文字型及 OCR 品質。
 - 多資料夾選取、持久存取權限與更新機制。→ ADR-0003：改由輔助程式開原生選取器；對話框與 macOS 隱私權提示待擁有者手動驗證。
 - macOS／Windows 支援順序、安裝包、簽章與發布方式。
@@ -18,5 +18,5 @@
 - 〔補〕各家官方 CLI 能否照 R5 執行：關閉全部工具、不載入使用者的設定／指令檔／hooks／MCP／外掛，同時仍走訂閱登入。本機 help 有相關旗標（claude 2.1.296：`--tools ""`、`--safe-mode`、`--strict-mcp-config`；codex 0.159.3：`--ignore-user-config`、`shell_tool` 功能開關；agy 1.3.2 的 help 未見對應旗標），都還沒實測。→ ADR-0002：claude 已實測通過（`--tools ""`＋`--strict-mcp-config`＋`--setting-sources ""`＋`--safe-mode` 等，HOME 須為真實 HOME，`--settings` 須禁用）；codex、agy 未驗證。
 - 〔補〕各家能否由工具自己回報「目前的登入／計費方式」（R6）。〔D12 後，額外用量是否啟用不再需要驗證〕→ ADR-0002：claude 可由 `auth status --json`（authMethod、subscriptionType）與 stream-json init 的 `apiKeySource` 回報；codex、agy 未驗證。
 - 〔補〕各模型在訂閱路線下的上下文上限（R8）。→ ADR-0002：claude 只能從執行結果 `modelUsage.<模型>.contextWindow` 取得（haiku 實測 1000000）；codex、agy 未驗證。
-- 〔補〕各平台的投遞流程能否附上自訂 PDF，以「具體投遞流程」為單位驗證（同一站可能有多種）。不能附的流程，F07 產出的 PDF 只能用於站外投遞，實際投出版本的記法依 D20。
+- 〔補〕各平台的投遞流程能否附上自訂 PDF，以「具體投遞流程」為單位驗證（同一站可能有多種）。不能附的流程，F07 產出的 PDF 只能用於站外投遞，實際投出版本的記法依 D20。→ ADR-0004：104 應徵在另一頁（`/jobs/apply/form`），職缺頁樣本看不出能否附自訂 PDF，需擁有者實際操作確認。
 - 〔補〕擴充功能與安裝包在自用（D17）下的安裝路線（開發人員模式載入或上架商店、簽章）與費用。

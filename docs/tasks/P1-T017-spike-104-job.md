@@ -1,7 +1,7 @@
 ---
 id: P1-T017
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T015"]
 specs: ["jobs-and-messages.md", "open-verifications.md"]
 track: extension
@@ -75,9 +75,9 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
-- Blocker：無；手動驗證需擁有者：登入 104、開幾個職缺頁協助存樣本
+- 最後完成：（2026-10-12）職缺頁部分：104 會員規約原文摘錄、4 份職缺頁去識別化 fixture（`apps/extension/src/sites/104/fixtures/job-*.html`，各 27～34 KB）、R10 欄位定位表、D20 樣本可見部分，皆寫入 ADR-0004 與 open-verifications
+- 已通過驗證：`npm run verify` 綠；fixture 以擁有者姓名／email／My104／追蹤參數等字串搜尋 0 筆；同一組定位方式讀原檔與 fixture，各欄位文字逐字相同（4/4）
+- 下一步：擁有者補存 104 履歷頁（「網頁，完整」放 `local-samples/104/`）→ 做履歷頁去識別化 fixture 與欄位定位，寫入 ADR-0004 第 5 節，再收官
+- Blocker：等擁有者：1）履歷頁樣本（待補，本 Task 維持 in_progress）；2）點「應徵」確認投遞表單能否附自訂 PDF（D20）；3）瀏覽器打開 `www.104.com.tw/info/terms`、`/privacy`（自動抓取 403）
 
 ## 完成結果

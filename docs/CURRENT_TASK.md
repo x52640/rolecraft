@@ -5,11 +5,11 @@
 <!-- index:start -->
 ## 進行中
 
-- 無
+- P1-T017 驗證：104 職缺頁條款與 DOM 樣本（`docs/tasks/P1-T017-spike-104-job.md`）
 
 ## ready
 
-- P1-T017 驗證：104 職缺頁條款與 DOM 樣本
+- 無
 <!-- index:end -->
 
 ## 下一步（2026-10-11 codex 補審後）
