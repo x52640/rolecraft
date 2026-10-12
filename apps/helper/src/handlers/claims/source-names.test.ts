@@ -1,63 +1,94 @@
-// 事實項來源文件名稱（P1-T073）：claims.list／list_unassigned 附檔名與資料夾名稱，不含上層路徑。
+// 事實項來源文件名稱（P1-T073）：claims.list／list_unassigned 附授權資料夾內的相對路徑與資料夾名稱，
+// 不含授權資料夾以上的路徑。
+import type { SourceDocument } from '@rolecraft/contracts';
 import { createRepositories } from '@rolecraft/storage';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { claim, openClaimsDb, P, type ClaimsDb } from './__fixtures__/claims-db.ts';
-import { lastSegmentOf } from './source-names.ts';
+import { lastSegmentOf, relativeNameOf } from './source-names.ts';
 
-let t: ClaimsDb;
-beforeEach(() => {
-  t = openClaimsDb();
-  createRepositories(t.db).sourceDocuments.save({
-    id: 'doc-1',
-    folderPath: '/Users/me/projects/rolecraft',
-    documentPath: 'docs/README.md',
+const ROOT = '/Users/me/projects/rolecraft';
+
+function doc(id: string, documentPath: string): SourceDocument {
+  return {
+    id,
+    folderPath: ROOT,
+    documentPath,
     contentHash: 'a'.repeat(64),
     contentVersion: 1,
     authorizationStatus: 'authorized',
     importedAt: '2026-10-10T08:00:00.000Z',
-  });
+  };
+}
+
+/** 引用指定來源文件的未歸專案事實項。 */
+function claimOn(id: string, sourceDocumentId: string) {
+  const base = claim(id);
+  const excerpt = base.basis.sourceExcerpts[0];
+  if (!excerpt) throw new Error('fixture');
+  return { ...base, basis: { ...base.basis, sourceExcerpts: [{ ...excerpt, sourceDocumentId }] } };
+}
+
+let t: ClaimsDb;
+beforeEach(() => {
+  t = openClaimsDb();
+  createRepositories(t.db).sourceDocuments.save(doc('doc-1', 'docs/README.md'));
 });
 afterEach(() => t.cleanup());
 
-const DOC_1 = { sourceDocumentId: 'doc-1', name: 'README.md', rootName: 'rolecraft' };
+const DOC_1 = { sourceDocumentId: 'doc-1', name: 'docs/README.md', rootName: 'rolecraft' };
+
+async function names(op: 'claims.list' | 'claims.list_unassigned') {
+  const payload = op === 'claims.list' ? { projectId: P } : {};
+  const res = (await t.send({ op, payload })) as { ok: boolean; sourceNames: unknown };
+  expect(res.ok).toBe(true);
+  expect(JSON.stringify(res)).not.toContain('/Users');
+  expect(JSON.stringify(res)).not.toContain('projects/');
+  return res.sourceNames;
+}
 
 describe('事實項來源名稱', () => {
-  it('claims.list 附來源文件的檔名與資料夾名稱，只有最後一段、不含上層路徑', async () => {
-    const res = (await t.send({ op: 'claims.list', payload: { projectId: P } })) as {
-      ok: boolean;
-      sourceNames: unknown;
-    };
-    expect(res.ok).toBe(true);
+  it('claims.list 附授權資料夾內的相對路徑與資料夾名稱，不含資料夾以上的路徑', async () => {
     // 四個事實項都引用 doc-1：只列一次
-    expect(res.sourceNames).toEqual([DOC_1]);
-    expect(JSON.stringify(res)).not.toContain('/Users');
-    expect(JSON.stringify(res)).not.toContain('docs/');
+    expect(await names('claims.list')).toEqual([DOC_1]);
   });
 
   it('claims.list_unassigned 也附名稱；查不到的來源文件不列（畫面自行說明）', async () => {
-    const orphan = claim('u-orphan');
-    const excerpt = orphan.basis.sourceExcerpts[0];
-    if (!excerpt) throw new Error('fixture');
-    createRepositories(t.db).claims.save({
-      ...orphan,
-      basis: { ...orphan.basis, sourceExcerpts: [{ ...excerpt, sourceDocumentId: 'doc-gone' }] },
-    });
-    createRepositories(t.db).claims.save(claim('u-first'));
-    const res = (await t.send({ op: 'claims.list_unassigned', payload: {} })) as {
-      ok: boolean;
-      sourceNames: unknown;
-    };
-    expect(res.ok).toBe(true);
-    expect(res.sourceNames).toEqual([DOC_1]);
+    const repos = createRepositories(t.db);
+    repos.claims.save(claimOn('u-orphan', 'doc-gone'));
+    repos.claims.save(claim('u-first'));
+    expect(await names('claims.list_unassigned')).toEqual([DOC_1]);
   });
 
-  it('名稱只取最後一段；控制字元換掉、空的給「（未命名）」', () => {
-    expect(lastSegmentOf('a/b/設計.md')).toBe('設計.md');
-    expect(lastSegmentOf('C:\\work\\notes.txt')).toBe('notes.txt');
+  it('同名、不同子資料夾的檔案名稱不同（回歸：對抗驗證）', async () => {
+    const repos = createRepositories(t.db);
+    repos.sourceDocuments.save(doc('doc-2023', '2023/週報.md'));
+    repos.sourceDocuments.save(doc('doc-2024', '2024/週報.md'));
+    repos.claims.save(claimOn('u-2023', 'doc-2023'));
+    repos.claims.save(claimOn('u-2024', 'doc-2024'));
+    expect(await names('claims.list_unassigned')).toEqual([
+      { sourceDocumentId: 'doc-2023', name: '2023/週報.md', rootName: 'rolecraft' },
+      { sourceDocumentId: 'doc-2024', name: '2024/週報.md', rootName: 'rolecraft' },
+    ]);
+  });
+
+  it('相對路徑：絕對路徑去掉資料夾前綴、資料夾外只給最後一段、`..` 不往上走、每段清理', () => {
+    expect(relativeNameOf(`${ROOT}/a/設計.md`, ROOT)).toBe('a/設計.md');
+    expect(relativeNameOf('/etc/secret/x.md', ROOT)).toBe('x.md');
+    expect(relativeNameOf('../../x/y.md', ROOT)).toBe('x/y.md');
+    expect(relativeNameOf('a\\b\\c.txt', ROOT)).toBe('a/b/c.txt');
+    expect(relativeNameOf('a\u0007b/c\u0000d.md', ROOT)).toBe('a b/c d.md');
+    expect(relativeNameOf('///', ROOT)).toBe('（未命名）');
+    expect(relativeNameOf(`${'字'.repeat(500)}/x.md`, ROOT)).toBe(`${'字'.repeat(100)}/x.md`);
+    const deep = Array.from({ length: 12 }, (_, i) => `d${String(i)}`).join('/');
+    expect(relativeNameOf(`${deep}/x.md`, ROOT)).toBe('…/d5/d6/d7/d8/d9/d10/d11/x.md');
+  });
+
+  it('資料夾名稱只取最後一段；控制字元換掉、空的給「（未命名）」', () => {
     expect(lastSegmentOf('/Users/me/proj/')).toBe('proj');
-    expect(lastSegmentOf('a\u0007b.md')).toBe('a b.md');
+    expect(lastSegmentOf('C:\\work\\notes')).toBe('notes');
+    expect(lastSegmentOf('a\u0007b')).toBe('a b');
     expect(lastSegmentOf('///')).toBe('（未命名）');
-    expect([...lastSegmentOf('字'.repeat(500))]).toHaveLength(200);
+    expect([...lastSegmentOf('字'.repeat(500))]).toHaveLength(100);
   });
 });

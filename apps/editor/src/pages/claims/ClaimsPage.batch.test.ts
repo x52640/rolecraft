@@ -166,17 +166,23 @@ describe('事實項頁實用性（P1-T073）', () => {
     ]);
   });
 
-  it('只勾非功能類型時不需選完成狀態；取消就不送', async () => {
+  it('未選完成狀態一律不能送；只勾非功能類型時完成狀態不寫入；取消就不送', async () => {
     const helper = fakeHelper();
     renderPage(helper);
     await screen.findByRole('article', { name: '負責後端' });
     fireEvent.click(box('負責後端'));
-    fireEvent.click(within(bar()).getByRole('button', { name: '設定並確認（1）' }));
+    const submit = () =>
+      within(bar()).getByRole<HTMLButtonElement>('button', { name: '設定並確認（1）' });
+    expect(submit().disabled).toBe(true);
+    fireEvent.change(within(bar()).getByRole('combobox', { name: '把勾選的設為' }), {
+      target: { value: 'planned' },
+    });
+    fireEvent.click(submit());
     const ask = within(bar()).getByRole('group', { name: '確認批次' });
     expect(ask.textContent).toContain('將確認 1 項（都不是功能／交付物，只確認內容）');
     fireEvent.click(within(ask).getByRole('button', { name: '取消' }));
     expect(helper.writes()).toEqual([]);
-    fireEvent.click(within(bar()).getByRole('button', { name: '設定並確認（1）' }));
+    fireEvent.click(submit());
     fireEvent.click(within(bar()).getByRole('button', { name: '確定確認' }));
     await screen.findByText('已確認 1 項。');
     expect(helper.writes()).toEqual([
@@ -185,5 +191,28 @@ describe('事實項頁實用性（P1-T073）', () => {
         payload: { claimId: 'c-3', text: '負責後端', expectedReviewStatus: 'normal' },
       },
     ]);
+  });
+
+  it('送出後完成狀態重設，下一批不沿用「已完成」（回歸：對抗驗證）', async () => {
+    const helper = fakeHelper();
+    renderPage(helper);
+    await screen.findByRole('article', { name: '支援 PDF 匯出' });
+    const choice = () =>
+      within(bar()).getByRole<HTMLSelectElement>('combobox', { name: '把勾選的設為' });
+    fireEvent.click(box('支援 PDF 匯出'));
+    fireEvent.change(choice(), { target: { value: 'user_confirmed_done' } });
+    fireEvent.click(within(bar()).getByRole('button', { name: '設定並確認（1）' }));
+    fireEvent.click(within(bar()).getByRole('button', { name: '確定確認' }));
+    await screen.findByText('已確認 1 項。');
+    expect(choice().value).toBe('');
+    // 下一批：沒重新選就不能送
+    fireEvent.click(box('交付安裝包'));
+    const next = within(bar()).getByRole<HTMLButtonElement>('button', {
+      name: '設定並確認（1）',
+    });
+    expect(next.disabled).toBe(true);
+    fireEvent.click(next);
+    expect(within(bar()).queryByRole('group', { name: '確認批次' })).toBeNull();
+    expect(helper.writes()).toHaveLength(1);
   });
 });

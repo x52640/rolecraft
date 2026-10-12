@@ -21,7 +21,7 @@ const CHOICE_LABELS: Record<ConfirmableCompletion, string> = {
 
 /**
  * 批次確認（P1-T073）：勾選的項目一次設定完成狀態並確認。只收尚未確認、複核狀態正常的項目；
- * 完成狀態不預設（避免順手確認成「已完成」），按下後先顯示將確認的數量，再按一次才送出。
+ * 完成狀態不預設、送出後重設（避免順手確認成「已完成」），按下後先顯示將確認的數量，再按一次才送出。
  */
 export function BatchBar(props: BatchBarProps) {
   const [choice, setChoice] = useState<ConfirmableCompletion | ''>('');
@@ -29,7 +29,8 @@ export function BatchBar(props: BatchBarProps) {
   const batchable = props.claims.filter((c) => batchBlockReason(c) === null);
   const targets = batchable.filter((c) => props.selected.has(c.id));
   const withCompletion = targets.filter(needsCompletion).length;
-  const needChoice = withCompletion > 0 && choice === '';
+  // 完成狀態一律要這一批重新選（不預設、不沿用上一批）；未選時不能送出
+  const needChoice = choice === '';
   const canSubmit = !props.busy && targets.length > 0 && !needChoice;
 
   return (
@@ -69,19 +70,23 @@ export function BatchBar(props: BatchBarProps) {
       <button type="button" disabled={!canSubmit} onClick={() => setAsking(true)}>
         {`設定並確認（${String(targets.length)}）`}
       </button>
-      {needChoice ? (
-        <span className="claim-hint">勾選的項目含功能／交付物，請先選「已完成」或「計畫中」。</span>
+      {needChoice && targets.length > 0 ? (
+        <span className="claim-hint">
+          請先選「已完成」或「計畫中」（只套用在功能／交付物，其他類型只確認內容）。
+        </span>
       ) : null}
       {asking && canSubmit ? (
         <span role="group" aria-label="確認批次">
           {`將確認 ${String(targets.length)} 項`}
-          {withCompletion > 0 && choice !== ''
+          {withCompletion > 0
             ? `：其中 ${String(withCompletion)} 項功能／交付物設為「${CHOICE_LABELS[choice]}」，其他 ${String(targets.length - withCompletion)} 項只確認內容。`
             : '（都不是功能／交付物，只確認內容）。'}
           <button
             type="button"
             onClick={() => {
               setAsking(false);
+              // 送出後重設：下一批要重新選，不沿用這一批的完成狀態
+              setChoice('');
               props.onConfirm(targets, choice);
             }}
           >
