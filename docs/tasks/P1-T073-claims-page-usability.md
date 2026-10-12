@@ -77,7 +77,7 @@ npm run verify
 
 ## 完成結果
 
-- contracts：`claims.list`／`claims.list_unassigned` 回應相加選填 `sourceNames`（`ClaimSourceName`：`sourceDocumentId`、`name`、`rootName`），ADR-0006 #15、bridge.md 記錄。
+- contracts：`claims.list`／`claims.list_unassigned` 回應相加選填 `sourceNames`（`ClaimSourceName`：`sourceDocumentId`、`name`、`rootName`），ADR-0006 #16、bridge.md 記錄。
 - helper：`handlers/claims/source-names.ts` 由 storage 來源文件取檔名與資料夾名稱的最後一段（控制字元換空白、最多 200 字、空的為「（未命名）」），查不到的文件不列；兩個清單 handler 一律附上。
 - 編輯器：來源顯示「檔名（資料夾 名稱）」，查不到名稱顯示「已不在來源清單的文件」，不再顯示內部 ID。新增批次列 `BatchBar.tsx`：「全選本專案（未歸專案）可批次的項目」、「清除勾選」、「把勾選的設為 已完成／計畫中」＋「設定並確認（N）」，按下先顯示將確認的數量與各類數目，再按「確定確認」才逐筆送 `claims.confirm`。只收尚未確認、複核狀態正常的項目；待複核、來源矛盾、來源已移除、已確認過的不能勾，並在卡片上說明原因。完成狀態不預設；只勾非功能類型時不需選。逐項確認保留。
 - 測試：helper `source-names.test.ts`（名稱、不含路徑、查不到不列、最後一段處理）；編輯器 `ClaimsPage.batch.test.ts`（檔名顯示、不可批次排除與原因、全選＋設定並確認、只勾非功能類型與取消）；`ClaimsPage.test.ts` 改為檢查檔名顯示並移除舊批次測試。
