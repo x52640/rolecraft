@@ -12,5 +12,7 @@ export type {
   ExtractResult,
   ExtractSuccess,
   ResumeFieldDraft,
+  StructuredDraft,
+  StructuredExperience,
   TextLine,
 } from './types.ts';

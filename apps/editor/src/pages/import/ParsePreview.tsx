@@ -2,7 +2,7 @@ import type { ImportDraft, ImportDraftField, ImportResult } from '@rolecraft/con
 
 type Parsed = Extract<ImportResult, { status: 'parsed' }>;
 
-const DRAFT_GROUPS: readonly [keyof Omit<ImportDraft, 'name'>, string][] = [
+const DRAFT_GROUPS: readonly [keyof Omit<ImportDraft, 'name' | 'structured'>, string][] = [
   ['dates', '日期'],
   ['companies', '公司'],
   ['titles', '職稱'],

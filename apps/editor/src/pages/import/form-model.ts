@@ -4,6 +4,7 @@ import {
   ProfileInput,
   type ImportDraft,
   type ImportDraftField,
+  type ImportStructuredDraft,
   type ResumeImportFailureReason,
 } from '@rolecraft/contracts';
 
@@ -107,8 +108,30 @@ function experiencesFrom(draft: ImportDraft): ExperienceRow[] {
   });
 }
 
-/** 欄位草稿 → 表單初值。 */
+/** 版面專屬的結構化草稿（P1-T066）→ 表單初值；姓名列一定在第一列。 */
+function formFromStructured(structured: ImportStructuredDraft): ProfileForm {
+  const name = structured.personalInfo.find((row) => row.label === '姓名');
+  const others = structured.personalInfo.filter((row) => row.label !== '姓名');
+  return {
+    info: [
+      { label: '姓名', value: name?.value.value ?? '' },
+      ...others.map((row) => ({ label: row.label, value: row.value.value })),
+    ],
+    experiences: structured.experiences.map((e) => ({
+      company: e.company?.value ?? '',
+      title: e.title?.value ?? '',
+      startDate: e.startDate?.value ?? '',
+      endDate: e.current ? '' : (e.endDate?.value ?? ''),
+      current: e.current,
+      description: e.description?.value ?? '',
+    })),
+    skills: [...new Set(structured.skills.map((s) => s.value.trim()).filter((s) => s !== ''))],
+  };
+}
+
+/** 欄位草稿 → 表單初值。有結構化草稿就用它，否則用通用規則的欄位。 */
 export function formFromDraft(draft: ImportDraft): ProfileForm {
+  if (draft.structured) return formFromStructured(draft.structured);
   return {
     info: [{ label: '姓名', value: draft.name?.value ?? '' }],
     experiences: experiencesFrom(draft),

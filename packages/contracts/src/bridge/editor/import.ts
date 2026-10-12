@@ -28,7 +28,30 @@ export const ImportDraftField = z.strictObject({
 });
 export type ImportDraftField = z.infer<typeof ImportDraftField>;
 
-/** 欄位草稿；找不到的欄位留空，不捏造。 */
+/** 結構化草稿裡的一段經歷（P1-T066）。找不到的欄位為 null；current＝仍在職（此時 endDate 為 null）。 */
+export const ImportStructuredExperience = z.strictObject({
+  company: ImportDraftField.nullable(),
+  title: ImportDraftField.nullable(),
+  startDate: ImportDraftField.nullable(),
+  endDate: ImportDraftField.nullable(),
+  current: z.boolean(),
+  description: ImportDraftField.nullable(),
+});
+export type ImportStructuredExperience = z.infer<typeof ImportStructuredExperience>;
+
+/**
+ * 認出特定版面（目前只有 104）時的結構化草稿（P1-T066、ADR-0006 #14）。
+ * personalInfo 保留原標籤（含「姓名」「學歷」）；每個值都帶出處。
+ */
+export const ImportStructuredDraft = z.strictObject({
+  layout: z.literal('104'),
+  personalInfo: z.array(z.strictObject({ label: z.string().min(1), value: ImportDraftField })),
+  experiences: z.array(ImportStructuredExperience),
+  skills: z.array(ImportDraftField),
+});
+export type ImportStructuredDraft = z.infer<typeof ImportStructuredDraft>;
+
+/** 欄位草稿；找不到的欄位留空，不捏造。structured 只在認出特定版面時才有（相加欄位）。 */
 export const ImportDraft = z.strictObject({
   name: ImportDraftField.nullable(),
   dates: z.array(ImportDraftField),
@@ -36,6 +59,7 @@ export const ImportDraft = z.strictObject({
   titles: z.array(ImportDraftField),
   experiences: z.array(ImportDraftField),
   skills: z.array(ImportDraftField),
+  structured: ImportStructuredDraft.optional(),
 });
 export type ImportDraft = z.infer<typeof ImportDraft>;
 

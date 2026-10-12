@@ -81,6 +81,26 @@ export interface ResumeFieldDraft {
   titles: DraftField[];
   experiences: DraftField[];
   skills: DraftField[];
+  /** 認出特定版面（目前只有 104）時的結構化草稿；認不出就沒有這個欄位（P1-T066）。 */
+  structured?: StructuredDraft;
+}
+
+/** 結構化草稿的一段經歷。找不到的欄位為 null；current＝仍在職（endDate 為 null）。 */
+export interface StructuredExperience {
+  company: DraftField | null;
+  title: DraftField | null;
+  startDate: DraftField | null;
+  endDate: DraftField | null;
+  current: boolean;
+  description: DraftField | null;
+}
+
+/** 依版面專屬規則整理出的草稿；personalInfo 保留原標籤。 */
+export interface StructuredDraft {
+  layout: '104';
+  personalInfo: { label: string; value: DraftField }[];
+  experiences: StructuredExperience[];
+  skills: DraftField[];
 }
 
 export interface ExtractSuccess {

@@ -1,4 +1,5 @@
 import type { DraftField, ExtractedPage, ResumeFieldDraft } from '../types.ts';
+import { build104 } from './layout104/build-104.ts';
 import {
   COMPANY_LABELS,
   companyIn,
@@ -42,7 +43,7 @@ function companiesAndTitles(text: string): { companies: string[]; titles: string
 }
 
 /**
- * 把排好閱讀順序的行粗略整理成待校正欄位草稿。
+ * 把排好閱讀順序的行粗略整理成待校正欄位草稿（通用規則）；認出 104 版面時另附結構化草稿。
  * 每個欄位都標「未確認」並記錄來源頁碼與行號；沒有線索的欄位留空。
  */
 export function buildDraft(pages: readonly ExtractedPage[]): ResumeFieldDraft {
@@ -77,5 +78,8 @@ export function buildDraft(pages: readonly ExtractedPage[]): ResumeFieldDraft {
       if (section === 'experience') draft.experiences.push(at(text));
     });
   }
+  // 認出 104 版面時另附結構化草稿；認不出就只有上面的通用結果（P1-T066）。
+  const structured = build104(pages);
+  if (structured) draft.structured = structured;
   return draft;
 }

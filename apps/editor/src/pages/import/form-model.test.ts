@@ -99,6 +99,65 @@ describe('formFromDraft', () => {
     };
     expect(formFromDraft(none)).toEqual(emptyForm());
   });
+
+  it('有 104 結構化草稿就用它預填（P1-T066），不用通用欄位', () => {
+    const draft: ImportDraft = {
+      ...DRAFT,
+      structured: {
+        layout: '104',
+        personalInfo: [
+          { label: '就業狀態', value: at('在職中', 3) },
+          { label: '姓名', value: at('林測試', 0) },
+          { label: '學歷', value: at('示範大學\n大學畢業', 9) },
+        ],
+        experiences: [
+          {
+            company: at('範例科技有限公司', 12),
+            title: at('資深產品經理', 11),
+            startDate: at('2021/1', 13),
+            endDate: null,
+            current: true,
+            description: at('核心職責\n• 規劃路線圖', 15),
+          },
+          {
+            company: null,
+            title: at('行銷助理', 20),
+            startDate: at('2015/2', 21),
+            endDate: at('2016/6', 21),
+            current: false,
+            description: null,
+          },
+        ],
+        skills: [at('SQL', 30), at(' SQL ', 31), at('產品管理', 30)],
+      },
+    };
+    expect(formFromDraft(draft)).toEqual({
+      info: [
+        { label: '姓名', value: '林測試' },
+        { label: '就業狀態', value: '在職中' },
+        { label: '學歷', value: '示範大學\n大學畢業' },
+      ],
+      experiences: [
+        {
+          company: '範例科技有限公司',
+          title: '資深產品經理',
+          startDate: '2021/1',
+          endDate: '',
+          current: true,
+          description: '核心職責\n• 規劃路線圖',
+        },
+        {
+          company: '',
+          title: '行銷助理',
+          startDate: '2015/2',
+          endDate: '2016/6',
+          current: false,
+          description: '',
+        },
+      ],
+      skills: ['SQL', '產品管理'],
+    });
+  });
 });
 
 describe('toProfileInput', () => {
