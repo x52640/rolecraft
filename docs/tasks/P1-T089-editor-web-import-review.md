@@ -23,7 +23,7 @@ expected_commit: "feat(P1-T089): editor：網頁來源核對改版（原文收�
 
 - (b) 原文區：預設收合的「查看擷取原文」；展開照結構呈現（標題、清單項目符號與層級縮排、標籤＋值兩欄、依標題分組）；不顯示區塊編號與種類，編號只在滑鼠移上或從欄位連過去時顯示；截斷提示收合時也看得到
 - (c) 每個有出處的欄位旁顯示出處區塊原文（最多兩行），可點一下連到原文區對應區塊（自動展開）
-- (d) 免標示／標黃判定與確認流程，照 resume-import「網頁來源的核對（D29）」；欄位對應表（標籤 → 欄位）是編輯器內固定清單，放在獨立模組並有測試，完成結果列出清單
+- (d) 免標示／標黃判定與確認流程，照 resume-import「網頁來源的核對（D29）」（2026-10-13 再裁定版：值包含於單一出處區塊且無個資標示即免標示；不需要欄位對應表）
 - 原本「我已逐欄核對」勾選：網頁來源改成「已看過」流程；PDF 來源維持現行勾選
 
 ### 不包含
@@ -54,7 +54,7 @@ npm run verify
 
 ## 契約判斷（規劃時已查）
 
-- 不改契約即可判定：`ImportWebDraftField` 有 `value`、`blockId`（第一個引用區塊）、`containsPersonalData`；`import.get` 的 `ImportWebBlock` 有 `kind`、`label`、`text`、`continues`。判定「標籤＋值直接讀到」＝`blockId` 指到的區塊 `kind` 是 `label_value`、標籤在對應表裡對應這個欄位、欄位值與區塊值正規化（去空白、NFKC，與照抄檢查相同）後**完全相等**。照抄檢查要求每個引用區塊都要用到，所以值完全等於第一個區塊的值就代表只引用一個區塊；跨多區塊或只取部分必然不相等 → 標黃。
+- 不改契約即可判定：`ImportWebDraftField` 有 `value`、`blockId`（第一個引用區塊）、`containsPersonalData`；`import.get` 的 `ImportWebBlock` 有 `text`。判定「只出自單一區塊」＝欄位值正規化（去空白、NFKC，與照抄檢查相同）後是 `blockId` 指到區塊文字（正規化後）的子字串；不是就代表跨多區塊 → 標黃。若發現此推論不成立就停下回報。
 - 實作時若發現這個推論不成立（例如某類欄位拿不到出處區塊），停下回報，不得自行改 `packages/contracts`；屆時另開契約 Task（候選：`ImportWebDraftField` 相加 `blockIds: WebBlockId[]`）。
 
 ## 實作要求
