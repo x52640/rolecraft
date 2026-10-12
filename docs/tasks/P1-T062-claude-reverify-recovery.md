@@ -1,7 +1,7 @@
 ---
 id: P1-T062
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T058"]
 specs: ["providers.md", "bridge.md", "architecture.md"]
 track: providers
@@ -87,7 +87,7 @@ npm run verify
 ## 中斷／接手紀錄
 
 - 最後完成：對抗驗證與 codex review 三項修正（重新檢查先讀新版本、狀態即時算、失敗結果寫入重試）＋回歸測試
-- 已通過驗證：worktree 內 `npm run verify` 綠；新增 6 個回歸測試中 4 個在修正前失敗（另 2 個鎖住退化與不補寫的邊界）；全部用假 spawn，未呼叫真實 CLI
+- 已通過驗證：worktree 與協調者主樹 `npm run verify` 綠（3025 通過）；對抗驗證 2 個角度屬實 2 項、codex 2 項，已在 `28de966` 修正；修正 diff 再跑 codex 無發現；全部用假 spawn，未呼叫真實 CLI
 - 下一步：協調者收官
 - Blocker：無
 
