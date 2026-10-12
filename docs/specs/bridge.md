@@ -91,7 +91,7 @@
 | `claims.move_claim` | 把事實項移到另一專案（`projectId`）或移回未歸專案（`projectId: null`）；一個事實項至多在一個專案 |
 | `claims.delete_project` | 刪除專案：事實項回到未歸專案、文件不再屬任何專案，事實項本身不刪 |
 | `resume.generate` | 針對已確認的職缺快照產生客製履歷，回工作 id（R9）（P1-T025） |
-| `resume.list`／`resume.get` | 某職缺的履歷版本清單／版本與段落；`get` 另回 `originals`：工作經歷段落對到的 Profile 經歷描述（原文對照用，其他段落沒有原文） |
+| `resume.list`／`resume.get` | 某職缺的履歷版本清單／版本與段落；`get` 另回 `originals`：工作經歷段落對到的 Profile 經歷描述（原文對照用，其他段落沒有原文）。〔D30 (a)，P1-T090〕版本相加選填 `profileVersion`（產生時的 Profile 版本號，舊版本沒有；編輯器據此顯示過期提示，resume-output「Profile 修改後的過期提示（D30 (a)）」） |
 | `resume.accept_section`／`reject_section` | 接受（只接受措辭，不確認事實項）／退回修改稿；退回後可直接重新接受（等於撤回退回） |
 | `resume.edit_section` | 自行編輯段落；引用只能增加，生成段落的引用不能移除（R1），新增引用必須是存在的事實項，違反回 `invalid_request`。既有引用的宣稱完成程度被調低（含拿掉標示）時，請求必須帶 `completionDowngradeAcknowledged: true`（使用者已重看措辭），否則回 `invalid_request`。任何變動都清掉逐段確認、段落回到待接受 |
 | `resume.delete_section` | 刪除整段（去掉引用的唯一方式） |

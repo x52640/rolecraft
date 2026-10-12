@@ -3,19 +3,19 @@ id: P1-T090
 phase: 1
 status: ready
 depends_on: ["P1-T079"]
-specs: ["resume-import.md", "bridge.md", "architecture.md", "evidence-model.md"]
+specs: ["resume-import.md", "bridge.md", "architecture.md", "evidence-model.md", "resume-output.md"]
 track: contracts
 primary_repo: rolecraft
-write_paths: ["packages/contracts/src/", "apps/helper/src/handlers/profile/", "apps/helper/src/handlers/import/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/bridge/__fixtures__/", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "apps/extension/src/bridge/client.test.ts", "packages/domain/src/evidence/profile-sources.test.ts", "packages/pipeline/src/generation/profile-sources.test.ts", "packages/pipeline/src/intro/profile-sources.test.ts", "packages/pipeline/src/resume-parse/check.ts", "packages/pipeline/src/resume-parse/web-check.ts", "packages/pipeline/src/resume-parse/types.ts", "apps/editor/src/pages/resumes/profile/useProfileCopy.ts", "apps/editor/src/pages/resumes/profile/ProfileCopy.test.ts"]
+write_paths: ["packages/contracts/src/", "apps/helper/src/handlers/profile/", "apps/helper/src/handlers/import/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/bridge/__fixtures__/", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "apps/extension/src/bridge/client.test.ts", "packages/domain/src/evidence/profile-sources.test.ts", "packages/pipeline/src/generation/profile-sources.test.ts", "packages/pipeline/src/intro/profile-sources.test.ts", "packages/pipeline/src/resume-parse/check.ts", "packages/pipeline/src/resume-parse/web-check.ts", "packages/pipeline/src/resume-parse/types.ts", "apps/editor/src/pages/resumes/profile/useProfileCopy.ts", "apps/editor/src/pages/resumes/profile/ProfileCopy.test.ts", "apps/helper/src/handlers/resume/generation.ts", "apps/helper/src/handlers/resume/profile-version.test.ts"]
 contract_change: additive
-expected_commit: "feat(P1-T090): profile.update 契約與 helper：個人資料編輯、版本衝突、各欄出處"
+expected_commit: "feat(P1-T090): profile.update 契約與 helper：個人資料編輯、版本衝突、各欄出處、履歷版本記 Profile 版本號"
 ---
 
 # contracts＋helper：profile.update、Profile 版本號與各欄出處（D30）
 
 ## 目標
 
-讓確認後的 Profile 可以經 `profile.update` 逐欄修改、刪除、新增，帶版本號防止蓋掉別處的寫入；`import.confirm` 寫入時由 helper 記下各欄出處原文，`profile.update` 搬移出處並標「已修改」。
+讓確認後的 Profile 可以經 `profile.update` 逐欄修改、刪除、新增，帶版本號防止蓋掉別處的寫入；`import.confirm` 寫入時由 helper 記下各欄出處原文，`profile.update` 搬移出處並標「已修改」。〔D30 (a)〕履歷版本產生時記下當時的 Profile 版本號，供履歷頁過期提示（P1-T092）比對。
 
 ## 範圍
 
@@ -30,11 +30,15 @@ expected_commit: "feat(P1-T090): profile.update 契約與 helper：個人資料�
   1. pipeline 照抄檢查（`check.ts`、`web-check.ts`）目前只保留第一個引用來源；D30 要求多區塊／多行欄位的出處原文完整，須保留全部引用來源（只加欄位、不改既有檢查結果），PDF 與網頁既有測試不得退步。
   2. 既有 `apps/editor/src/pages/resumes/profile/useProfileCopy.ts` 以 `JSON.stringify` 比對整份 Profile；`profile.get` 帶出處與版本號後，比對要排除出處、版本號等中繼資料，只比欄位值。補「只有出處不同時仍可複製」回歸測試。
 
+- 〔2026-10-13 D30 (a) 補充〕Profile 版本號即「修改序號」（不另加修改時間）；`profile.get` 回傳版本號（舊資料沒有視為 0）。
+  - contracts（additive）：`ResumeVersion` 相加選填 `profileVersion`（非負整數）；`resume.get`／`resume.list` 回應照實帶出；fixture、`contract-drift` 一致。
+  - helper `generation.ts`：存版本時記下這次生成**最後一次送出模型時 `loadInputs` 實際讀到**的 Profile 版本號（沒有記 0）；不得在 `commitUnit` 時另外重讀 Profile。只改 helper，不改 `packages/pipeline/src/generation/`（若做不到就停下回報）。
+  - 新測試 `apps/helper/src/handlers/resume/profile-version.test.ts`：產生後版本記到當時版本號；生成途中（兩次送出之間）Profile 被 `profile.update` 改過，記的是最後一次送出讀到的值；Profile 沒有版本號記 0；段落編輯、接受不改 `profileVersion`；舊版本（沒有該欄）照常可讀。
+
 ### 不包含
 
-- 編輯器個人資料頁（P1-T091）、匯入頁（P1-T089）
-- storage migration（Profile 以整份 JSON 存，相加選填欄位不需要；若發現需要就停下回報）
-- 已產生履歷的過期標示（plan D30 未裁定，見 CURRENT_TASK）
+- 編輯器個人資料頁（P1-T091）、匯入頁（P1-T089）、履歷頁過期提示畫面（P1-T092）
+- storage migration（Profile 與履歷版本都以整份 JSON 存，相加選填欄位不需要；若發現需要就停下回報）
 
 ## 工作區與 Context
 
@@ -42,8 +46,8 @@ expected_commit: "feat(P1-T090): profile.update 契約與 helper：個人資料�
 
 - `plan.md` D30、D29（再裁定 2）、D28 Q8、D4、D19
 - `docs/README.md`
-- `docs/specs/resume-import.md`「匯入工作階段」「個人資料編輯（D30）」；`bridge.md` 共同規則、`import.confirm`、`profile.get`、`profile.update`、錯誤碼；`architecture.md` Profile 列；`evidence-model.md` R1 檢查 3
-- P1-T074、P1-T079 完成結果；`packages/contracts/src/entities/profile.ts`、`bridge/editor/profile.ts`、`bridge/editor/import.ts`；`apps/helper/src/handlers/profile/`、`handlers/import/confirm.ts`、`import-service.ts`
+- `docs/specs/resume-import.md`「匯入工作階段」「個人資料編輯（D30）」；`bridge.md` 共同規則、`import.confirm`、`profile.get`、`profile.update`、`resume.list`／`resume.get`、錯誤碼；`architecture.md` Profile、ResumeVersion 列；`evidence-model.md` R1 檢查 3；`resume-output.md`「Profile 修改後的過期提示（D30 (a)）」的「記錄」
+- P1-T074、P1-T079 完成結果；`packages/contracts/src/entities/profile.ts`、`entities/resume-version.ts`、`apps/helper/src/handlers/resume/generation.ts`、`bridge/editor/profile.ts`、`bridge/editor/import.ts`；`apps/helper/src/handlers/profile/`、`handlers/import/confirm.ts`、`import-service.ts`
 
 ### 不應載入
 
@@ -61,7 +65,7 @@ npm run verify
 - **高風險（R1／D4、資料覆寫、並行）**：版本比對與寫入在同一個同步寫入內完成，中間不得 await；衝突時資料完全不變；出處文字不得來自請求；出處不得進任何提示或 R1 檢查 3。收官前跑對抗驗證（E3，上限 4 個 agent），再跑 codex review
 - 舊資料（沒有版本號、沒有出處）照常可讀、可更新（版本號視為 0）
 - 契約只做相加；既有操作的請求形狀不變
-- 與 P1-T088（extension sites）、P1-T089（editor import）write_paths 不重疊，可平行（E5）
+- 與 P1-T088（extension sites）、P1-T089（editor import）、P1-T093（pipeline `redact.ts` 與新測試檔）write_paths 不重疊，可平行（E5）
 - 遵守 `docs/specs/architecture.md`（單檔 300 行、相依方向）；變更只在 write_paths 內，超出就停下回報
 - 測試資料一律合成、去識別化；不讀擁有者真實資料；測試不呼叫真實 CLI
 
@@ -72,6 +76,7 @@ npm run verify
 - resume-import「個人資料編輯（D30）」驗收中屬 helper／契約的各項：修改、刪除、新增後讀回一致且仍已確認；版本不符回 `profile_conflict` 且資料不變；`import.confirm` 之後用舊版本號的 `profile.update` 衝突；來源列不存在或重複引用回 `invalid_request`；修改過的欄位出處保留並標已修改、新增列沒有出處；`import.confirm` 只在值相同時寫出處、請求帶出處欄位被 schema 擋
 - 沒有 Profile 回 `profile_missing`、多份回 `multiple_profiles`
 - 出處原文不進生成／自介提示、R1 檢查 3 不認出處裡的數字
+- 履歷版本的 `profileVersion`：resume-output「Profile 修改後的過期提示（D30 (a)）」驗收中屬 helper 的各項（記錄時機、生成途中被改、沒有版本號記 0）
 
 ### 手動驗證
 
