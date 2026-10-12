@@ -6,7 +6,6 @@
 ## 進行中
 
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本（`docs/tasks/P1-T017-spike-104-job.md`）
-- P1-T088 extension：104 履歷頁介面字樣過濾（D29 (a)）（`docs/tasks/P1-T088-extension-104-ui-noise-filter.md`）
 
 ## ready
 

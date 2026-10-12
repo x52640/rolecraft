@@ -1,7 +1,7 @@
 ---
 id: P1-T088
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T077"]
 specs: ["web-resume-capture.md"]
 track: extension
@@ -86,7 +86,7 @@ RUN_CHROME=1 npx vitest run apps/extension/src/sites/104/resume
 
 - 最後完成：實作、測試、expected-blocks、ADR-0004 5.3／5.4 更新（worker，2026-10-13）
 - 已通過驗證：`npm run verify` 綠；`RUN_CHROME=1 npx vitest run apps/extension/src/sites/104/resume` 3 檔 17 測試全過
-- 下一步：協調者收官（對抗驗證 E3、codex review、`RUN_CHROME=1` 實跑）
+- 下一步：已收官（2026-10-13 協調者：codex 3 輪屬實項皆已修；最後一個 commit 只改測試輔助，未再跑 codex；main `npm run verify` 綠）
 - Blocker：無
 
 ## 完成結果
