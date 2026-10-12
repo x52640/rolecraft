@@ -7,6 +7,7 @@ import type { FileStore } from '../files/file-store.ts';
 import { newId, nowTimestamp } from '../ids.ts';
 import { deletedMaterialsHeldBy } from '../application/materials.ts';
 import { decode, encode } from '../repositories/json-table.ts';
+import { readCurrentPhoto } from '../repositories/photo-repository.ts';
 import { assertImmutabilityGuards } from './guards.ts';
 import { assertNotInTransaction, releasePdfs } from './pdf-cleanup.ts';
 
@@ -85,6 +86,18 @@ export function deleteUnappliedExportVersion(db: DatabaseSync, id: string): stri
   return version.pdfHash;
 }
 
+/**
+ * 匯出版本記的照片必須是目前照片（同照片 ID、同雜湊）：不認得的照片 ID 或內容對不上都拒絕，
+ * 免得記下一張資料區裡沒有、刪除時也找不到的照片（D19、D28）。
+ */
+function assertCurrentPhoto(db: DatabaseSync, photo: ExportVersionInput['photo']): void {
+  if (photo === undefined) return;
+  const current = readCurrentPhoto(db);
+  if (current?.photo.id !== photo.photoId || current.photo.sha256 !== photo.sha256) {
+    throw new StorageError(`匯出內容的照片不是目前的照片，不能建立匯出版本：${photo.photoId}`);
+  }
+}
+
 export function createExportVersionRepository(
   db: DatabaseSync,
   fileStore: FileStore,
@@ -102,6 +115,7 @@ export function createExportVersionRepository(
         const list = deleted.map((ref) => `${ref.kind}:${ref.id}`).join('、');
         throw new StorageError(`匯出內容含使用者已刪除的素材，不能建立匯出版本：${list}`);
       }
+      assertCurrentPhoto(db, input.photo);
       const stored = fileStore.put(pdf);
       const candidate: ExportVersion = {
         ...input,

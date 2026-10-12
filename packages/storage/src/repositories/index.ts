@@ -29,6 +29,7 @@ import {
   createProviderSelectionRepository,
   type ProviderSelectionRepository,
 } from './provider-selection-repository.ts';
+import { createPhotoRepository, type PhotoRepository } from './photo-repository.ts';
 import { createProfileRepository, type ProfileRepository } from './profile-repository.ts';
 import {
   createProjectDocumentRepository,
@@ -78,12 +79,14 @@ export interface Repositories {
   claudeVersionRecords: ClaudeVersionRecordRepository;
   analysisState: AnalysisStateRepository;
   applicationIntros: ApplicationIntroRepository;
+  photos: PhotoRepository;
 }
 
 /**
  * 組出所有核心物件的 repository（共用同一個資料庫連線）。
  * 素材（sourceDocuments、claims、resumeVersions、jobSnapshots）不提供 delete：
  * 刪除只走 deleteMaterial，才會套用 D19（未投遞匯出版本整份刪除、已投遞保留並明示）。
+ * 照片同理：photos 只有讀與加入，刪除與更換走 removePhoto／replacePhoto。
  */
 export function createRepositories(db: DatabaseSync): Repositories {
   return {
@@ -104,6 +107,7 @@ export function createRepositories(db: DatabaseSync): Repositories {
     claudeVersionRecords: createClaudeVersionRecordRepository(db),
     analysisState: createAnalysisStateRepository(db),
     applicationIntros: createApplicationIntroRepository(db),
+    photos: createPhotoRepository(db),
   };
 }
 
@@ -115,6 +119,7 @@ export type {
   ClaudeVersionRecordRepository,
   JobSnapshotRepository,
   MessageDraftRepository,
+  PhotoRepository,
   ProfileRepository,
   ProjectDocumentRepository,
   ProjectEvidenceRepository,
@@ -137,4 +142,5 @@ export type {
   AnalyzedDocumentRow,
   DocumentSummaryRow,
 } from './analysis-state-repository.ts';
+export type { PhotoInput, StoredPhoto } from './photo-repository.ts';
 export type { SourceReadLogEntry } from './source-read-log-repository.ts';

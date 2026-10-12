@@ -1,12 +1,12 @@
 ---
 id: P1-T082
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T074"]
 specs: ["resume-output.md", "architecture.md"]
 track: storage
 primary_repo: rolecraft
-write_paths: ["packages/storage/src/migrations/", "packages/storage/src/repositories/photo-repository.ts", "packages/storage/src/repositories/index.ts", "packages/storage/src/application/", "packages/storage/src/export/", "packages/storage/src/index.ts", "packages/storage/src/__fixtures__/"]
+write_paths: ["packages/storage/src/migrations/", "packages/storage/src/repositories/photo-repository.ts", "packages/storage/src/repositories/index.ts", "packages/storage/src/application/", "packages/storage/src/export/", "packages/storage/src/index.ts", "packages/storage/src/__fixtures__/", "packages/storage/src/migrate.test.ts"]
 contract_change: none
 expected_commit: "feat(P1-T082): storage：目前照片、匯出版本記照片，刪除與更換照片套 D19"
 ---
@@ -80,9 +80,18 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等 P1-T074 收官後改 ready
-- Blocker：無（相依 P1-T074 已於 2026-10-12 收官）
+- 最後完成：2026-10-12 「包含」各項已實作並 commit（工作者 worktree，未 push）
+- 已通過驗證：`npm run verify` 綠
+- 協調者 2026-10-12 擴充 write_paths：加 `packages/storage/src/migrate.test.ts`（新增 photos 表需同步寫死的資料表清單，前例 P1-T064）
+- 下一步：協調者收官；高風險 Task，收官前跑對抗驗證（E3）與 codex review（尚未跑）
+- Blocker：無
 
 ## 完成結果
+
+- migration `0009_photos.sql`：`photos` 表（slot 固定 1 且唯一＝最多一張；內容存資料庫、不進檔案區）；觸發器 `photos_no_update`、`photos_no_reuse_deleted_id`、`photos_record_deleted`、`export_versions_no_deleted_photo`；`deleted_materials` 重建讓 kind 加 `photo`（先拿掉 0003 四個觸發器、搬資料改名後原樣建回）；`export_versions` 加由 JSON 產生的 `photo_id`、`photo_sha256` 欄與索引
+- `repositories/photo-repository.ts`：`get`、`add`（已有照片拒絕）、`readCurrentPhoto`、`insertPhoto`；無刪除
+- `application/photo-material.ts`：`removePhoto`、`replacePhoto`（刪舊加新同一交易），套 D19：含該照片的未投遞匯出版本整份刪除、PDF 走待刪紀錄，已投遞保留並回報；`material-deletion.ts` 拆出 `deleteMaterialRows`／`finishMaterialDeletion`（`deleteMaterial` 行為不變）；`materials.ts` 加 `photo` 種類，以照片 ID 判斷
+- 匯出建立：已刪照片 ID 被已刪素材檢查與資料庫觸發器兩層拒絕；照片不是目前照片（ID 或雜湊不符）也拒絕
+- 測試：`application/photo-material.test.ts`、`application/photo-storage.test.ts` 共 18 案例（刪除、更換、更換中途失敗全不變、刪後再加同一張不被擋、孤兒清掃不碰照片、直接 SQL 刪照片由清掃補做 D19、0008→0009 升級）
+- 保守選擇：(1) 刪除與更換放 application 層、repository 不給刪除（同其他素材）；(2) 匯出照片須是目前照片，不只擋已刪；(3) 沒照片時更換＝加入、刪除不動也不記紀錄；(4) 不存縮圖（由 P1-T083 處理）
+- 規格落差：(1) Task 寫 repository 負責更換與刪除，但 D19 要刪 PDF、repository 拿不到檔案區，故放 `application/photo-material.ts`；(2) `ExportVersion.photo.sha256` 是寬鬆 `ContentHash`、`Photo.sha256` 是 `Sha256Hash`，storage 與目前照片比對所以實際等同嚴格，契約未改

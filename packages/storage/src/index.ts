@@ -29,6 +29,12 @@ export {
 } from './application/application-record-repository.ts';
 export { deleteMaterial, type MaterialDeletion } from './application/material-deletion.ts';
 export {
+  removePhoto,
+  replacePhoto,
+  type PhotoRemoval,
+  type PhotoReplacement,
+} from './application/photo-material.ts';
+export {
   OrphanPdfSweepError,
   sweepStorage,
   type StorageSweep,

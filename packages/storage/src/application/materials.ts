@@ -3,10 +3,12 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { ExportVersion } from '@rolecraft/contracts';
 
 /**
- * 「素材」＝匯出版本保存了副本的原件（R3）：履歷版本、事實項、來源文件（片段原文）、職缺快照。
+ * 「素材」＝匯出版本保存了副本的原件（R3）：履歷版本、事實項、來源文件（片段原文）、職缺快照、
+ * 照片（D28；印進 PDF 的照片，身分是照片 ID，不用雜湊）。
  * D19：刪除素材時，未投遞的匯出版本整份刪除，已投遞的保留並明示。
  */
-export type MaterialKind = 'claim' | 'source_document' | 'resume_version' | 'job_snapshot';
+export type MaterialKind =
+  'claim' | 'source_document' | 'resume_version' | 'job_snapshot' | 'photo';
 
 export interface MaterialRef {
   kind: MaterialKind;
@@ -16,7 +18,7 @@ export interface MaterialRef {
 /** 判斷副本只需要的欄位（匯出版本建立前也能檢查）。 */
 export type MaterialCopies = Pick<
   ExportVersion,
-  'citedClaims' | 'sections' | 'sourceDocumentIds' | 'resumeVersionId' | 'jobSnapshot'
+  'citedClaims' | 'sections' | 'sourceDocumentIds' | 'resumeVersionId' | 'jobSnapshot' | 'photo'
 >;
 
 /** 匯出版本是否保存了該素材的副本。 */
@@ -33,6 +35,8 @@ export function holdsCopyOf(version: MaterialCopies, ref: MaterialRef): boolean 
       return version.resumeVersionId === ref.id;
     case 'job_snapshot':
       return version.jobSnapshot.id === ref.id;
+    case 'photo':
+      return version.photo?.photoId === ref.id;
   }
 }
 

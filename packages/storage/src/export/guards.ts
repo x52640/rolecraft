@@ -21,6 +21,11 @@ export const IMMUTABILITY_TRIGGERS = [
   'source_documents_record_deleted',
   'resume_versions_record_deleted',
   'job_snapshots_record_deleted',
+  // 0009：照片素材（D19、D28）
+  'photos_no_update',
+  'photos_no_reuse_deleted_id',
+  'photos_record_deleted',
+  'export_versions_no_deleted_photo',
 ] as const;
 
 export function assertImmutabilityGuards(db: DatabaseSync): void {

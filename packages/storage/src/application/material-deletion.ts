@@ -27,12 +27,63 @@ export interface MaterialDeletion {
   releasedPdfHashes: string[];
 }
 
+/** 交易內的刪除結果：PDF 雜湊已記入待刪紀錄，提交後交給 finishMaterialDeletion 清檔。 */
+export type MaterialDeletionInTransaction = Omit<MaterialDeletion, 'releasedPdfHashes'> & {
+  pdfHashes: string[];
+};
+
 const MATERIAL_TABLES = {
   claim: 'claims',
   source_document: 'source_documents',
   resume_version: 'resume_versions',
   job_snapshot: 'job_snapshots',
+  photo: 'photos',
 } as const;
+
+/**
+ * D19 的資料列部分，必須在呼叫端的交易內：刪原件、記已刪素材、刪含其副本的未投遞匯出版本
+ * （PDF 記入待刪紀錄），已投遞的保留並回報。給 replacePhoto 在同一交易接著寫新照片用。
+ */
+export function deleteMaterialRows(
+  db: DatabaseSync,
+  ref: MaterialRef,
+): MaterialDeletionInTransaction {
+  const table = MATERIAL_TABLES[ref.kind];
+  const materialDeleted = db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(ref.id).changes > 0;
+  recordDeletedMaterial(db, ref, nowTimestamp());
+
+  const deletedExportVersionIds: string[] = [];
+  const retainedExportVersionIds: string[] = [];
+  const pdfHashes: string[] = [];
+  const rows = db.prepare('SELECT id, data FROM export_versions ORDER BY exported_at, id').all();
+  for (const row of rows) {
+    const version = decode(ExportVersion, row.data, `export_versions[${String(row.id)}]`);
+    if (!holdsCopyOf(version, ref)) continue;
+    if (isExportVersionApplied(db, version.id)) {
+      retainedExportVersionIds.push(version.id);
+    } else {
+      const pdfHash = deleteUnappliedExportVersion(db, version.id);
+      if (pdfHash !== null) pdfHashes.push(pdfHash);
+      deletedExportVersionIds.push(version.id);
+    }
+  }
+  recordPendingPdfDeletions(db, pdfHashes);
+  return { materialDeleted, deletedExportVersionIds, retainedExportVersionIds, pdfHashes };
+}
+
+/**
+ * 交易提交後只清這次釋出的 PDF；失敗的留在待刪紀錄（不拋：素材已刪，重試會變成找不到），
+ * 啟動清掃立即重試、刪不掉擋啟動（裁定 #14）。
+ */
+export function finishMaterialDeletion(
+  db: DatabaseSync,
+  fileStore: FileStore,
+  result: MaterialDeletionInTransaction,
+): MaterialDeletion {
+  const { pdfHashes, ...deletion } = result;
+  const { released } = processPendingPdfDeletions(db, fileStore, pdfHashes);
+  return { ...deletion, releasedPdfHashes: released };
+}
 
 /**
  * 刪除素材（D19）：同一交易內刪除原件、記下已刪素材、刪除含其副本的未投遞匯出版本；
@@ -49,31 +100,6 @@ export function deleteMaterial(
 ): MaterialDeletion {
   assertImmutabilityGuards(db);
   assertNotInTransaction(db, '刪除素材');
-  const result = transaction(db, () => {
-    const table = MATERIAL_TABLES[ref.kind];
-    const materialDeleted = db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(ref.id).changes > 0;
-    recordDeletedMaterial(db, ref, nowTimestamp());
-
-    const deletedExportVersionIds: string[] = [];
-    const retainedExportVersionIds: string[] = [];
-    const pdfHashes: string[] = [];
-    const rows = db.prepare('SELECT id, data FROM export_versions ORDER BY exported_at, id').all();
-    for (const row of rows) {
-      const version = decode(ExportVersion, row.data, `export_versions[${String(row.id)}]`);
-      if (!holdsCopyOf(version, ref)) continue;
-      if (isExportVersionApplied(db, version.id)) {
-        retainedExportVersionIds.push(version.id);
-      } else {
-        const pdfHash = deleteUnappliedExportVersion(db, version.id);
-        if (pdfHash !== null) pdfHashes.push(pdfHash);
-        deletedExportVersionIds.push(version.id);
-      }
-    }
-    recordPendingPdfDeletions(db, pdfHashes);
-    return { materialDeleted, deletedExportVersionIds, retainedExportVersionIds, pdfHashes };
-  });
-  // 提交後只清這次釋出的 PDF；失敗的留在待刪紀錄（不拋：素材已刪，重試會變成找不到）
-  const { pdfHashes, ...deletion } = result;
-  const { released } = processPendingPdfDeletions(db, fileStore, pdfHashes);
-  return { ...deletion, releasedPdfHashes: released };
+  const result = transaction(db, () => deleteMaterialRows(db, ref));
+  return finishMaterialDeletion(db, fileStore, result);
 }
