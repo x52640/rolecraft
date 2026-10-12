@@ -6,12 +6,16 @@
 ## 進行中
 
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本（`docs/tasks/P1-T017-spike-104-job.md`）
-- P1-T074 contracts：網頁履歷匯入、照片、個人資料讀取的橋接契約（`docs/tasks/P1-T074-web-import-contracts.md`）
-- P1-T086 editor：客製履歷段落「複製」按鈕（`docs/tasks/P1-T086-editor-section-copy.md`）
 
 ## ready
 
-- 無
+- P1-T075 extension：履歷頁區塊抽取與擷取共用流程
+- P1-T076 extension：點圖示／快捷鍵依頁型觸發與發送者驗證
+- P1-T078 pipeline：網頁區塊來源的去個資、提示與照抄檢查
+- P1-T079 helper：網頁擷取與手動輸入的匯入工作階段、確認更新唯一 Profile、profile.get
+- P1-T081 editor：匯入頁接網頁擷取與手動輸入
+- P1-T082 storage：照片保存與照片素材的 D19 刪除
+- P1-T085 editor：履歷頁的個人資料複製與照片管理
 <!-- index:end -->
 
 ## 下一步（2026-10-11 codex 補審後）

@@ -1,7 +1,7 @@
 ---
 id: P1-T082
 phase: 1
-status: blocked
+status: ready
 depends_on: ["P1-T074"]
 specs: ["resume-output.md", "architecture.md"]
 track: storage
@@ -83,6 +83,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：等 P1-T074 收官後改 ready
-- Blocker：相依 P1-T074 未完成
+- Blocker：無（相依 P1-T074 已於 2026-10-12 收官）
 
 ## 完成結果

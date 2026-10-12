@@ -1,7 +1,7 @@
 ---
 id: P1-T074
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T041", "P1-T069"]
 specs: ["bridge.md", "web-resume-capture.md", "resume-import.md", "resume-output.md", "architecture.md"]
 track: contracts
@@ -91,7 +91,7 @@ npm run verify
 - 最後完成：2026-10-12 「包含」各項已實作（未 commit，在工作者 worktree）：contracts 7 個新操作、`resume-capture.ts`、`import-shapes.ts`（草稿積木搬移、形狀不變）、`import-web.ts`、`photo.ts`、`profile.ts`、`entities/photo.ts`、`ExportVersion.photo`、`BridgeFailure.error.reason`；helper 分派表與 7 個 handler、`photo`／`profile` 服務介面；兩份 fixture；ADR-0006 #17
 - 已通過驗證：`npm run verify` 全綠（擴充 write_paths 後）
 - 協調者 2026-10-12 擴充 write_paths：加 `apps/extension/src/bridge/client.test.ts`（BRIDGE_PICKER_OPERATIONS 加 photo.pick 需同步既有測試）與 `docs/specs/bridge.md`（reason 欄位與 photo.pick busy 需寫回權威規格）
-- 下一步：收官（協調者閘門＋codex review）
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，修正 diff 的 codex review 無發現；main `npm run verify` 綠，Vitest 3811 通過）
 - Blocker：無
 
 ## 完成結果
