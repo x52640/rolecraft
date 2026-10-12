@@ -6,7 +6,7 @@ depends_on: ["P1-T058"]
 specs: ["providers.md", "bridge.md", "architecture.md"]
 track: providers
 primary_repo: rolecraft
-write_paths: ["docs/specs/providers.md", "docs/specs/bridge.md", "packages/providers/src/claude/", "packages/providers/src/index.ts", "packages/contracts/src/bridge/editor/providers.ts", "packages/contracts/src/index.ts", "apps/helper/src/handlers/providers/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "apps/editor/src/pages/settings/", "apps/editor/src/bridge/", "docs/adr/0006-contracts-interim-fields.md"]
+write_paths: ["docs/specs/providers.md", "docs/specs/bridge.md", "packages/providers/src/claude/", "packages/providers/src/index.ts", "packages/contracts/src/bridge/editor/providers.ts", "packages/contracts/src/bridge/operations.ts", "packages/contracts/src/bridge/__fixtures__/editor-requests.ts", "packages/contracts/src/index.ts", "apps/helper/src/handlers/providers/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "apps/editor/src/pages/settings/", "apps/editor/src/bridge/", "docs/adr/0006-contracts-interim-fields.md"]
 contract_change: additive
 expected_commit: "feat(P1-T062): Claude 重新驗證中斷不算失敗、失敗只綁版本、設定頁可重新啟用"
 ---
