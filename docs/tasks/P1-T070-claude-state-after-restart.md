@@ -6,7 +6,7 @@ depends_on: ["P1-T062"]
 specs: ["providers.md", "bridge.md"]
 track: providers
 primary_repo: rolecraft
-write_paths: ["docs/specs/providers.md", "packages/providers/src/claude/", "apps/helper/src/handlers/providers/", "apps/editor/src/pages/settings/"]
+write_paths: ["docs/specs/providers.md", "packages/providers/src/claude/", "apps/helper/src/handlers/providers/", "apps/editor/src/pages/settings/", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "apps/helper/src/handlers/analysis/failures.ts", "apps/helper/src/handlers/resume/failure.ts", "apps/helper/src/handlers/intro/failures.ts", "apps/helper/src/handlers/messages/"]
 contract_change: none
 expected_commit: "fix(P1-T070): helper 重開後不必手動重新檢查，使用者發起 AI 工作時自動做連線檢查"
 ---
@@ -25,6 +25,11 @@ expected_commit: "fix(P1-T070): helper 重開後不必手動重新檢查，使�
 - 設定頁打開時若尚未檢查，也自動檢查一次（同樣不呼叫模型）
 - 不在 helper 啟動、背景輪詢時呼叫模型（D24 不變）；版本閘門規則不變
 - 測試：重開後直接發起生成 → 自動檢查一次再執行；檢查不通過 → 不執行並回原因；設定頁開啟觸發一次；都不呼叫模型（假 runner 計次）
+
+- 協調者裁定（2026-10-12，worker 回報後）：
+  - `createServices` 讓測試能注入假 probe／runDeps；`main.test.ts` 等經過 `createServices` 的測試一律用假的，不得在 verify 時執行真實 `claude`（含 `--version`、`auth status`）
+  - 狀態查詢與設定頁自動檢查不呼叫模型；版本未記錄或未完成時，照 D24：使用者發起需要 Claude 的工作時才自動重跑驗證
+  - 檢查不通過時，生成端回具體原因（未登入、方案不符、CLI 版本待驗證等），不再一律回「尚未選定可用的模型」
 
 ### 不包含
 
