@@ -22,7 +22,11 @@ describe('讀取與出處', () => {
     expect(screen.getAllByText('已修改')).toHaveLength(1);
     expect(screen.getByText('（原文超過 300 字，已截斷）')).toBeTruthy();
     expect(screen.getAllByText('沒有出處原文').length).toBeGreaterThan(0);
-    const expand = button('展開出處');
+    // 每個出處都可展開（短的在窄視窗也可能被截成兩行）
+    const expands = screen.getAllByRole('button', { name: '展開出處' });
+    expect(expands).toHaveLength(screen.getAllByTestId('field-source').length);
+    const [expand] = expands;
+    if (!expand) throw new Error('應有展開按鈕');
     fireEvent.click(expand);
     expect(expand.getAttribute('aria-expanded')).toBe('true');
     expect(screen.queryByTestId('unsaved')).toBeNull();

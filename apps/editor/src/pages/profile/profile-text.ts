@@ -22,6 +22,7 @@ export const PROFILE_PAGE_TEXT = {
   notImplemented: '目前連到的本機輔助程式還不支援個人資料編輯，請更新 RoleCraft。',
   unavailable: '連不到本機輔助程式：請確認 RoleCraft 已安裝並啟動後，按「重新讀取」。',
   unsaved: '尚未儲存',
+  leave: '個人資料有尚未儲存的修改，離開這頁會捨棄這些修改。確定要離開嗎？',
   reloadWarning: '重新讀取會捨棄尚未儲存的修改。確定的話再按一次「重新讀取」。',
   reloaded: '已重新讀取已儲存的內容。',
 } as const;

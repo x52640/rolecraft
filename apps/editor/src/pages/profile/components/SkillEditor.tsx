@@ -1,4 +1,10 @@
-import { newKey, skillSource, type ProfileBase, type SkillRow } from '../profile-model.ts';
+import {
+  newKey,
+  sendValue,
+  skillSource,
+  type ProfileBase,
+  type SkillRow,
+} from '../profile-model.ts';
 import { SourceNote } from './SourceNote.tsx';
 
 interface SkillEditorProps {
@@ -35,7 +41,7 @@ export function SkillEditor({ base, rows, onChange }: SkillEditorProps) {
             <SourceNote
               source={skillSource(base, row.from)}
               added={row.from === null}
-              changed={old !== undefined && old !== null && old.trim() !== row.value.trim()}
+              changed={old !== undefined && old !== null && sendValue(row.value, old) !== old}
             />
           </div>
         );

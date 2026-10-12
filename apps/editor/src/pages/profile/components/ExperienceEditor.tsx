@@ -1,8 +1,7 @@
 import {
-  baseExperienceValue,
   emptyExperience,
+  experienceChanged,
   experienceSource,
-  experienceValue,
   type ExperienceKey,
   type ExperienceRow,
   type ProfileBase,
@@ -31,12 +30,11 @@ function Note({
   row: ExperienceRow;
   field: ExperienceKey;
 }) {
-  const old = baseExperienceValue(base, row.from, field);
   return (
     <SourceNote
       source={experienceSource(base, row.from, field)}
       added={row.from === null}
-      changed={old !== null && old !== experienceValue(row, field)}
+      changed={experienceChanged(base, row, field)}
     />
   );
 }

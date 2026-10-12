@@ -71,8 +71,14 @@ function applyUpdate(base: Profile, p: ProfileUpdatePayload): Profile {
   const infoSources: Record<string, ProfileFieldSource> = {};
   for (const row of p.personalInfo) {
     personalInfo[row.label] = row.value;
-    const moved = row.from === null ? null : s?.personalInfo[row.from];
-    const old = row.from === null ? undefined : base.personalInfo[row.from];
+    const moved =
+      row.from !== null && s && Object.hasOwn(s.personalInfo, row.from)
+        ? s.personalInfo[row.from]
+        : null;
+    const old =
+      row.from !== null && Object.hasOwn(base.personalInfo, row.from)
+        ? base.personalInfo[row.from]
+        : undefined;
     const next = mark(moved, old !== row.value);
     if (next) infoSources[row.label] = next;
   }

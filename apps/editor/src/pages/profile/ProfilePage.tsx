@@ -1,8 +1,6 @@
 import './profile-page.css';
 
-import { useEffect } from 'react';
-
-import { hrefFor } from '../../app/router.ts';
+import { hrefFor, useLeaveGuard } from '../../app/router.ts';
 import { ExperienceEditor } from './components/ExperienceEditor.tsx';
 import { InfoEditor } from './components/InfoEditor.tsx';
 import { SaveBar } from './components/SaveBar.tsx';
@@ -10,19 +8,6 @@ import { SkillEditor } from './components/SkillEditor.tsx';
 import { isDirty, unmatchedExperiences } from './profile-model.ts';
 import { PROFILE_PAGE_TEXT } from './profile-text.ts';
 import { useProfileEditor } from './useProfileEditor.ts';
-
-/** 有未存修改時，關閉或重新整理分頁前請瀏覽器先確認。 */
-function useLeaveGuard(active: boolean) {
-  useEffect(() => {
-    if (!active) return undefined;
-    const guard = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', guard);
-    return () => window.removeEventListener('beforeunload', guard);
-  }, [active]);
-}
 
 /**
  * 個人資料頁（D30；resume-import「個人資料編輯（D30）」）：唯一那份已確認 Profile 的逐欄修改、刪除、新增，
@@ -34,7 +19,8 @@ export function ProfilePage() {
   const ready = view.kind === 'ready' && form !== null ? { base: view.base, form } : null;
   const dirty = ready !== null && isDirty(ready.base, ready.form);
   const locked = s.busy !== null;
-  useLeaveGuard(dirty);
+  // 有未存修改時，站內換頁、關閉或重新整理分頁前先確認
+  useLeaveGuard(dirty ? PROFILE_PAGE_TEXT.leave : null);
 
   return (
     <section aria-labelledby="page-title" className="pf-page">

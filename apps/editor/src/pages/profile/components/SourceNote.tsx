@@ -4,9 +4,6 @@ import type { Source } from '../profile-model.ts';
 
 const KIND_TEXT = { web: '網頁', pdf: 'PDF' } as const;
 
-/** 超過這個長度或有換行才提供展開（預設最多顯示兩行）。 */
-const LONG = 40;
-
 interface SourceNoteProps {
   /** 基準的出處；沒有出處為 null */
   source: Source;
@@ -30,7 +27,6 @@ export function SourceNote({ source, added, changed }: SourceNoteProps) {
     );
   }
   const modified = changed || source?.modified === true;
-  const long = source !== null && (source.text.length > LONG || source.text.includes('\n'));
   return (
     <span className="pf-source">
       {modified ? <span className="pf-tag pf-tag-modified">已修改</span> : null}
@@ -47,16 +43,15 @@ export function SourceNote({ source, added, changed }: SourceNoteProps) {
           {source.truncated ? (
             <span className="pf-source-cut">（原文超過 300 字，已截斷）</span>
           ) : null}
-          {long ? (
-            <button
-              type="button"
-              className="pf-link"
-              aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
-            >
-              {open ? '收合出處' : '展開出處'}
-            </button>
-          ) : null}
+          {/* 一律可展開：會不會被兩行截斷取決於視窗寬度，不能用字數判斷 */}
+          <button
+            type="button"
+            className="pf-link"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? '收合出處' : '展開出處'}
+          </button>
         </>
       )}
     </span>

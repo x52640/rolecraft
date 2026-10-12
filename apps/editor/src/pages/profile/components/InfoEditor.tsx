@@ -1,4 +1,11 @@
-import { infoSource, newKey, type InfoRow, type ProfileBase } from '../profile-model.ts';
+import {
+  baseInfoValue,
+  infoSource,
+  newKey,
+  sendValue,
+  type InfoRow,
+  type ProfileBase,
+} from '../profile-model.ts';
 import { SourceNote } from './SourceNote.tsx';
 
 interface InfoEditorProps {
@@ -10,8 +17,8 @@ interface InfoEditorProps {
 /** 這一列跟基準比有沒有改（欄位名或值）。 */
 function rowChanged(base: ProfileBase, row: InfoRow): boolean {
   if (row.from === null) return false;
-  const old = base.profile.personalInfo[row.from];
-  return row.label.trim() !== row.from || row.value.trim() !== (old ?? '').trim();
+  const old = baseInfoValue(base, row.from);
+  return sendValue(row.label, row.from) !== row.from || sendValue(row.value, old) !== old;
 }
 
 /** 基本資料（personalInfo 各列，含「學歷」列）：逐列改欄位名與值、刪除、新增。 */
@@ -30,8 +37,10 @@ export function InfoEditor({ base, rows, onChange }: InfoEditorProps) {
               value={row.label}
               onChange={(e) => replace(i, { ...row, label: e.target.value })}
             />
-            <input
+            {/* 學歷等值可能有多行：用 textarea 保留換行（單行 input 會吃掉換行並寫回） */}
+            <textarea
               aria-label={`基本資料 ${n} 內容`}
+              rows={Math.min(6, row.value.split('\n').length)}
               value={row.value}
               onChange={(e) => replace(i, { ...row, value: e.target.value })}
             />

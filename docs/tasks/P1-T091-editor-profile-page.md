@@ -6,7 +6,7 @@ depends_on: ["P1-T090"]
 specs: ["resume-import.md", "bridge.md"]
 track: editor
 primary_repo: rolecraft
-write_paths: ["apps/editor/src/pages/profile/", "apps/editor/src/app/routes.ts", "apps/editor/src/app/App.test.ts"]
+write_paths: ["apps/editor/src/pages/profile/", "apps/editor/src/app/routes.ts", "apps/editor/src/app/App.test.ts", "apps/editor/src/app/router.ts", "apps/editor/src/app/router.test.ts", "apps/editor/src/app/App.tsx"]
 contract_change: none
 expected_commit: "feat(P1-T091): editor：個人資料頁（逐欄修改、刪除、新增，顯示出處）"
 ---
@@ -84,10 +84,16 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：個人資料頁實作＋測試（worker，2026-10-13）
-- 已通過驗證：`npm run verify` 綠（worktree）
-- 下一步：協調者合併、範圍稽核、對抗驗證（E3）與 codex review、手動驗證（開發入口匯入後改一欄、刪一段經歷、加一個技能，重新整理一致）後收官
+- 最後完成：審查項修正（worker，2026-10-13）
+- 已通過驗證：見完成結果
+- 下一步：協調者合併、範圍稽核、收官
 - Blocker：無
+- 審查待修（codex＋worker 殘餘，協調者 2026-10-13 指派，另一個 commit）：
+  1. 基本資料值用單行 input，學歷等多行值的換行被吃掉並寫回 → 改 textarea
+  2. 出處以標籤查找沒用 `Object.hasOwn`：標籤 `constructor`／`toString` 取到繼承成員，頁面當掉
+  3. 出處依字數決定能否展開：窄視窗少於 41 字也會被截成兩行而無法展開 → 一律可展開
+  4. 有未存修改時從導覽列切頁不攔 → 通用「離開前確認」，個人資料頁註冊
+  5. 單行欄位一律修剪頭尾空白，未動的欄位也被改寫並標「已修改」→ 只修剪使用者改過的欄位
 
 ## 完成結果
 
@@ -99,4 +105,10 @@ npm run verify
 - `profile_conflict`：顯示固定訊息、重新讀取、未存修改捨棄、不重送（D30 (c)）；`profile_missing` 重讀後導向匯入；`multiple_profiles` 轉為不讀不寫；其他失敗顯示原因、保留畫面修改。
 - 競態：比照 useIntro／useBlockLock，單一請求鎖（請求中表單 fieldset 與按鈕鎖住、輸入不套用）、每操作 token（卸載或 StrictMode 重跑作廢）；有未存修改時「重新讀取」要再按一次、關閉／重新整理分頁觸發 beforeunload 確認。
 - 新測試：`profile-model.test.ts`、`ProfilePage.test.ts`、`ProfilePage.conflict.test.ts`（StrictMode＋記憶體假 bridge，合成資料）。
-- 殘餘：站內切換導覽（hash 換頁）有未存修改時不攔、直接捨棄——攔截要改 `app/router.ts`／`App.tsx`，不在 write_paths；單行欄位送出前去頭尾空白，若基準值本身帶頭尾空白，存其他欄時該欄也會被寫成去空白值並被 helper 判為「已修改」。
+- 審查項修正（第二個 commit，先在 `ProfilePage.review.test.ts`、`router.test.ts`、`profile-model.test.ts` 寫測試重現，舊程式 5 項全紅）：
+  1. 基本資料值改 textarea，多行（學歷）換行保留、原樣送回。
+  2. 出處與基準值以標籤查找改走 `Object.hasOwn`，`constructor`／`toString` 標籤不再取到繼承成員。
+  3. 出處一律可展開（是否被兩行截斷取決於視窗寬度，不再用字數判斷）。
+  4. `app/router.ts` 加通用「離開前確認」`useLeaveGuard(message)`：有註冊時站內換頁（導覽列、頁內連結、上一頁）先 `confirm`，不確認就把 hash 換回原頁（replaceState，不新增歷史）、畫面不動；同時處理 beforeunload。只有註冊的頁面受影響；個人資料頁有未存修改時註冊。`App.tsx` 不需改。
+  5. 只修剪使用者改過的欄位：與基準完全相同的值原樣送回（`sendValue`），「已修改」、對不到經歷、驗證都以要送出的值判斷。
+- 殘餘：被擋下的「上一頁」會以 replaceState 把該筆歷史改回本頁網址（歷史少一筆往回的目標）；離開確認用瀏覽器原生 `confirm` 對話框。

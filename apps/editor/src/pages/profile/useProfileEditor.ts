@@ -138,7 +138,7 @@ export function useProfileEditor() {
     const shown = viewRef.current;
     const sent = formRef.current;
     if (shown.kind !== 'ready' || sent === null || busyRef.current !== null) return;
-    const problem = validate(sent);
+    const problem = validate(sent, shown.base);
     if (problem) {
       setNotice(null);
       setFailure(problem);
@@ -146,7 +146,7 @@ export function useProfileEditor() {
     }
     const token = begin('saving');
     if (token === null) return;
-    const payload = toPayload(sent, shown.base.version);
+    const payload = toPayload(sent, shown.base);
     const res = await bridge.send({ op: 'profile.update', payload });
     if (!current(token)) return;
     if (res.ok) {
