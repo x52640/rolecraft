@@ -12,10 +12,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { exportTestbed, VERSION_ID } from './__fixtures__/testbed.ts';
 import { createExportService } from './export-service.ts';
 
-const FIXTURE_FONTS = path.resolve(
+const FIXTURES = path.resolve(
   import.meta.dirname,
-  '../../../../../packages/pdf-export/src/__fixtures__/fonts',
+  '../../../../../packages/pdf-export/src/__fixtures__',
 );
+const FIXTURE_FONTS = path.join(FIXTURES, 'fonts');
 
 const fonts = (): Promise<FontSet> =>
   Promise.resolve({
@@ -49,5 +50,27 @@ describe.runIf(process.env.RUN_CHROME === '1')('匯出接線＋Chrome 列印（R
     const version = await service.getVersion({ exportVersionId: id });
     if (!version.ok) throw new Error('應有版本');
     expect(createHash('sha256').update(pdf).digest('hex')).toBe(version.version.pdfHash);
+  }, 60_000);
+
+  it('有目前照片（D28）：含照版 PDF 通過檢查、內嵌 JPEG，匯出版本記照片 ID 與雜湊', async () => {
+    const bed = exportTestbed({ loadFonts: fonts });
+    cleanups.push(bed.cleanup);
+    const content = new Uint8Array(readFileSync(path.join(FIXTURES, 'photo.jpg')));
+    const stored = bed.runtime.repos.photos.add({
+      format: 'jpeg',
+      width: 90,
+      height: 120,
+      content,
+    });
+    const service = createExportService(bed.runtime);
+    const created = await service.create({ resumeVersionId: VERSION_ID });
+    if (!created.ok || created.outcome.status !== 'exported') {
+      throw new Error(`應匯出：${JSON.stringify(created)}`);
+    }
+    const version = bed.runtime.exports.get(created.outcome.exportVersionId);
+    if (version === null) throw new Error('應有版本');
+    expect(version.photo).toEqual({ photoId: stored.photo.id, sha256: stored.photo.sha256 });
+    const pdf = new TextDecoder('latin1').decode(bed.runtime.exports.readPdf(version));
+    expect(pdf.match(/\/DCTDecode/gu)).toHaveLength(1);
   }, 60_000);
 });

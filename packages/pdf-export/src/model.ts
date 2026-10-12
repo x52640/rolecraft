@@ -34,6 +34,14 @@ export interface TemplateSection {
   readonly items: readonly TemplateItem[];
 }
 
+/**
+ * 頁首照片（D28，選填）：JPEG 的 data URI（CSP 只允許 data: 圖片）。
+ * 只印圖、不印任何文字（沒有 alt），所以不影響匯出後的逐字比對。
+ */
+export interface TemplatePhoto {
+  readonly dataUri: string;
+}
+
 /** 一份要匯出的履歷。 */
 export interface ResumeDocument {
   /** 姓名（頁首大字） */
@@ -42,6 +50,8 @@ export interface ResumeDocument {
   readonly headline?: string;
   readonly contacts: readonly ContactItem[];
   readonly sections: readonly TemplateSection[];
+  /** 沒有照片時省略，版面與加照片前完全相同 */
+  readonly photo?: TemplatePhoto;
 }
 
 /** 允許的連結協定。javascript:、file: 等一律拒絕。 */
@@ -51,10 +61,16 @@ const SAFE_HREF = /^(https?:\/\/[^\s]+|mailto:[^\s]+)$/iu;
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/u;
 
+/**
+ * 照片只收 JPEG（storage 存的一律是重新編碼後的 JPEG）：標準 base64，且開頭必須是 JPEG 的
+ * SOI＋marker（FF D8 FF → base64 「/9j/」）。其他格式、SVG、帶參數的 data URI 一律拒絕。
+ */
+const JPEG_DATA_URI = /^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]*={0,2}$/u;
+
 export interface DocumentProblem {
   /** 出問題的欄位位置，例如 sections[1].items[0].text */
   readonly path: string;
-  readonly reason: 'empty' | 'control_char' | 'unsafe_href';
+  readonly reason: 'empty' | 'control_char' | 'unsafe_href' | 'unsafe_photo';
 }
 
 /** 匯出前的結構檢查；回傳空陣列才可匯出。 */
@@ -69,6 +85,9 @@ export function validateDocument(doc: ResumeDocument): DocumentProblem[] {
   };
 
   text(doc.name, 'name');
+  if (doc.photo !== undefined && !isJpegDataUri(doc.photo.dataUri)) {
+    problems.push({ path: 'photo.dataUri', reason: 'unsafe_photo' });
+  }
   if (doc.headline !== undefined) text(doc.headline, 'headline');
   doc.contacts.forEach((c, i) => {
     text(c.text, `contacts[${i}].text`);
@@ -97,6 +116,13 @@ export function validateDocument(doc: ResumeDocument): DocumentProblem[] {
     });
   });
   return problems;
+}
+
+/** 照片 data URI 是否為合法 JPEG（base64 長度須為 4 的倍數）。 */
+export function isJpegDataUri(value: string): boolean {
+  if (!JPEG_DATA_URI.test(value)) return false;
+  const payload = value.slice(value.indexOf(',') + 1);
+  return payload.length % 4 === 0;
 }
 
 /** 文件中所有連結網址（去重、保持出現順序）。 */

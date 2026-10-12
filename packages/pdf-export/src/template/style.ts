@@ -47,6 +47,9 @@ h1 { font-size: 20pt; font-weight: 700; line-height: 1.25; }
 .contacts { list-style: none; display: flex; flex-wrap: wrap; margin-top: 4pt; font-size: 9.5pt; }
 .contacts li { padding: 0 8pt; border-left: 0.6pt solid #888; }
 .contacts li:first-child { padding-left: 0; border-left: none; }
+header.with-photo { display: flex; align-items: flex-start; gap: 12pt; }
+.header-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.photo { flex: none; display: block; width: 26mm; height: auto; max-height: 34mm; object-fit: contain; }
 section { margin-top: 9pt; }
 h2 {
   font-size: 12.5pt; font-weight: 700;

@@ -1,7 +1,7 @@
 ---
 id: P1-T084
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T082"]
 specs: ["resume-output.md"]
 track: pdf-export
@@ -77,9 +77,19 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等 P1-T082 收官後改 ready
-- Blocker：無（相依已於 2026-10-12 收官）
+- 最後完成：2026-10-12 worker 實作完成（pdf-export 頁首照片、helper 匯出帶照片並記照片 ID／雜湊、照片不送模型守門測試）
+- 已通過驗證：`npm run verify` 綠（Vitest 4039 通過、15 略過）；`RUN_CHROME=1` 跑 pdf-export 與 helper 匯出測試全過（含照版 1 頁、inspect 無問題）
+- 下一步：協調者收官（範圍稽核、目視確認含照版、codex review）
+- Blocker：無
 
 ## 完成結果
+
+- pdf-export `model.ts`：`ResumeDocument.photo?: TemplatePhoto`（`dataUri`）；`validateDocument` 加 `unsafe_photo`，只收 `data:image/jpeg;base64,` 且開頭為 JPEG SOI（`/9j/`）、標準 base64；新增 `isJpegDataUri`。未改 `index.ts`（`TemplatePhoto` 未從套件入口匯出，helper 用 `ResumeDocument['photo']`）
+- `template/html.ts`：`header()`，沒有照片時輸出與原本逐字相同；有照片時 `<header class="with-photo">` 內文字欄＋`<img class="photo" alt="">`（照片排在全部頁首文字之後，PDF 文字順序不變）。`template/style.ts`：flex 並排、不用 position；照片 `flex: none`、寬 26mm、最高 34mm；文字欄 `min-width: 0`＋`overflow-wrap: anywhere`，縮窄換行不會被照片蓋住
+- helper `handlers/export/photo.ts`：`readExportPhoto` 讀一次目前照片，自行重算 SHA-256 與存的雜湊比對（不符就不匯出），產出印出用 data URI 與記錄用 `{ photoId, sha256 }`；`export-create.ts`：`ExportCreateDeps.repos` 加 `photos`，文件帶照片、`exports.create` 帶 `photo`（同一份內容）；匯出途中照片被更換／刪除時由 storage 的目前照片比對拒絕，回「無法建立匯出版本」
+- 照片不送模型：`export-photo.test.ts` 靜態掃描組模型輸入的程式（helper resume／intro／analysis／import／messages、pipeline、providers、resume-import 非測試原始碼）不得出現 photo
+- 測試：`model.test.ts`（合成照片通過、10 種非 JPEG data URI 被擋）、`template.test.ts`（無照版頁首不變、含照版一張圖排在頁首文字後、文字與順序不變、CSS 照片欄固定寬）、`export-photo.test.ts` 7 案例（無照／有照記 ID 與雜湊、刪照片連帶刪含照未投遞版本、匯出途中更換／刪除不建版本、雜湊不符不匯出、不送模型）、兩個 `export.chrome.test.ts` 各加含照版（RUN_CHROME=1：inspect 無問題、1 頁、文字與無照版相同、PDF 內恰一個 DCTDecode 圖、匯出版本記照片）
+- 合成照片：`__fixtures__/photo.jpg`（程式畫的 90×120 色塊，已去 APP1～APP15 區段）、`__fixtures__/photo.ts`
+- 保守選擇：(1) 只收 JPEG（storage 只存 JPEG）；(2) helper 另外驗雜湊，不只信 storage；(3) 照片放右上、尺寸固定，不做版面選項
+- 人眼確認：`RUN_CHROME=1 PHOTO_PDF_OUT=<路徑> npx vitest run packages/pdf-export/src/export.chrome.test.ts -t 含照版` 會寫出含照版 PDF；worker 已轉圖目視一次：照片在右上、沒有蓋到文字，協調者需再確認（W17）
+- 殘餘：照片與文字不重疊目前靠 CSS 與目視，`inspect` 沒有圖片／文字重疊檢查；「不送模型」是原始碼靜態掃描，不是執行期攔截

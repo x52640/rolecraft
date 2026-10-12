@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { fixturePhoto } from './__fixtures__/photo.ts';
 import { SAMPLE_DOCUMENT } from './__fixtures__/sample-document.ts';
-import { collectHrefs, validateDocument, type ResumeDocument } from './model.ts';
+import { collectHrefs, isJpegDataUri, validateDocument, type ResumeDocument } from './model.ts';
 
 const base: ResumeDocument = {
   name: '王大明',
@@ -61,6 +62,35 @@ describe('validateDocument', () => {
       expect(validateDocument({ ...base, contacts: [{ text: 'x', href }] })).toEqual([]);
     },
   );
+});
+
+describe('validateDocument：照片（D28）', () => {
+  it('合成 JPEG 照片通過；沒有照片也通過', () => {
+    expect(validateDocument({ ...base, photo: fixturePhoto() })).toEqual([]);
+    expect(validateDocument(base)).toEqual([]);
+  });
+
+  it.each([
+    'data:image/png;base64,iVBORw0KGgo=',
+    'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+    'data:image/jpeg,/9j/AAAA',
+    'data:image/jpeg;charset=x;base64,/9j/AAAA',
+    'data:image/jpeg;base64,AAAA',
+    'data:image/jpeg;base64,/9j/AAA',
+    'data:image/jpeg;base64,/9j/AA AA',
+    'data:image/jpeg;base64,/9j/AAAA"><script>',
+    'https://example.com/me.jpg',
+    '',
+  ])('擋不是 JPEG data URI 的照片 %s', (dataUri) => {
+    expect(validateDocument({ ...base, photo: { dataUri } })).toEqual([
+      { path: 'photo.dataUri', reason: 'unsafe_photo' },
+    ]);
+  });
+
+  it('isJpegDataUri', () => {
+    expect(isJpegDataUri(fixturePhoto().dataUri)).toBe(true);
+    expect(isJpegDataUri('data:image/jpeg;base64,/9j/4A==')).toBe(true);
+  });
 });
 
 describe('collectHrefs', () => {

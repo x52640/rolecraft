@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { fixturePhoto } from '../__fixtures__/photo.ts';
 import { SAMPLE_DOCUMENT } from '../__fixtures__/sample-document.ts';
 import type { ResumeDocument } from '../model.ts';
 
@@ -40,6 +41,47 @@ describe('buildHtml', () => {
       expect(at, text).toBeGreaterThanOrEqual(cursor);
       cursor = at;
     }
+  });
+});
+
+describe('buildHtml：頁首照片（D28）', () => {
+  const photo = fixturePhoto();
+  const withPhoto: ResumeDocument = { ...SAMPLE_DOCUMENT, photo };
+
+  it('沒有照片：頁首與加照片前相同，沒有任何圖片', () => {
+    const html = buildHtml(SAMPLE_DOCUMENT, []);
+    expect(html).toContain('<header><h1>林小堃</h1><p class="headline">');
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('class="with-photo"');
+  });
+
+  it('有照片：頁首放一張 data: 圖片，排在所有頁首文字之後、alt 為空', () => {
+    const html = buildHtml(withPhoto, []);
+    expect(html.match(/<img /gu)).toHaveLength(1);
+    expect(html).toContain(`<img class="photo" src="${photo.dataUri}" alt="">`);
+    expect(html).toContain('img-src data:');
+    const headerEnd = html.indexOf('</header>');
+    const img = html.indexOf('<img');
+    expect(img).toBeLessThan(headerEnd);
+    expect(img).toBeGreaterThan(html.indexOf(escapeHtml('臺北市')));
+  });
+
+  it('有照片：印出的文字與順序不變', () => {
+    expect(printedTexts(withPhoto)).toEqual(printedTexts(SAMPLE_DOCUMENT));
+    const html = buildHtml(withPhoto, []);
+    let cursor = 0;
+    for (const text of printedTexts(withPhoto)) {
+      const at = html.indexOf(escapeHtml(text), cursor);
+      expect(at, text).toBeGreaterThanOrEqual(cursor);
+      cursor = at;
+    }
+  });
+
+  it('照片欄固定寬、不縮；文字欄可縮窄換行（不會被照片蓋住）', () => {
+    expect(TEMPLATE_CSS).toMatch(/\.photo \{ flex: none;[^}]*width: 26mm;[^}]*max-height: 34mm;/u);
+    expect(TEMPLATE_CSS).toMatch(
+      /\.header-text \{[^}]*min-width: 0;[^}]*overflow-wrap: anywhere;/u,
+    );
   });
 });
 

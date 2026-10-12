@@ -1,6 +1,6 @@
 /**
  * ResumeDocument → 完整 HTML。內容一律跳脫；頁面以 CSP 禁止腳本與任何網路載入，
- * 只允許 data: 字型（字型由呼叫端先裁切後內嵌）。
+ * 只允許 data: 字型（字型由呼叫端先裁切後內嵌）與 data: 圖片（頁首照片，D28）。
  */
 import type { ContactItem, ResumeDocument, TemplateItem } from '../model.ts';
 
@@ -43,6 +43,20 @@ function item(i: TemplateItem): string {
   }
 }
 
+/**
+ * 頁首：沒有照片時與加照片前的輸出逐字相同。有照片時文字欄與照片並排（flex，不用 position），
+ * 照片排在文字之後、alt 為空，PDF 內的文字順序與內容不變；文字欄會縮窄換行，不會被照片蓋住。
+ * dataUri 已由 validateDocument 限制為 JPEG data URI；這裡仍跳脫。
+ */
+function header(doc: ResumeDocument, headline: string, contacts: string): string {
+  const text = `<h1>${escapeHtml(doc.name)}</h1>${headline}${contacts}`;
+  if (doc.photo === undefined) return `<header>${text}</header>`;
+  return (
+    `<header class="with-photo"><div class="header-text">${text}</div>` +
+    `<img class="photo" src="${escapeHtml(doc.photo.dataUri)}" alt=""></header>`
+  );
+}
+
 const CSP = "default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:";
 
 export function buildHtml(doc: ResumeDocument, fonts: readonly FontFaceSource[]): string {
@@ -70,7 +84,7 @@ ${TEMPLATE_CSS}
 </style>
 </head>
 <body>
-<header><h1>${escapeHtml(doc.name)}</h1>${headline}${contacts}</header>
+${header(doc, headline, contacts)}
 ${sections}
 </body>
 </html>`;

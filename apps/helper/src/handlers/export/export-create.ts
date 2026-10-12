@@ -2,6 +2,7 @@
 // 讀一次履歷版本 → 凍結成快照 → 對快照跑 R1 → 用「同一份快照」組文件 → 匯出 PDF → 建立不可變匯出版本。
 // 快照之後不再讀資料庫裡的履歷版本，所以檢查後就算版本被改，印出的也只會是檢查過的內容。
 // 匯出不等於投遞（R3）；這裡不建立任何投遞紀錄。
+// 有目前照片時（D28）同時讀一次照片：印進 PDF 的與匯出版本記的照片 ID、雜湊是同一份。
 import type {
   BridgeErrorCode,
   BridgeFailure,
@@ -26,9 +27,13 @@ import { StorageError, type ExportVersionRepository, type Repositories } from '@
 import { sectionBlockers } from '../resume/readiness.ts';
 import { buildResumeDocument, type DocumentProblem } from './document.ts';
 import { fitsChunkLimit } from './chunks.ts';
+import { readExportPhoto } from './photo.ts';
 
 export interface ExportCreateDeps {
-  readonly repos: Pick<Repositories, 'profiles' | 'claims' | 'jobSnapshots' | 'resumeVersions'>;
+  readonly repos: Pick<
+    Repositories,
+    'profiles' | 'claims' | 'jobSnapshots' | 'resumeVersions' | 'photos'
+  >;
   readonly exports: Pick<ExportVersionRepository, 'create'>;
   /** 隨附字型（安裝時放在固定資料夾，見 services/runtime.ts） */
   readonly loadFonts: () => Promise<FontSet>;
@@ -123,11 +128,15 @@ export async function createExport(
 
   const built = buildResumeDocument(profile, version.sections);
   if (!built.ok) return fail('invalid_request', DOCUMENT_MESSAGES[built.problem.reason]);
+  const photo = readExportPhoto(deps.repos.photos);
+  if (!photo.ok) return fail('internal_error', '照片內容與紀錄不符，無法匯出');
+  const document =
+    photo.photo === null ? built.document : { ...built.document, photo: photo.photo.document };
 
   let outcome: PdfExportOutcome;
   try {
     const fonts = await deps.loadFonts();
-    outcome = await (deps.exportPdf ?? exportResumePdf)({ r1, document: built.document, fonts });
+    outcome = await (deps.exportPdf ?? exportResumePdf)({ r1, document, fonts });
   } catch (error) {
     return pdfFailure(error);
   }
@@ -147,12 +156,13 @@ export async function createExport(
         sections: [...built.printedSections],
         citedClaims: claims.filter((c) => printedIds.has(c.id)).map(copyOf),
         jobSnapshot,
+        ...(photo.photo !== null && { photo: photo.photo.record }),
       },
       outcome.pdf,
     );
     return { ok: true, outcome: { status: 'exported', exportVersionId: created.id } };
   } catch (error) {
-    // 例：內容含使用者已刪除的素材（D19），storage 拒絕建立
+    // 例：內容含使用者已刪除的素材（D19）、照片在匯出途中被更換或刪除，storage 拒絕建立
     if (error instanceof StorageError) return fail('internal_error', '無法建立匯出版本');
     throw error;
   }

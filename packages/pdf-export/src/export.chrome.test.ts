@@ -2,9 +2,12 @@
  * 真的用本機 Chrome 列印的整合測試，只在 RUN_CHROME=1 時跑（需要 Google Chrome）。
  * 字型用 __fixtures__/fonts 的小子集。
  */
+import { writeFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { loadFixtureFonts } from './__fixtures__/fonts.ts';
+import { fixturePhoto } from './__fixtures__/photo.ts';
 import { SAMPLE_DOCUMENT } from './__fixtures__/sample-document.ts';
 import { exportResumePdf } from './export.ts';
 import { describeFont } from './fonts/font-set.ts';
@@ -64,6 +67,27 @@ describe.runIf(process.env.RUN_CHROME === '1')('Chrome 列印（RUN_CHROME=1）'
       expect(text).not.toMatch(/[⼀-⿟]/u); // 沒有康熙部首
       if (!outcome.ok) return;
       expect(new TextDecoder('latin1').decode(outcome.pdf.slice(0, 5))).toBe('%PDF-');
+    },
+    TIMEOUT,
+  );
+
+  it(
+    '含照版（D28）：檢查照舊通過、文字與不含照版相同、PDF 內有圖片',
+    async () => {
+      const doc: ResumeDocument = { ...SAMPLE_DOCUMENT, photo: fixturePhoto() };
+      const outcome = await exportResumePdf({ r1: PASSED, document: doc, fonts });
+      const plain = await exportResumePdf({ r1: PASSED, document: SAMPLE_DOCUMENT, fonts });
+      expect(outcome.report.issues).toEqual([]);
+      expect(outcome.report.pageCount).toBe(1);
+      expect(outcome.report.extractedText).toBe(plain.report.extractedText);
+      if (!outcome.ok || !plain.ok) throw new Error('應匯出');
+      // 人眼確認用（W17：inspect 不檢查圖片）：PHOTO_PDF_OUT=<路徑> 時寫出含照版 PDF
+      const out = process.env.PHOTO_PDF_OUT;
+      if (out !== undefined && out !== '') writeFileSync(out, outcome.pdf);
+      const raw = new TextDecoder('latin1').decode(outcome.pdf);
+      // 條列點（CSS 漸層）也會變成圖片，所以以 JPEG 原樣內嵌（DCTDecode）辨認照片
+      expect(raw.match(/\/DCTDecode/gu)).toHaveLength(1);
+      expect(new TextDecoder('latin1').decode(plain.pdf)).not.toMatch(/\/DCTDecode/u);
     },
     TIMEOUT,
   );
