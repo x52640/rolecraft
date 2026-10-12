@@ -95,4 +95,5 @@ RUN_CHROME=1 npx vitest run apps/extension/src/sites/104/resume
 - 104 清單：`src/sites/104/resume/ui-noise.ts`，由 `config.ts` 帶入（registry 不動）。選擇器 `button`；完全相等 6 項（查看／解鎖薪資競爭力、測你的中文能力、求職門檻多益700你有嗎？免費測、免費職場能力檢測、前往查看）；標題提示 2 項。單字按鈕不登記成完全相等（職稱可能就是「編輯」）。
 - 真實 Chrome：過濾前 214 → 過濾後 188 區塊（丟 26：按鈕組合 14、推廣連結 8、前往查看 4；2 個標題移除提示）；其餘非標題區塊與過濾前依序相同；「更多」收合區個資過濾前後皆 0 筆、`nameText` 相同。
 - 測試：`resume/noise.test.ts`（合成 DOM 12 案例）；`104/resume/fixture.chrome.test.ts` 加過濾前對照組。
-- 殘餘：未跑對抗驗證與 codex review（交協調者收官）；fixture 只有預設版型，其他版型或 104 改版的按鈕／連結字樣要再登記；表單 label 若被登記成雜訊、而控制項在雜訊外，控制項仍會帶該 label 文字（104 本文沒有表單，未處理）。
+- codex 1 項（已修）：配對的表單控制項繞過選擇器過濾（label 包著登記為雜訊的 input 仍輸出標籤＋值）。改為配對探索也套用雜訊判定（`dom.ts` `findPairs`）：控制項或它的 label 在雜訊元素內就整對不讀（值與 label 文字都不出）；在雜訊內的 dt 不當標籤、切斷配對；label／dt 的標籤文字不含其中的雜訊元素文字。`noise.test.ts` 加 4 案例（修正前重現失敗）。姓名元素文字不套過濾。
+- 殘餘：fixture 只有預設版型，其他版型或 104 改版的按鈕／連結字樣要再登記。

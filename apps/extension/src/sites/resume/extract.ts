@@ -1,6 +1,6 @@
 import { RESUME_BLOCK_MAX_LEVEL } from '@rolecraft/contracts';
 
-import { controlValue, findPairs, isControl, type Pairs } from './dom.ts';
+import { controlValue, findPairs, isControl, type NoiseMatcher, type Pairs } from './dom.ts';
 import { isChildRendered, isSkipped, renderedChildNodes, scopedOracle, textOf } from './render.ts';
 import { joinLines, splitLines } from './text.ts';
 import type { RenderOracle, ResumeBlock } from './types.ts';
@@ -22,7 +22,7 @@ interface Ctx {
   root: Element;
   pairs: Pairs;
   /** 站台登記的介面元素（區塊抽取規則 7）：整棵不讀 */
-  isNoise: ((el: Element) => boolean) | null;
+  isNoise: NoiseMatcher;
 }
 
 const PARAGRAPH: Shape = { kind: 'paragraph', level: null, label: null };
@@ -96,6 +96,7 @@ function pairBlocks(label: string, control: Element, ctx: Ctx): ResumeBlock[] {
 
 /** 表單控制項與 label：配成對的在 label（包住控制項時）或控制項的位置出一次。 */
 function scanFormPart(el: Element, ctx: Ctx, out: Item[]): boolean {
+  if (ctx.pairs.noisePairs.has(el)) return true;
   const pairedControl = ctx.pairs.labelControls.get(el);
   if (pairedControl) {
     if (el.contains(pairedControl)) {
@@ -189,10 +190,10 @@ function rowBlocks(tr: Element, ctx: Ctx): ResumeBlock[] {
 export function extractBlocks(
   root: Element,
   base: RenderOracle,
-  isNoise: ((el: Element) => boolean) | null = null,
+  isNoise: NoiseMatcher = null,
 ): ResumeBlock[] {
   const oracle = scopedOracle(base);
-  const ctx: Ctx = { oracle, root, pairs: findPairs(root, oracle), isNoise };
+  const ctx: Ctx = { oracle, root, pairs: findPairs(root, oracle, isNoise), isNoise };
   const items: Item[] = [];
   scanElement(root, ctx, 'paragraph', items);
   return flush(items, PARAGRAPH);
