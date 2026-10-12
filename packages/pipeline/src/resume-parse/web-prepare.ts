@@ -48,9 +48,12 @@ export function prepareWebResumeParse(
 ): PrepareWebResumeParseResult {
   const split = splitWebBlocks(inputs.blocks);
   const pageNames = filled(inputs.pageNames);
-  const recognized = pageNames.length > 0 || split.labeledNames.length > 0;
   const confirmed = filled(inputs.confirmedNames);
-  if (!recognized && confirmed.length === 0) return { ok: false, reason: 'name_unconfirmed' };
+  // 只有 2 字以上的姓名遮得到（redact.ts），單字姓名不算辨識或確認（複審 1）
+  const maskable = (names: readonly string[]) =>
+    names.some((n) => [...normalizeForMatch(n)].length >= 2);
+  const recognized = maskable(pageNames) || split.labeledNames.length > 0;
+  if (!recognized && !maskable(confirmed)) return { ok: false, reason: 'name_unconfirmed' };
 
   const names = knownNames(
     [...split.labeledNames, ...pageNames, ...confirmed, ...filled(inputs.profileNames)],

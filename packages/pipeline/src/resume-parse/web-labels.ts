@@ -25,7 +25,9 @@ export function labelOf(
   if (block.label !== null) {
     if (isPersonalBlockLabel(block.label)) return { label: block.label.trim(), value: block.text };
     const inner = personalLabelLine(block.text);
-    return inner ? { label: inner.label, value: block.text } : null;
+    // 預填與遮蔽用內層的值（「姓名：林雨晴」→ 林雨晴；複審 2）；內層值空白時整塊當值
+    if (!inner) return null;
+    return { label: inner.label, value: inner.value === '' ? block.text : inner.value };
   }
   return labelsOnly ? null : personalLabelLine(line);
 }
@@ -52,4 +54,14 @@ export function isContactHeading(text: string): boolean {
   const cjk = bare.replace(/[a-z]/gu, '');
   const ascii = bare.replace(/[^a-z]/gu, '');
   return (cjk === '' || CONTACT_HEADINGS.has(cjk)) && (ascii === '' || CONTACT_HEADINGS.has(ascii));
+}
+
+const FAMILY = new Set(['姓', '姓氏', 'lastname', 'familyname', 'surname']);
+const GIVEN = new Set(['名', '名字', 'firstname', 'givenname', 'middlename']);
+
+/** 只是姓名的一部分（姓或名）的標籤；完整姓名標籤與其他標籤回 null（複審 1）。 */
+export function namePart(label: string): 'family' | 'given' | null {
+  const key = headingKey(label).replace(/[-_.]/gu, '');
+  if (FAMILY.has(key)) return 'family';
+  return GIVEN.has(key) ? 'given' : null;
 }

@@ -15,7 +15,7 @@ import { isNameLabel, isStrictPersonalLabel, labelOnlyLine } from './labels.ts';
 import { CONTACT_BLOCK_MAX } from './personal.ts';
 import type { Secret } from './redact.ts';
 import { isSectionHeading, normalizeForMatch } from './text.ts';
-import { isContactHeading, labelOf, personalTablePairs } from './web-labels.ts';
+import { isContactHeading, labelOf, namePart, personalTablePairs } from './web-labels.ts';
 
 export interface WebPersonalRow {
   readonly label: string;
@@ -29,6 +29,7 @@ interface Row {
 
 /** 一串被移除的區塊（本身＋續行）：每段文字與它要接回的預填列。 */
 interface Chain {
+  readonly label: string;
   readonly row: Row | null;
   readonly name: boolean;
   readonly parts: string[];
@@ -39,7 +40,10 @@ export interface WebSplit {
   readonly kept: readonly ImportWebBlock[];
   /** 移除的值（每段、接回後的完整值），全部加入遮蔽 */
   readonly removed: readonly Secret[];
-  /** 從區塊抽到姓名標籤的值（送出條件 (2)） */
+  /**
+   * 從區塊抽到的姓名（送出條件 (2)）：完整姓名標籤的值，以及「姓」＋「名」合併的姓名（含中間空白變體）；
+   * 都至少 2 字（遮蔽只遮 2 字以上的姓名，單字不算已辨識；複審 1）。
+   */
   readonly labeledNames: readonly string[];
 }
 
@@ -73,7 +77,7 @@ export function splitWebBlocks(blocks: readonly ImportWebBlock[]): WebSplit {
       existing.value = { ...existing.value, value: `${existing.value.value}\n${clean}` };
       row = existing;
     }
-    const chain: Chain = { row, name: isNameLabel(label), parts: [clean] };
+    const chain: Chain = { label, row, name: isNameLabel(label), parts: [clean] };
     chains.push(chain);
     return chain;
   };
@@ -174,6 +178,16 @@ function secretsOf(chains: readonly Chain[]): Secret[] {
   });
 }
 
+const atLeastTwo = (value: string) => [...normalizeForMatch(value)].length >= 2;
+
 function namesOf(chains: readonly Chain[]): string[] {
-  return chains.filter((c) => c.name).map((c) => c.parts.join(' '));
+  const named = chains.filter((c) => c.name);
+  const valuesOf = (part: ReturnType<typeof namePart>) =>
+    named.filter((c) => namePart(c.label) === part).map((c) => c.parts.join(' '));
+  const family = valuesOf('family');
+  const given = valuesOf('given');
+  const combined = family.flatMap((f) =>
+    given.flatMap((g) => [f + g, `${f} ${g}`, `${g} ${f}`, g + f]),
+  );
+  return [...valuesOf(null), ...combined].filter(atLeastTwo);
 }
