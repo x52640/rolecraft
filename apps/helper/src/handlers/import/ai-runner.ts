@@ -40,13 +40,20 @@ export function createAiParser(deps: ImportAiDeps): AiParser {
   const starting = new Map<string, Promise<AiParseOutcome>>();
   /** 每次開始給一個代號；被清掉（forget）或重新開始後，舊的結果不寫回 */
   const runs = new Map<string, number>();
+  /** 正在選模型的匯入：期間被清掉（擠出記憶體）就標記，選完不送（P1-T080 審查 6） */
+  const selecting = new Map<string, { forgotten: boolean }>();
+  /** 執行中那筆的中止控制；forget 時中止 */
+  const controllers = new Map<string, AbortController>();
   let counter = 0;
 
   async function begin(importId: string, job: AiJob | null): Promise<AiParseOutcome> {
     const current = views.get(importId);
     if (current?.state === 'running') return { ok: true, parse: current };
     if (job === null) return { ok: false, reason: 'not_parsed' };
-    const selection = await deps.engine.select();
+    const mark = { forgotten: false };
+    selecting.set(importId, mark);
+    const selection = await deps.engine.select().finally(() => selecting.delete(importId));
+    if (mark.forgotten) return { ok: false, reason: 'unknown_import' };
     if (selection === null) return { ok: false, reason: 'no_service' };
     const prepared = prepareJob(job, selection.budget, makeId);
     if (!prepared.ok) return { ok: false, reason: prepared.reason };
@@ -55,7 +62,10 @@ export function createAiParser(deps: ImportAiDeps): AiParser {
     const run = (counter += 1);
     runs.set(importId, run);
     views.set(importId, running);
+    const controller = new AbortController();
+    controllers.set(importId, controller);
     const settle = (view: ImportAiParseView) => {
+      if (controllers.get(importId) === controller) controllers.delete(importId);
       if (runs.get(importId) !== run) return;
       views.set(importId, view);
       deps.onSettled?.(importId);
@@ -65,7 +75,7 @@ export function createAiParser(deps: ImportAiDeps): AiParser {
         provider: selection.provider,
         model: selection.model,
         execute: (request) => selection.execute(request),
-        signal: new AbortController().signal,
+        signal: controller.signal,
         recordRunCheck: (record) => {
           deps.recordRunCheck(record);
           return Promise.resolve();
@@ -89,6 +99,10 @@ export function createAiParser(deps: ImportAiDeps): AiParser {
     forget(importId) {
       views.delete(importId);
       runs.delete(importId);
+      const mark = selecting.get(importId);
+      if (mark) mark.forgotten = true;
+      controllers.get(importId)?.abort();
+      controllers.delete(importId);
     },
   };
 }

@@ -15,7 +15,13 @@ import { isNameLabel, isStrictPersonalLabel, labelOnlyLine } from './labels.ts';
 import { CONTACT_BLOCK_MAX } from './personal.ts';
 import type { Secret } from './redact.ts';
 import { isSectionHeading, normalizeForMatch } from './text.ts';
-import { isContactHeading, labelOf, namePart, personalTablePairs } from './web-labels.ts';
+import {
+  isAliasNameLabel,
+  isContactHeading,
+  labelOf,
+  namePart,
+  personalTablePairs,
+} from './web-labels.ts';
 
 export interface WebPersonalRow {
   readonly label: string;
@@ -45,6 +51,8 @@ export interface WebSplit {
    * 都至少 2 字（遮蔽只遮 2 字以上的姓名，單字不算已辨識；複審 1）。
    */
   readonly labeledNames: readonly string[];
+  /** labeledNames 去掉只來自別名類標籤（英文姓名、暱稱…）的值：送出條件 (2) 只看這個（P1-T080 審查 1） */
+  readonly recognizedNames: readonly string[];
   /**
    * 所有姓名標籤的值（含只有姓或名的部分，去重）：一律交給 knownNames 遮蔽與拆別名，
    * 與上面的確認門檻分開（複審 2-1）。
@@ -173,6 +181,7 @@ export function splitWebBlocks(blocks: readonly ImportWebBlock[]): WebSplit {
     kept,
     removed: secretsOf(chains),
     labeledNames: names.names,
+    recognizedNames: names.recognized,
     nameValues,
     nameCombinationsOverLimit: names.overLimit,
   };
@@ -202,10 +211,14 @@ const atLeastTwo = (value: string) => [...normalizeForMatch(value)].length >= 2;
  */
 export const NAME_COMBINATIONS_MAX = 16;
 
-function namesOf(chains: readonly Chain[]): { names: string[]; overLimit: boolean } {
+function namesOf(chains: readonly Chain[]): {
+  names: string[];
+  recognized: string[];
+  overLimit: boolean;
+} {
   const named = chains.filter((c) => c.name);
-  const valuesOf = (part: ReturnType<typeof namePart>) => [
-    ...new Set(named.filter((c) => namePart(c.label) === part).map((c) => c.parts.join(' '))),
+  const valuesOf = (part: ReturnType<typeof namePart>, from = named) => [
+    ...new Set(from.filter((c) => namePart(c.label) === part).map((c) => c.parts.join(' '))),
   ];
   const family = valuesOf('family');
   const given = valuesOf('given');
@@ -213,5 +226,8 @@ function namesOf(chains: readonly Chain[]): { names: string[]; overLimit: boolea
   const combined = overLimit
     ? []
     : family.flatMap((f) => given.flatMap((g) => [f + g, `${f} ${g}`, `${g} ${f}`, g + f]));
-  return { names: [...new Set([...valuesOf(null), ...combined])].filter(atLeastTwo), overLimit };
+  const names = [...new Set([...valuesOf(null), ...combined])].filter(atLeastTwo);
+  const primary = named.filter((c) => !isAliasNameLabel(c.label));
+  const recognized = [...new Set([...valuesOf(null, primary), ...combined])].filter(atLeastTwo);
+  return { names, recognized, overLimit };
 }

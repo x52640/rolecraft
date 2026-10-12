@@ -66,6 +66,9 @@ export interface WebEnvOptions {
   profiles?: ProfileInput[];
   /** 送到模型前先等這個（測「執行中」） */
   hold?: Promise<void>;
+  /** select 回答前先等這個（測選模型期間匯入被擠掉） */
+  selectHold?: Promise<void>;
+  maxImports?: number;
 }
 
 export function webEnv(options: WebEnvOptions = {}) {
@@ -74,41 +77,51 @@ export function webEnv(options: WebEnvOptions = {}) {
   for (const [i, profile] of (options.profiles ?? []).entries()) {
     repos.profiles.save({ ...profile, id: `profile-${String(i)}`, pdfParseConfirmed: true });
   }
-  const state = { selectable: true, executed: [] as string[], records: [] as RunCheckRecord[] };
+  const state = {
+    selectable: true,
+    executed: [] as string[],
+    records: [] as RunCheckRecord[],
+    signals: [] as AbortSignal[],
+  };
   const respond = options.respond ?? (() => '{}');
   const engine: GenerationEngine = {
-    select: () =>
-      Promise.resolve(
-        state.selectable
-          ? {
-              provider: 'claude',
-              model: 'fake-model',
-              budget: {
-                contextLimit: 200_000,
-                outputReserve: 0,
-                toolOverheadReserve: 0,
-                available: 200_000,
-              },
-              execute: async ({ prompt, signal }) => {
-                await options.hold;
-                const script = [{ text: respond(prompt) }];
-                const adapter = createFakeAdapter({ ...options.fake, script });
-                const outcome = await runWithSubscriptionCheck(
-                  adapter,
-                  { model: 'fake-model', prompt, trigger: 'run_start', signal },
-                  { parentEnv: { PATH: '/usr/bin' }, now: () => new Date(0), newId: () => 'rc' },
-                );
-                state.executed.push(...adapter.calls.prompts);
-                return outcome;
-              },
-            }
-          : null,
-      ),
+    select: async () => {
+      await options.selectHold;
+      return state.selectable
+        ? {
+            provider: 'claude',
+            model: 'fake-model',
+            budget: {
+              contextLimit: 200_000,
+              outputReserve: 0,
+              toolOverheadReserve: 0,
+              available: 200_000,
+            },
+            execute: async ({ prompt, signal }) => {
+              state.signals.push(signal);
+              await options.hold;
+              if (signal.aborted) {
+                throw new Error('cancelled');
+              }
+              const script = [{ text: respond(prompt) }];
+              const adapter = createFakeAdapter({ ...options.fake, script });
+              const outcome = await runWithSubscriptionCheck(
+                adapter,
+                { model: 'fake-model', prompt, trigger: 'run_start', signal },
+                { parentEnv: { PATH: '/usr/bin' }, now: () => new Date(0), newId: () => 'rc' },
+              );
+              state.executed.push(...adapter.calls.prompts);
+              return outcome;
+            },
+          }
+        : null;
+    },
   };
   let waiters: (() => void)[] = [];
   let n = 0;
   const service = createResumeImportService({
     profiles: repos.profiles,
+    ...(options.maxImports !== undefined && { maxImports: options.maxImports }),
     newId: () => `id-${String((n += 1))}`,
     ai: {
       engine,

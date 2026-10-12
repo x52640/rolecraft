@@ -28,13 +28,32 @@ function escape(text: string): string {
 
 const HAN = /\p{Script=Han}/u;
 
-/** 姓名的比對式：相鄰兩個中文字之間允許空白（「林 雨 晴」；P1-T078 審查 3）。其他值逐字比對。 */
+/**
+ * 姓名的比對式：相鄰兩個中文字之間允許空白（「林 雨 晴」；P1-T078 審查 3）；名單本身中文字間的空白不算
+ * （「林 雨晴」也認「林雨晴」）；其他空白可多可少（「Ivy  Lin」；P1-T080 審查 4）。其他值逐字比對。
+ */
 function pattern(value: string, name: boolean): string {
   if (!name) return escape(value);
-  const chars = [...value];
+  const chars = [...value.replace(/(?<=\p{Script=Han})\s+(?=\p{Script=Han})/gu, '')];
   return chars
-    .map((c, i) => escape(c) + (HAN.test(c) && HAN.test(chars[i + 1] ?? '') ? '\\s*' : ''))
+    .map((c, i) => {
+      if (/\s/u.test(c)) return /\s/u.test(chars[i - 1] ?? '') ? '' : '\\s+';
+      return escape(c) + (HAN.test(c) && HAN.test(chars[i + 1] ?? '') ? '\\s*' : '');
+    })
     .join('');
+}
+
+const ASCII_LETTER = /[A-Za-z]/u;
+
+/**
+ * 含英文字母的姓名另比一次不分大小寫（「IVY LIN」「ivy lin」；P1-T080 審查 4）。為了不誤遮「Ann」→「planning」，
+ * 這一次要求前後不接英文字母；原本分大小寫的比對照舊，所以只會比以前多遮。
+ */
+function caselessPattern(value: string): RegExp {
+  const chars = [...value];
+  const head = ASCII_LETTER.test(chars[0] ?? '') ? '(?<![A-Za-z])' : '';
+  const tail = ASCII_LETTER.test(chars[chars.length - 1] ?? '') ? '(?![A-Za-z])' : '';
+  return new RegExp(head + pattern(value, true) + tail, 'giu');
 }
 
 /**
@@ -80,9 +99,15 @@ export function createRedactor(secrets: readonly Secret[]) {
   const folded = patterns
     .filter((p) => p.name)
     .map((p) => ({ value: foldMarks(p.value), name: true, fold: true }));
-  const all = [...patterns, ...folded]
-    .filter((p) => p.value !== '')
-    .map((p) => ({ re: new RegExp(pattern(p.value, p.name), 'gu'), name: p.name, fold: p.fold }));
+  const caseless = patterns
+    .filter((p) => p.name && ASCII_LETTER.test(p.value))
+    .map((p) => ({ re: caselessPattern(p.value), name: true, fold: false }));
+  const all = [
+    ...[...patterns, ...folded]
+      .filter((p) => p.value !== '')
+      .map((p) => ({ re: new RegExp(pattern(p.value, p.name), 'gu'), name: p.name, fold: p.fold })),
+    ...caseless,
+  ];
   const generic = [EMAIL, PHONE, NATIONAL_ID].map((re) => ({ re, name: false, fold: false }));
 
   function redact(original: string): string {

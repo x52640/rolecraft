@@ -14,6 +14,7 @@ export {
   type ResumeParseParseResult,
   type ResumeParseSource,
 } from './output.ts';
+export { isNameLabel, isPersonalBlockLabel } from './labels.ts';
 export {
   extractPersonal,
   isPersonalLabel,

@@ -116,16 +116,16 @@ describe('104 履歷編輯頁結構：擷取到 AI 整理的端到端（P1-T080�
     expect(env.state.records).toHaveLength(1);
   });
 
-  // 規格「送出條件」：姓名標籤的值（這裡只有英文姓名）就算辨識出本次頁面姓名，所以會送。沒有標籤的頁首中文名
-  // 這時不在已知姓名裡、會進提示（殘餘，已回報；104 有登記姓名元素時由 nameText 遮掉，見上一個案例）。
-  it('只有「英文姓名」標籤、沒有姓名元素：照規格會送；英文名與聯絡資料不進提示', async () => {
+  // 審查 1（協調者保守裁定）：只有「英文姓名」這類別名標籤不算辨識，否則沒有標籤的頁首中文名會進提示。
+  it('只有「英文姓名」標籤、沒有姓名元素：回 name_required、模型 0 次；確認後中文名與英文名都不進提示', async () => {
     const env = webEnv({ respond: () => OUTPUT });
     const importId = await env.submit(capture(BLOCKS, null));
-    await env.parse(importId);
+    const refused = await env.call('import.ai_parse', { importId });
+    expect(refused).toMatchObject({ ok: false, error: { reason: 'name_required' } });
+    expect(env.state.executed).toHaveLength(0);
+    await env.parse(importId, ['林雨晴']);
     expect(env.state.executed).toHaveLength(1);
-    for (const secret of SECRETS.filter((s) => s !== '林雨晴')) {
-      expect(env.state.executed[0]).not.toContain(secret);
-    }
+    for (const secret of SECRETS) expect(env.state.executed[0]).not.toContain(secret);
   });
 
   it('沒有姓名元素、頁面也沒有姓名標籤：不送，確認姓名後才送且仍不含姓名', async () => {

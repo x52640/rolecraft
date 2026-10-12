@@ -6,7 +6,7 @@ depends_on: ["P1-T078", "P1-T079"]
 specs: ["resume-import.md", "providers.md", "bridge.md"]
 track: helper
 primary_repo: rolecraft
-write_paths: ["apps/helper/src/handlers/import/"]
+write_paths: ["apps/helper/src/handlers/import/", "packages/pipeline/src/resume-parse/", "docs/specs/resume-import.md"]
 contract_change: none
 expected_commit: "feat(P1-T080): helper：網頁來源 AI 整理接線（姓名四來源、未辨識不送）"
 ---
@@ -82,10 +82,21 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：網頁來源 AI 整理接線＋測試（worker 一個 commit）
-- 已通過驗證：`npm run verify` 綠（Vitest 4137 通過、21 略過）
-- 下一步：協調者收官（對抗驗證 E3、codex review、開發入口手動實跑一次）
+- 最後完成：「審查待修」6 項已修（第二個 commit，fix）
+- 已通過驗證：`npm run verify` 綠（Vitest 4153 通過、21 略過）；重現測試在修正前失敗、修正後通過
+- 下一步：協調者收官（修正 diff 複審、開發入口手動實跑一次）
 - Blocker：無
+- write_paths 擴充（2026-10-12 協調者）：加入 `packages/pipeline/src/resume-parse/`（匯出 `isNameLabel`、網頁區塊用的已知標籤分類、修 redact 比對規則）與 `docs/specs/resume-import.md`（寫回送出條件的保守變更）；理由：審查 1～4 的修法落在 pipeline 與規格，helper 端無法單獨修好。
+
+## 審查待修（2026-10-12 對抗審查＋codex，協調者轉來）
+
+1. 〔協調者保守裁定〕只有英文姓名類標籤（無中文姓名、無可用姓名元素、無確認姓名）不算「已辨識姓名」，回 name_required；規格同步寫明。
+2. Profile 姓名欄位判斷改用 pipeline `isNameLabel` 語意（英文名、中文名、暱稱、綽號、本名…）；2 字名字要遮。
+3. Profile 個資欄位判斷改用網頁區塊的已知標籤分類（不受 8 字限制）：「緊急聯絡人的通訊地址」的值要遮。
+4. 確認姓名／頁面姓名／Profile 姓名產生變體：中文去所有空白、字間空白；英文姓名比對不分大小寫。`林 雨晴`↔`林雨晴`、`ivy lin`↔`Ivy Lin`、`Ivy Lin`↔`IVY LIN`。
+5. `nameText` 是純英文且無法可靠拆出姓名（`Alex Smith Great Developer`）時不算已辨識姓名，回 name_required。
+6. `ai-runner.ts` `begin`：`select()` 之後重查匯入是否仍在（不在回 unknown_import、不呼叫模型）；`forget` 時中止該筆的 AbortController。
+- 不改：作品集網址是否遮蔽待擁有者決定。
 
 ## 完成結果
 
@@ -95,6 +106,17 @@ npm run verify
 - 測試：`web-ai-parse.test.ts`（四個姓名來源各一、只有舊 Profile→name_required 且模型 0 次、確認後才送、單字姓名不算確認、姓名欄位過多、擷取與查詢不呼叫、沒有模型、R6 不通過不送、執行中與同時兩次只送一次、格式錯、還原個資標示）；`web-ai-parse-104.test.ts` 端到端（104 履歷頁結構經 submit_resume_capture→ai_parse→ai_status，假 provider 記錄提示，斷言無姓名、英文名、電話、email、地址、網址）。P1-T077 的 expected-blocks.json 尚未在 main，區塊仿 fixture 與 pipeline 104 測試。
 - 保守選擇：Profile 姓名欄位用本地寬鬆比對（含「姓名」「名字」「name」等就當姓名，多遮不漏）；多份 Profile 時全部的姓名與聯絡值都遮；PDF 路徑忽略 `names`。
 - 殘餘（需協調者／擁有者看）：
-  1. 規格送出條件把「姓名標籤的值」算辨識：頁面只有「英文姓名：Ivy」、姓名元素沒找到（nameText 為 null）時會送出，沒有標籤的頁首中文名會進提示（測試已記錄此行為）。104 有登記姓名元素時不受影響；要堵需改規格（例如只有英文名標籤不算）或 pipeline。
-  2. nameText 是純英文（沒有中文名開頭）時 `cleanHeaderName` 不切，整串含標語當一個姓名遮；單獨出現的英文名（不接中文名）不會被遮。
+  1. （已由審查 1 修）只有英文姓名標籤時中文名漏遮。
+  2. （已由審查 5 修）純英文 nameText 整串當姓名；單獨出現、不接中文名的英文名字（例如只有「Alex」）仍不會被遮。
   3. `unknownImport` 訊息仍是「請重新選擇 PDF」（網頁來源也用）；未改。
+
+### 審查 6 項修正（fix commit）
+
+1. 只有別名類標籤不算辨識：pipeline `web-labels.ts` 新增 `isAliasNameLabel`（英文、外文、暱稱、綽號、別名、English、Nickname、Alias、Preferred），`splitWebBlocks` 另回 `recognizedNames`（去掉只來自別名類標籤的值），送出條件只看它；遮蔽照舊用全部姓名值。規格「送出條件」寫明。`web-name-paths` 通則測試裡英文姓名、英文名、暱稱三案改成「未確認回 name_unconfirmed＋確認後仍遮」，沒有刪遮蔽斷言。
+2. Profile 姓名欄位：helper 改用 pipeline `isNameLabel`（index 新匯出），另保留含「姓名／名字／name」的寬鬆判斷（只會多遮）；2 字名字照遮。
+3. Profile 個資欄位：改用 `isPersonalBlockLabel`（index 新匯出，中文標籤不受 8 字限制）。
+4. 姓名變體：`redact.ts` 姓名比對式去掉名單中文字間空白、英文空白可多可少；含英文字母的姓名另加一次不分大小寫、前後不接英文字母的比對（原本分大小寫的比對照舊，只會多遮）；`web-names.ts` 加「中文去空白」寫法，讓「林 雨晴 Ivy Lin」也拆得出英文別名。
+5. nameText：切出的姓名要是 2～5 個中文字，或整串是 1～3 個大寫開頭英文字（三個字另加前兩個字）；否則不算辨識，整串放進只遮蔽的姓名（profileNames）。
+6. `ai-runner.ts`：選模型期間匯入被清掉就回 unknown_import、不送；每筆執行有自己的 AbortController，`forget` 時中止。
+- PDF 路徑影響：只有 `redact.ts` 共用。PDF 的姓名比對因此也多了「不分大小寫（有字界）」與「空白可多可少」，只會多遮、不會少遮；P1-T069 既有測試全過。
+- 新測試：`packages/pipeline/src/resume-parse/web-t080-review.test.ts`（1、4）、`apps/helper/src/handlers/import/web-ai-review.test.ts`（2、3、5、6）；`web-ai-parse-104.test.ts` 的「只有英文姓名」案例改成 name_required、確認後全部不進提示。

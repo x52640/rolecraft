@@ -65,3 +65,23 @@ export function namePart(label: string): 'family' | 'given' | null {
   if (FAMILY.has(key)) return 'family';
   return GIVEN.has(key) ? 'given' : null;
 }
+
+/**
+ * 別名類姓名標籤（英文姓名、外文名、暱稱、綽號、English Name、Nickname）：值一律遮蔽，但只有這類標籤時
+ * 不算本次頁面的姓名已辨識（頁首沒有標籤的中文姓名可能沒被找到；P1-T080 審查 1，協調者保守裁定）。
+ */
+const ALIAS_NAME_PARTS = [
+  '英文',
+  '外文',
+  '暱稱',
+  '綽號',
+  '別名',
+  'english',
+  'nickname',
+  'alias',
+  'preferred',
+];
+export function isAliasNameLabel(label: string): boolean {
+  const key = headingKey(label).replace(/[-_.]/gu, '');
+  return ALIAS_NAME_PARTS.some((part) => key.includes(part));
+}

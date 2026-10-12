@@ -18,10 +18,7 @@ describe('姓名確認路徑都要遮得到後文的姓名', () => {
     ['姓名', [lv('姓名', '林雨晴')], '林雨晴'],
     ['Name', [lv('Name', 'Ivy Lin')], 'Ivy Lin'],
     ['Full Name', [lv('Full Name', 'Ivy Lin')], 'Ivy Lin'],
-    ['英文姓名', [lv('英文姓名', 'Ivy Lin')], 'Ivy Lin'],
     ['中文名', [lv('中文名', '林雨晴')], '林雨晴'],
-    ['英文名', [lv('英文名', 'Ivy Lin')], 'Ivy Lin'],
-    ['暱稱', [lv('暱稱', '晴晴子')], '晴晴子'],
     ['姓＋名', [lv('姓', '林'), lv('名', '晴')], '林晴'],
     ['姓氏＋名字', [lv('姓氏', '林'), lv('名字', '雨晴')], '林雨晴'],
     ['名＋姓（順序相反）', [lv('名', '晴'), lv('姓', '林')], '林晴'],
@@ -38,6 +35,28 @@ describe('姓名確認路徑都要遮得到後文的姓名', () => {
   for (const [what, specs, name] of cases) {
     it(what, () => {
       const result = prepare([...specs, ...body(name)]);
+      if (!result.ok) throw new Error(`${what}: ${result.reason}`);
+      expect(result.prepared.prompt).not.toContain(name);
+      expect(result.prepared.prompt).toContain('喜歡門市營運');
+    });
+  }
+
+  // P1-T080 審查 1（協調者保守裁定）：只有別名類標籤（英文姓名、英文名、暱稱）不算已辨識，要使用者確認姓名；
+  // 確認後別名類標籤的值照樣在後文被遮蔽。
+  const aliasCases: [string, BlockSpec[], string][] = [
+    ['英文姓名', [lv('英文姓名', 'Ivy Lin')], 'Ivy Lin'],
+    ['英文名', [lv('英文名', 'Ivy Lin')], 'Ivy Lin'],
+    ['暱稱', [lv('暱稱', '晴晴子')], '晴晴子'],
+    ['English Name', [lv('English Name', 'Ivy Lin')], 'Ivy Lin'],
+  ];
+  for (const [what, specs, name] of aliasCases) {
+    it(`${what}（只有別名類標籤：要確認；確認後仍遮）`, () => {
+      expect(prepare([...specs, ...body(name)])).toEqual({ ok: false, reason: 'name_unconfirmed' });
+      const result = prepareWebResumeParse(
+        inputsOf([...specs, ...body(name)], { confirmedNames: ['王確認'] }),
+        budget(1_000_000),
+        idSource(),
+      );
       if (!result.ok) throw new Error(`${what}: ${result.reason}`);
       expect(result.prepared.prompt).not.toContain(name);
       expect(result.prepared.prompt).toContain('喜歡門市營運');

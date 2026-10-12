@@ -1,8 +1,8 @@
 /**
  * 網頁來源 AI 整理的送出前準備（D28；resume-import「網頁來源的 AI 整理」）。任何一項不成立就不送出：
  * - 姓 × 名欄位的組合數超過上限：一律不送（name_parts_over_limit）。
- * - 送出條件：本次頁面的姓名辨識出來（姓名元素文字，或姓名標籤的區塊值），或使用者在匯入頁確認了姓名；
- *   只有舊 Profile 的姓名不算（name_unconfirmed）。
+ * - 送出條件：本次頁面的姓名辨識出來（姓名元素文字，或姓名標籤的區塊值；只有英文姓名、暱稱等別名類標籤
+ *   不算，P1-T080 審查 1），或使用者在匯入頁確認了姓名；只有舊 Profile 的姓名不算（name_unconfirmed）。
  * - 本機先移除姓名與聯絡資料（web-personal.ts），其餘區塊遮蔽已知姓名（四個來源＋別名）、移除的值、
  *   既有 Profile 的聯絡資料值（多行的各行與接合值）與 email／電話／身分證字號（redact.ts）。標籤也遮蔽。
  * - 移除後沒有區塊：no_text；提示估算超過預算：over_budget（R8）。
@@ -59,7 +59,8 @@ export function prepareWebResumeParse(
   // 只有 2 字以上的姓名遮得到（redact.ts），單字姓名不算辨識或確認（複審 1）
   const maskable = (names: readonly string[]) =>
     names.some((n) => [...normalizeForMatch(n)].length >= 2);
-  const recognized = maskable(pageNames) || split.labeledNames.length > 0;
+  // 只有別名類標籤（英文姓名、暱稱…）的值不算（P1-T080 審查 1）
+  const recognized = maskable(pageNames) || split.recognizedNames.length > 0;
   if (!recognized && !maskable(confirmed)) return { ok: false, reason: 'name_unconfirmed' };
 
   const names = knownNames(

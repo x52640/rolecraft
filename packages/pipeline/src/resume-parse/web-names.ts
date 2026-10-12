@@ -29,7 +29,12 @@ function clean(name: string): string {
 function variantsOf(name: string): string[] {
   const whole = clean(name);
   const pieces = whole.split(NAME_SEPARATORS).map((piece) => piece.trim());
-  return [whole, ...pieces].flatMap((text) => {
+  // 「林 雨晴」：中文字間的空白去掉也是一個寫法（P1-T080 審查 4；別名比對靠它）
+  const joined = [whole, ...pieces].flatMap((text) => {
+    const stripped = text.replace(/(?<=\p{Script=Han})\s+(?=\p{Script=Han})/gu, '');
+    return stripped === text ? [] : [stripped];
+  });
+  return [whole, ...pieces, ...joined].flatMap((text) => {
     const han = CJK_NAME_THEN_MORE.exec(text)?.[1];
     if (!han) return [text];
     return [text, han, ...englishNames(text.slice(han.length).trim())];
