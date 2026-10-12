@@ -107,7 +107,7 @@ npm run verify
 - 已通過驗證：worktree `npm run verify` 綠（見完成結果「第二輪」）；第二輪新增的 15 項回歸測試換回舊實作全部失敗；全程假 provider
 - codex 審查待修 3 項已修（先寫測試重現，3 項都重現；見完成結果「codex 審查項修正」）
 - 對抗審查待修 3 項＋codex review cc63fdb 追加 3 項已修（先寫測試重現，修正前 30 個案例失敗；見完成結果「對抗審查項修正」）
-- 下一步：協調者對本次修正 diff 跑 codex review
+- 下一步：修「codex 複審待修」3 項（其中 2 項個資退步，優先），修完 codex review 修正 diff 後收官
 - Blocker：無
 
 ## 完成結果

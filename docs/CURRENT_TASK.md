@@ -25,9 +25,10 @@
 
 ## 交接（2026-10-12 擁有者要求清空對話後重開）
 
-- 方向變更：匯入改走「擴充功能讀求職網站履歷頁 HTML」，PDF 只負責輸出（加照片、匯出）。規格草稿 `docs/spec-discussions/web-resume-import/spec.md`（v0，擁有者已看過、同意送討論），尚未跑 Codex 往返。
+- web-resume-import 規格已收斂（2026-10-12，擁有者裁決已寫入，final2 no_blockers；觸發改為在履歷頁點外掛圖示擷取）。等擁有者說「開工」才拆 Task；實作前需 P1-T017 各站履歷頁樣本（Q2）。
+- 方向變更：匯入改走「擴充功能讀求職網站履歷頁 HTML」，PDF 只負責輸出（加照片、匯出）。規格 `docs/spec-discussions/web-resume-import/spec.md`。
 - 2026-10-12 收官 P1-T070～T073：舊審查屬實項與修正 diff 的 codex／對抗審查屬實項皆已修，最後一輪 codex 無發現；harness 手動實跑併入 P1-T032。
-- P1-T069 仍進行中：codex 審查 3 項已修（cc63fdb），其對抗審查（個資標籤辨識退步等 3 項）與 codex 複審（3 項）修正中。
+- P1-T069 仍進行中：codex 3 項（cc63fdb）與對抗＋codex 複審 6 項（d069fcd）已修；d069fcd 的 codex review 又有 3 項**尚未修**（2 項個資退步：`地址（戶籍）` 類標籤、姓名與 email 重疊遮蔽不全），見 Task「codex 複審待修」。擁有者 2026-10-12 因額度要求先停，下次優先修。
 - 協調者實測發現、尚未開 Task：貼職缺要自己拆欄位（改整段貼上由 AI 拆）；除匯入頁外各頁樣式陽春；照片匯出（併新規格）。
 - 開發入口：`npm run dev:harness -- --pdf <檔> --folders <資料夾>`（P1-T068），測試資料在 `local-samples/`（gitignore）。
 
