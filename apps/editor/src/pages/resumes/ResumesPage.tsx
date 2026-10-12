@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { SectionCard } from './SectionCard.tsx';
 import { SectionEditor } from './SectionEditor.tsx';
+import type { ResumePollOptions } from './useGenerateResume.ts';
 import { useResumeEditor, type ResumeEditor, type VersionView } from './useResumeEditor.ts';
 import './resumes.css';
 
@@ -63,9 +64,12 @@ function Sections({ editor, view }: { editor: ResumeEditor; view: VersionView })
   );
 }
 
-/** 履歷頁（F07、R1）：針對職缺逐段對照修改稿，接受、退回、改寫，匯出前檢查不過不能匯出。 */
-export function ResumesPage() {
-  const editor = useResumeEditor();
+/**
+ * 履歷頁（F07、R1）：針對職缺逐段對照修改稿，接受、退回、改寫，匯出前檢查不過不能匯出。
+ * 產生後自動輪詢並顯示新版本（P1-T072）；poll 只給測試調整。
+ */
+export function ResumesPage({ poll }: { readonly poll?: ResumePollOptions }) {
+  const editor = useResumeEditor(poll);
   const job = editor.jobs?.find((j) => j.id === editor.jobId);
 
   return (
@@ -85,7 +89,11 @@ export function ResumesPage() {
         <div className="resume-toolbar">
           <label>
             職缺
-            <select value={editor.jobId ?? ''} onChange={(e) => editor.setJobId(e.target.value)}>
+            <select
+              value={editor.jobId ?? ''}
+              disabled={editor.generating}
+              onChange={(e) => editor.setJobId(e.target.value)}
+            >
               {editor.jobs.map((j) => (
                 <option key={j.id} value={j.id}>
                   {j.company}｜{j.title}
@@ -99,7 +107,7 @@ export function ResumesPage() {
             disabled={editor.busy || !job || job.confirmedAt === null}
             onClick={() => void editor.generate()}
           >
-            產生客製履歷
+            {editor.generating ? '產生中…' : '產生客製履歷'}
           </button>
           <button type="button" disabled={editor.busy} onClick={() => void editor.refresh()}>
             重新整理

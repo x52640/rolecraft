@@ -5,6 +5,10 @@
  *   不得寫職缺快照的公司或職稱（grounding.ts）。
  * - 最後再過 domain 的 R1 匯出前檢查（不帶 Profile：數字只認引用的事實項）。
  * 經歷段落的公司、職稱、日期、原文從 Profile 帶入，不採用模型的任何文字。
+ *
+ * 經歷段落（P1-T072）：經歷描述是使用者確認過的文字，所以經歷段落可以不引用事實項，
+ * 數字、網址、倍數詞也可以來自同一段經歷描述（不認其他經歷）。改寫後仍沒有任何段落的經歷，
+ * 由程式補一段沿用原文（experience-fallback.ts），不額外呼叫模型。
  */
 import {
   ResumeVersion,
@@ -17,6 +21,7 @@ import {
 import { checkExportReadiness } from '@rolecraft/domain';
 
 import { completionCap, exceedsCap } from './completion.ts';
+import { fallbackExperienceSections } from './experience-fallback.ts';
 import { groundingProblem, type JobIdentity } from './grounding.ts';
 import { claimLabel, experienceLabel } from './prompt.ts';
 import type {
@@ -72,8 +77,9 @@ function claimByLabel(claims: readonly Claim[]): Map<string, Claim> {
 function resolveCitations(
   draft: SectionDraft,
   byLabel: ReadonlyMap<string, Claim>,
+  allowEmpty: boolean,
 ): { citations: ClaimCitation[]; cited: Claim[] } | SectionDropReason {
-  if (draft.citations.length === 0) return 'no_citation';
+  if (draft.citations.length === 0 && !allowEmpty) return 'no_citation';
   const citations: ClaimCitation[] = [];
   const cited: Claim[] = [];
   for (const citation of draft.citations) {
@@ -100,9 +106,11 @@ function convertSection(
 ): { section: ResumeSection; placement: SectionPlacement } | SectionDropReason {
   const placement = placementOf(draft, ctx.profile);
   if (!placement) return 'unknown_placement';
-  const resolved = resolveCitations(draft, byLabel);
+  const experience = placement.kind === 'experience' ? placement : null;
+  const resolved = resolveCitations(draft, byLabel, experience !== null);
   if (typeof resolved === 'string') return resolved;
-  const problem = groundingProblem(draft.text, resolved.cited, ctx.job);
+  const own = experience === null ? [] : [experience.originalText];
+  const problem = groundingProblem(draft.text, resolved.cited, ctx.job, own);
   if (problem) return problem;
   const section: ResumeSection = {
     id: ctx.newId(),
@@ -114,8 +122,15 @@ function convertSection(
     rationale: draft.rationale,
     decision: 'pending',
   };
-  const check = checkExportReadiness({ sections: [section], claims: ctx.claims, profile: null });
-  if (!check.ok) return 'export_check_failed';
+  // 經歷段落：沒有引用是允許的（之後由使用者逐段確認，R1），數字另認已確認的 Profile
+  // （上面的依據檢查已限縮到同一段經歷描述）；其他段落數字只認引用的事實項。
+  const check = checkExportReadiness({
+    sections: [section],
+    claims: ctx.claims,
+    profile: experience === null ? null : ctx.profile,
+  });
+  const blocking = check.issues.filter((i) => experience === null || i.check !== 'no_citation');
+  if (blocking.length > 0) return 'export_check_failed';
   return { section, placement };
 }
 
@@ -157,6 +172,11 @@ export function convertGeneration(
     placements.push({ sectionId: converted.section.id, placement: converted.placement });
   });
   if (sections.length === 0) return { ok: false, error: '沒有任何段落通過事實項檢查' };
+  const fallbacks = fallbackExperienceSections(ctx, placements);
+  for (const fallback of fallbacks) {
+    sections.push(fallback.section);
+    placements.push({ sectionId: fallback.section.id, placement: fallback.placement });
+  }
 
   const version = ResumeVersion.safeParse({
     id: ctx.newId(),
@@ -176,6 +196,7 @@ export function convertGeneration(
       gaps,
       droppedSections,
       droppedMatches: dropped,
+      filledExperiences: fallbacks.map((f) => f.placement.experienceIndex),
     },
   };
 }

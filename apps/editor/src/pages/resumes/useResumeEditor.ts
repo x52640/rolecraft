@@ -9,9 +9,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
 import type { ResponseOf } from '../../bridge/client.ts';
+import {
+  DEFAULT_RESUME_POLL,
+  useGenerateResume,
+  type ResumePollOptions,
+  type VersionList,
+} from './useGenerateResume.ts';
 
 type JobsList = Extract<ResponseOf<'jobs.list'>, { ok: true }>['snapshots'];
-type VersionList = Extract<ResponseOf<'resume.list'>, { ok: true }>['versions'];
 export type CheckResult = Extract<ResponseOf<'resume.check_export'>, { ok: true }>;
 
 export interface VersionView {
@@ -27,8 +32,9 @@ const errorOf = (failure: BridgeFailure) => failure.error.message;
 /**
  * 履歷頁的資料與動作：每次寫入後都從 helper 重新讀取版本與匯出前檢查，
  * 畫面只顯示 helper 回來的狀態；確認時間由 helper 決定（R1）。
+ * 產生客製履歷後自動輪詢，出現新版本就自動顯示（P1-T072）；產生期間鎖住操作。
  */
-export function useResumeEditor() {
+export function useResumeEditor(poll: ResumePollOptions = DEFAULT_RESUME_POLL) {
   const bridge = useBridge();
   const [jobs, setJobs] = useState<JobsList | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -42,6 +48,16 @@ export function useResumeEditor() {
   const currentJob = useRef<string | null>(null);
   const currentVersion = useRef<string | null>(null);
   const viewSeq = useRef(0);
+  const generation = useGenerateResume(poll, {
+    setBusy,
+    setNotice,
+    onNewVersion: (list, id) => {
+      setVersions(list);
+      setVersionId(id);
+    },
+  });
+  const cancelGeneration = useRef(generation.cancel);
+  cancelGeneration.current = generation.cancel;
 
   useEffect(() => {
     void bridge.send({ op: 'jobs.list', payload: {} }).then((res) => {
@@ -104,6 +120,8 @@ export function useResumeEditor() {
 
   useEffect(() => {
     currentJob.current = jobId;
+    // 切換職缺：舊職缺的生成輪詢作廢，不會把它的新版本套到這個職缺
+    cancelGeneration.current();
     setVersions(null);
     setView(null);
     if (jobId !== null) void loadVersions(jobId);
@@ -118,7 +136,7 @@ export function useResumeEditor() {
 
   /** 執行一個寫入，成功時顯示 okText，之後重新讀取。 */
   async function write(action: () => Promise<{ ok: true } | BridgeFailure>, okText: string) {
-    if (versionId === null) return false;
+    if (versionId === null || generation.generating) return false;
     setBusy(true);
     setNotice(null);
     try {
@@ -151,17 +169,9 @@ export function useResumeEditor() {
       const next = await loadVersions(jobId);
       if (next !== undefined && next !== null && next === before) await loadView(next);
     },
+    generating: generation.generating,
     generate: async () => {
-      if (jobId === null) return;
-      setBusy(true);
-      setNotice(null);
-      const res = await bridge.send({ op: 'resume.generate', payload: { jobSnapshotId: jobId } });
-      setBusy(false);
-      setNotice(
-        res.ok
-          ? '已開始產生客製履歷；完成後按「重新整理」查看新版本。生成的段落都要逐段把關。'
-          : errorOf(res),
-      );
+      if (jobId !== null) await generation.generate(jobId);
     },
     accept: (sectionId: string) =>
       write(

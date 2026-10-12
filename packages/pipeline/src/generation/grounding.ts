@@ -187,13 +187,20 @@ export interface JobIdentity {
   readonly title: string;
 }
 
-/** 數字、網址、倍數詞只能來自引用的事實項；不得寫職缺公司或職稱。 */
+/**
+ * 數字、網址、倍數詞只能來自引用的事實項（或 extraSources：經歷段落的同一段經歷描述，
+ * 那是使用者確認過的文字，P1-T072）；不得寫職缺公司或職稱。
+ */
 export function groundingProblem(
   rawText: string,
   cited: readonly Claim[],
   job: JobIdentity,
+  extraSources: readonly string[] = [],
 ): SectionDropReason | null {
-  const raw = cited.flatMap((c) => [c.text, c.basis.userConfirmation?.text ?? '']);
+  const raw = [
+    ...cited.flatMap((c) => [c.text, c.basis.userConfirmation?.text ?? '']),
+    ...extraSources,
+  ];
   const urls = new Set(raw.flatMap(fullUrls));
   if (fullUrls(rawText).some((url) => !urls.has(url))) return 'link_not_in_claims';
   const loose = new Set(raw.flatMap(extractLooseUrls));

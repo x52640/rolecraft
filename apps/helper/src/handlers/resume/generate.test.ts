@@ -1,46 +1,11 @@
 // resume.generate：經 Claude 執行（ClaudeService.run＋helperClaudeDeps）與 P1-T024 runner，
 // 子程序一律是假 spawn（輸出改寫自 providers 套件的去識別化實錄），不呼叫真實 CLI。
-import type { ChildProcess } from 'node:child_process';
-import { EventEmitter } from 'node:events';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { PassThrough } from 'node:stream';
-
-import type { InputBudget } from '@rolecraft/domain';
-import { createClaudeService, type RunDeps } from '@rolecraft/providers';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { BUDGET, fixture, runWithResult, setupGeneration } from './__fixtures__/fake-claude.ts';
 import { INVALID, JOB, openResumeDb, snapshot, type ResumeDb } from './__fixtures__/resume-db.ts';
-import type { ProvidersService } from '../providers/service.ts';
 import { pauseInterruptedJobs } from './assemble.ts';
-import { createClaudeGenerationEngine } from './claude-engine.ts';
 import type { GenerationEngine } from './generation.ts';
-
-type SpawnFn = NonNullable<RunDeps['spawn']>;
-
-const FIXTURES = path.resolve(
-  import.meta.dirname,
-  '../../../../../packages/providers/src/claude/fixtures',
-);
-const fixture = (name: string): string => readFileSync(path.join(FIXTURES, name), 'utf8');
-
-/** 把實錄的回覆文字換成指定內容（assistant 訊息與最後的 result 都換）。 */
-function runWithResult(text: string): string {
-  return fixture('run-ok.jsonl')
-    .split('\n')
-    .filter((line) => line.trim() !== '')
-    .map((line) => {
-      const event = JSON.parse(line) as Record<string, unknown>;
-      if (event.type === 'result') event.result = text;
-      if (event.type === 'assistant') {
-        const message = event.message as { content: { type: string; text?: string }[] };
-        message.content = [{ type: 'text', text }];
-      }
-      return JSON.stringify(event);
-    })
-    .join('\n')
-    .concat('\n');
-}
 
 /** C1 c-done、C2 c-doc、C3 c-metric（c-review 待複核，不會送出）。 */
 const GOOD = JSON.stringify({
@@ -62,86 +27,13 @@ const GOOD = JSON.stringify({
   ],
 });
 
-function fakeClaude(run: string, auth = fixture('auth-subscription.json')) {
-  const calls: { args: readonly string[]; env: Record<string, string>; stdin: string }[] = [];
-  const spawn: SpawnFn = (_file, args, options) => {
-    const call = { args, env: { ...(options.env as Record<string, string>) }, stdin: '' };
-    calls.push(call);
-    const child = new EventEmitter() as ChildProcess & EventEmitter;
-    const stdout = new PassThrough();
-    const stdin = new PassThrough();
-    stdin.on('data', (chunk: Buffer) => (call.stdin += chunk.toString('utf8')));
-    let killed = false;
-    Object.assign(child, { stdout, stderr: new PassThrough(), stdin, kill: () => (killed = true) });
-    const out =
-      args[0] === '--version' ? '2.1.296 (Claude Code)\n' : args[0] === 'auth' ? auth : run;
-    const lines = out.split(/(?<=\n)/);
-    const step = (i: number) => {
-      const line = lines[i];
-      if (killed || line === undefined) {
-        stdout.end();
-        setImmediate(() => child.emit('close', killed ? null : 0));
-        return;
-      }
-      stdout.write(line);
-      setImmediate(() => step(i + 1));
-    };
-    setImmediate(() => step(0));
-    return child;
-  };
-  return { spawn, calls, modelCalls: () => calls.filter((c) => c.stdin !== '') };
-}
-
-const BUDGET: InputBudget = {
-  contextLimit: 100_000,
-  outputReserve: 0,
-  toolOverheadReserve: 0,
-  available: 100_000,
-};
-
 let t: ResumeDb | null = null;
 afterEach(() => t?.cleanup());
 
-/** 假 providers 服務：Claude 可用且選定唯一候選（對應 candidates ['haiku']）；model 為 null 表示沒選定。 */
-function providers(model: string | null): ProvidersService {
-  return {
-    status: () =>
-      Promise.resolve([
-        {
-          service: 'claude',
-          state: 'available',
-          login: 'passed',
-          eligibility: 'passed',
-          subscriptionOnly: 'passed',
-          checkedAt: '2026-10-10T00:00:00.000Z',
-          selectedCandidateId: model === null ? null : 'cand-1',
-        },
-      ]),
-    listCandidates: () => Promise.resolve([{ candidateId: 'cand-1', label: 'Claude Haiku' }]),
-  };
-}
-
 function setup(run: string, model: string | null = 'haiku', auth?: string) {
-  const fake = fakeClaude(run, auth);
-  let settle: () => void = () => undefined;
-  const settled = new Promise<void>((resolve) => (settle = resolve));
-  const engine = createClaudeGenerationEngine({
-    service: createClaudeService({
-      locate: () => Promise.resolve('/fake/claude'),
-      findManagedSettings: () => Promise.resolve([]),
-    }),
-    providers: providers(model),
-    candidates: ['haiku'],
-    budget: BUDGET,
-    runDeps: {
-      spawn: fake.spawn,
-      parentEnv: { HOME: '/Users/owner', ANTHROPIC_API_KEY: 'k-not-real' },
-      now: () => new Date('2026-10-10T00:00:00.000Z'),
-    },
-    sleep: () => Promise.resolve(),
-  });
-  t = openResumeDb({ withVersion: false, generation: engine, onGenerationSettled: settle });
-  return { fake, settled, db: t };
+  const made = setupGeneration(run, model, auth);
+  t = made.db;
+  return made;
 }
 
 const generate = (db: ResumeDb, jobSnapshotId = JOB) =>

@@ -117,4 +117,6 @@ export interface GenerationResult {
   readonly droppedSections: readonly DroppedSection[];
   /** 引用了不存在／不可用事實項而被丟掉的匹配索引 */
   readonly droppedMatches: readonly number[];
+  /** 沒有可用改寫稿、由程式補「沿用原文」段落的經歷（Profile 經歷索引，P1-T072） */
+  readonly filledExperiences: readonly number[];
 }

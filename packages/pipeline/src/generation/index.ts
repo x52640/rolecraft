@@ -27,6 +27,7 @@ export {
   type GenerationRunner,
   type GenerationRunnerDeps,
 } from './runner.ts';
+export { FALLBACK_RATIONALE } from './experience-fallback.ts';
 export { convertGeneration, type SectionContext, type SectionConversion } from './sections.ts';
 export type {
   CitationDraft,

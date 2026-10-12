@@ -106,7 +106,7 @@ describe('convertGeneration（R1、D14）', () => {
       section({ citations: [cite('C1', 'planned'), cite('C1', 'planned')] }),
       'duplicate_citation',
     ],
-    ['no citations', section({ citations: [] }), 'no_citation'],
+    ['no citations (project)', section({ placement: 'project', citations: [] }), 'no_citation'],
     ['unknown experience', section({ placement: 'E2' }), 'unknown_placement'],
     [
       'number not in cited claims',
