@@ -268,4 +268,30 @@ describe('客製履歷段落複製（P1-T086）', () => {
     await waitFor(() => expect(card.getByText(COPY_TEXT.stale)).toBeTruthy());
     expect(writeText).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['新出現 R1 問題', { ok: true, ready: false, issues: [ISSUE], blockers: [] }, COPY_TEXT.issues],
+    [
+      '失去檢查結果',
+      { ok: false, error: { code: 'internal_error', message: 'x' } },
+      COPY_TEXT.noCheck,
+    ],
+  ])(
+    '複製進行中按重新整理、段落沒變但%s：舊的成功檢查作廢，不複製',
+    async (_name, nextCheck, reason) => {
+      const helper = fakeHelper();
+      const card = await renderPage(helper);
+      await waitFor(() => expect(copyButton(card).disabled).toBe(false));
+      helper.hold = true;
+      fireEvent.click(copyButton(card));
+      await waitFor(() => expect(copyButton(card).textContent).toContain('檢查中'));
+      helper.hold = false;
+      helper.check = nextCheck;
+      fireEvent.click(screen.getByRole('button', { name: '重新整理' }));
+      await waitFor(() => expect(card.getByText(reason)).toBeTruthy());
+      helper.release();
+      await waitFor(() => expect(card.getByText(COPY_TEXT.stale)).toBeTruthy());
+      expect(writeText).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -83,9 +83,9 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：實作與測試完成（工作者 worktree，單一 commit）
-- 已通過驗證：`npm run verify` 綠（Vitest 3618 通過、13 略過）
-- 下一步：協調者收官前跑對抗驗證（E3）與 codex review
+- 最後完成：審查待修 2 項（2026-10-12，工作者 worktree，單一 commit）
+- 已通過驗證：`npm run verify` 綠（Vitest 3632 通過、13 略過）
+- 下一步：協調者確認後收官
 - Blocker：無
 
 ## 完成結果
@@ -102,3 +102,7 @@ npm run verify
   - `ResumesPage.tsx` 不在 write_paths，版本 id 改由模組層級的小型 store 傳給段落卡片（單一編輯器頁面假設）；若日後 ResumesPage 可改，宜改為 props。
   - helper 內容與畫面不一致時只提示按「重新整理」，不自動更新畫面（自介是自動同步再按一次）。
   - 未接受除了 helper blockers 外在本機再擋一次；畫面任何寫入進行中也作廢複製。
+- 審查待修 2 項（2026-10-12）：
+  1. 空白／隱藏字元：`copy-rules.ts` 新增 `isBlankForCopy`（原文或 NFKC 後去掉 Default_Ignorable、Cf、Mn、Me、Co 與所有空白後沒內容即空白）與 `hasHiddenChars`（含標籤字元 U+E0000～E007F 或私用區字元一律不能複製，`COPY_TEXT.hidden`）。刻意比 domain `isBlankForNumbers` 更嚴（domain 判空白者這裡必判空白）。不重用 domain：架構規則 editor 只能依賴 contracts（`docs/specs/architecture.md`），協調者裁定不搬套件、不改契約。測試 `copy/copy-rules.test.ts`（標籤字元整段／夾帶、私用區、零寬整段、組合記號整段、不可見字元夾空白不能複製；重音、emoji＋ZWJ、變體選擇符可以複製）。
+  2. 檢查結果改變時作廢：`useSectionCopy.ts` 寫入剪貼簿前除了段落，還比對畫面上的整個把關狀態（段落＋該段問題＋blockers）是否與按下時相同、畫面仍有檢查結果，並用最新狀態重跑 `copyBlockReason`；任一不符顯示 `COPY_TEXT.stale` 不複製。測試 `SectionCopy.test.ts`「複製進行中按重新整理、段落沒變但新出現 R1 問題／失去檢查結果：舊的成功檢查作廢，不複製」（修正前兩案例皆失敗）。
+  - 殘餘：editor 與 domain 兩套空白判定；domain 日後若放寬或改變，要同步確認 editor 仍是超集合。含標籤字元的 emoji（例如英格蘭旗）也會被擋，屬保守取捨。

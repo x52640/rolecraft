@@ -15,7 +15,7 @@ const failed = (res: BridgeFailure): Outcome => ({
  * 一段客製履歷的「複製」（P1-T086、resume-output「內容回填到求職網站」）。
  * 按下時向 helper 重新讀取版本、重跑 resume.check_export、再讀一次版本：
  * 兩次讀到的這段完全相同、文字等於畫面、已接受，且檢查結果中這段沒有任何問題或 blocker，才寫入剪貼簿。
- * 請求進行中鎖住按鈕；回應回來時卡片已卸載、版本已切換、畫面上的這段已更新，或頁面有寫入進行中，一律作廢。
+ * 請求進行中鎖住按鈕；回應回來時卡片已卸載、版本已切換、畫面上的這段或檢查結果已更新、畫面失去檢查結果，或頁面有寫入進行中，一律作廢。
  */
 export function useSectionCopy(gate: SectionGate, busy: boolean) {
   const bridge = useBridge();
@@ -65,12 +65,16 @@ export function useSectionCopy(gate: SectionGate, busy: boolean) {
     const token = ++op.current;
     const { versionId } = context;
     const shown = gate.section;
-    const shownJson = JSON.stringify(shown);
+    const gateJson = JSON.stringify(gate);
+    // 畫面上的段落、檢查結果（問題／blockers）、有無檢查結果任一改變（例如重檢期間按了重新整理），
+    // 進行中的複製就作廢；寫入剪貼簿前再用畫面上最新的把關確認一次（codex）
     const current = () =>
       alive.current &&
       op.current === token &&
       readCopyContext()?.versionId === versionId &&
-      JSON.stringify(latest.current.gate.section) === shownJson &&
+      readCopyContext()?.checked === true &&
+      JSON.stringify(latest.current.gate) === gateJson &&
+      copyBlockReason(latest.current.gate) === null &&
       !latest.current.busy;
     setCopying(true);
     setMessage(null);
