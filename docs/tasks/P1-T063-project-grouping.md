@@ -1,7 +1,7 @@
 ---
 id: P1-T063
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T061"]
 specs: ["evidence-model.md", "bridge.md", "providers.md", "sources-and-authorization.md", "runtime-and-budget.md", "architecture.md"]
 track: helper
@@ -97,7 +97,7 @@ npm run verify
 ## 中斷／接手紀錄
 
 - 最後完成：對抗驗證與 codex review 屬實三項已修（刪除或讀不到的文件不進建議也不能建成專案、建議輪詢舊回應失效、組大小對齊建立上限），各補回歸測試
-- 已通過驗證：worktree 內 `npm run verify` 綠（Vitest 3187 通過、13 略過）；四則回歸測試在修正前皆失敗
+- 已通過驗證：worktree 與協調者主樹 `npm run verify` 綠（3187 通過、13 略過）；對抗驗證 1 項、codex 3 項（1 項重疊）已在 `38fed82` 修正，四則回歸測試修正前皆失敗；修正 diff 再跑 codex 無發現
 - 下一步：協調者收官
 - Blocker：無
 
