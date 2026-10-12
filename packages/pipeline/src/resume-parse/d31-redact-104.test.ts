@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { runWebResumeParse } from './run.ts';
 import type { ResumeParseOutput } from './types.ts';
-import { f, fakeDeps, h, inputsOf, li, p, prepareWeb } from './web-fixtures.test-helpers.ts';
+import { f, fakeDeps, h, inputsOf, li, lv, p, prepareWeb } from './web-fixtures.test-helpers.ts';
 
 const PAGE_104 = [
   p('林雨晴'), // b1
@@ -116,5 +116,19 @@ describe('104 履歷頁區塊（D31 驗收）', () => {
     const originals = new Map(lines.map((l) => [l.id, l.original]));
     expect(originals.get('b5')).toBe('負責三家門市的日常：https://example.com/portfolio');
     expect(originals.get('b22')).toBe('高雄市、台南市東區、台南市北區、屏東縣屏東市、高雄市鳳山區');
+  });
+
+  it('codex 審查：數字路名、之／- 門牌、.NET 尾綴網域經網頁路線也不送', () => {
+    const extra = [
+      p('臺中市西屯區工業區38路100號'),
+      lv('通訊處', '新北市中和區景平路100之1號5樓'),
+      p('居住地 新北市中和區景平路100-1號5樓'),
+      p('作品 team.asp.net/portfolio'),
+      p('熟悉 ASP.NET/C#'),
+    ];
+    const { prompt } = prepareWeb(inputsOf([...PAGE_104, ...extra], { pageNames: ['林雨晴'] }));
+    for (const s of ['38路', '100號', '100之1', '100-1', '5樓', 'asp.net/'])
+      expect(prompt).not.toContain(s);
+    expect(prompt).toContain('ASP.NET/C#');
   });
 });

@@ -144,3 +144,65 @@ describe('PDF 路線（personal.ts 經同一遮蔽器）', () => {
     expect(lines.map((l) => l.original)).toContain('GitHub github.com/sample-dev');
   });
 });
+
+const CODEX_ADDRESSES = [
+  '臺中市西屯區工業區38路100號',
+  '臺中市西屯區工業區３８路１００號',
+  '新北市中和區景平路100之1號5樓',
+  '新北市中和區景平路100-1號5樓',
+  '高雄市苓雅區四維三路100－1號5樓之2',
+  '臺北市大安區復興南路一段390號地下1樓',
+  '臺北市信義區松仁路100號B1',
+  '台南市東區大學路1巷2弄3號4樓302室',
+];
+
+describe('codex 審查 3 項（數字路名、之／- 門牌、.NET 例外只限獨立詞）', () => {
+  it.each(CODEX_ADDRESSES)('整段地址一起遮：%s', (text) => {
+    expect(masked(text)).toEqual([text]);
+  });
+
+  it.each([
+    ['作品 team.asp.net/portfolio', ['team.asp.net/portfolio']],
+    ['作品 asp.net/portfolio', ['asp.net/portfolio']],
+    ['sample.vb.net/x 與 my-ado.net/y', ['sample.vb.net/x', 'my-ado.net/y']],
+  ])('.NET 尾綴的網域照遮：%s', (text, expected) => {
+    expect(masked(text)).toEqual(expected);
+  });
+
+  it.each(['ASP.NET/C#', 'asp.net/MVC 與 VB.NET/WinForms', 'ADO.NET/SQL'])(
+    '獨立的 .NET 技術詞接技術詞不遮：%s',
+    (text) => {
+      expect(redactOne(text)).toBe(text);
+    },
+  );
+
+  it('PDF 路線的提示不含上述地址與網址', () => {
+    const result = prepareResumeParse(
+      {
+        pages: [
+          {
+            pageNumber: 1,
+            lines: ['工作經驗', ...CODEX_ADDRESSES, '作品 team.asp.net/portfolio'],
+          },
+        ],
+        names: [],
+        personalHints: [],
+      },
+      budget(1e6),
+      idSource('c'),
+    );
+    if (!result.ok) throw new Error(result.reason);
+    const leaks = [
+      '38路',
+      '３８路',
+      '100之1',
+      '100-1',
+      '100－1',
+      '地下1樓',
+      'B1',
+      '302室',
+      'asp.net',
+    ];
+    for (const s of leaks) expect(result.prepared.prompt).not.toContain(s);
+  });
+});
