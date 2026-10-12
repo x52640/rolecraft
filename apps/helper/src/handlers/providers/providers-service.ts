@@ -159,7 +159,6 @@ export function createProvidersService(
 
   // 自動連線檢查（P1-T070）：設定頁讀狀態、選定模型前只讀版本＋登入；使用者發起工作前照 D22／D24。
   const checks = createClaudeCheckScheduler(probe, applyCheck, () => current('claude'));
-  const refresh = (): Promise<ServiceStatus> => checks.refresh();
 
   // Claude 同一時間只跑一個短驗證：被擋時的自動重新檢查會覆寫狀態，
   // 兩個候選並行時可能蓋掉另一個剛設的 quota_exhausted（P1-T044）。
@@ -234,7 +233,8 @@ export function createProvidersService(
     recheck(service) {
       // Codex、Antigravity 首版「尚未支援」：不檢查、不啟動任何程式。
       if (service !== 'claude') return Promise.resolve(current(service));
-      return refresh();
+      // 與使用者發起工作的一般檢查共用進行中的那一次（P1-T070）。
+      return checks.recheck();
     },
 
     listCandidates(service) {

@@ -17,7 +17,7 @@ export function claudeUnavailableReason(status: ServiceStatus | undefined): stri
     case 'not_logged_in':
       return 'Claude Code 尚未登入，請用 Claude 訂閱帳號登入後再試';
     case 'quota_exhausted':
-      return 'Claude 訂閱額度已用完，請等額度恢復後再試';
+      return 'Claude 訂閱額度已用完；額度恢復後請到設定頁按「重新檢查」';
     case 'eligibility_unknown':
       return status.checkedAt === null
         ? '還沒能檢查 Claude 服務，請到設定頁按「重新檢查」'

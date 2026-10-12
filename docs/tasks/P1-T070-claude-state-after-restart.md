@@ -86,8 +86,9 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：「審查屬實待修」4 項（並行檢查結果、失敗後重試、等待上限、未選模型不檢查），每項補假 runner 計次測試
-- 已通過驗證：worktree `npm run verify` 綠（Vitest 3526 通過、13 略過）
+- 最後完成：「修正 cde0ddb 的審查待修」3 項（手動檢查中共用、額度用完指示、rescue 只限純版本問題），每項先寫重現測試再修
+- 已通過驗證：worktree `npm run verify` 綠（Vitest 3551 通過、13 略過）
+- 前一輪：「審查屬實待修」4 項（並行檢查結果、失敗後重試、等待上限、未選模型不檢查）
 - 下一步：協調者稽核、對抗驗證＋codex review；手動以 harness 重開後直接產生自介
 - Blocker：無
 - 第 3 項（重新驗證可能超過橋接 30 秒逾時）的選擇：helper 端給 `prepareRun` 加等待上限（`CLAUDE_PREPARE_RUN_WAIT_MS` 20 秒），等不到就回既有的失敗碼（no_model／no_service）加具體原因「正在檢查…請稍後再試」，檢查在背景繼續、下次發起接著等同一次。理由：改動最小，不動 contracts、bridge 規格與 extension 逾時；延長單一請求逾時要改 extension／contracts（超出 write_paths），回「檢查中」狀態讓前端輪詢要新增回應欄位（contract 變更）。代價：使用者第一次要再按一次。
@@ -117,3 +118,10 @@ npm run verify
 - `docs/specs/providers.md` P1-T070 段同步。
 - 殘餘：一般檢查背景進行中、且本程序還沒做過任何檢查時，設定頁讀狀態看到的是初始「資格未知」（不顯示「檢查中」）；要顯示需新增狀態欄位或沿用 versionCheck=running 的語意，沒做。手動「重新檢查」（`providers.recheck`）本身會同步重新驗證、可能超過 30 秒，是 P1-T062 以來的既有行為，不在這 4 項內。
 
+### 修正 cde0ddb 的審查待修（2026-10-12）
+
+1. 手動重新檢查中發起工作：`check-scheduler.ts` 新增 `recheck()`，手動「重新檢查」與 `prepareRun` 共用進行中的同一次一般檢查（`general`），不再另開一次被閘門擋下。等超過上限照舊回「檢查中」。重新啟用（D24）跑完後的檢查仍用不共用的 `refresh()`，要反映重新驗證之後的閘門。
+2. 額度用完：訊息改為「Claude 訂閱額度已用完；額度恢復後請到設定頁按「重新檢查」」，R9 不重新檢查的行為不變。
+3. rescue 條件：較新的那次要是「純版本問題」（找得到 CLI、isolation 不是 passed，且 login／eligibility／subscriptionOnly 都不是 failed）才採用較舊的通過結果；有確定的登入或訂閱路線失敗一律保留較新的結果。`docs/specs/providers.md` P1-T070 段同步。
+- 測試：`providers/check-scheduler.shared.test.ts`（手動檢查中發起工作共用 1 次、手動檢查超過上限回檢查中且不另開、工作檢查中按重新檢查共用、額度訊息、額度用完不重新檢查、純版本問題採用舊結果、登出／API key／方案不符保留新結果；假 probe 計次、verifyModel 0 次）。`check-scheduler.test.ts` 的並行案例改用重新啟用路徑製造兩次並行檢查（手動重新檢查現在會共用）。
+- 殘餘：背景重新啟用（D24）進行中發起工作，一般檢查仍會被閘門擋下，回版本驗證中的原因（不是「檢查中」）；不在這 3 項內。

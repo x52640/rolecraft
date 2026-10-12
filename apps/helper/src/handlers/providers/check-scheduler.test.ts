@@ -44,7 +44,11 @@ function setup(options: { selected?: string | null; waitMs?: number } = {}) {
       }),
   );
   const verifyModel = vi.fn<ClaudeProbe['verifyModel']>();
-  const probe: ClaudeProbe = { candidates: ['haiku'], check, verifyModel };
+  // 重新啟用（D24）跑完後的檢查不與一般檢查共用：用它製造兩次並行的檢查。
+  const reverify = vi.fn<NonNullable<ClaudeProbe['reverify']>>(() =>
+    Promise.resolve({ outcome: 'passed', reason: null }),
+  );
+  const probe: ClaudeProbe = { candidates: ['haiku'], check, verifyModel, reverify };
   const selected = options.selected === undefined ? 'haiku' : options.selected;
   const providers = createProvidersService({
     claudeProbe: probe,
@@ -69,11 +73,12 @@ describe('並行檢查：先開始的較晚結束', () => {
     const { pending, providers, resolve, verifyModel } = setup();
     const run = resolve();
     await waitPending(pending, 1);
-    // 使用者在設定頁按「重新檢查」：重新驗證進行中，被閘門擋下，先結束。
-    const manual = providers.recheck('claude');
+    // 重新啟用跑完後的檢查：確認不了版本（純版本問題），先結束。
+    await providers.reverifyClaude();
     await waitPending(pending, 2);
     pending[1]?.resolve(VERSION_BLOCKED);
-    expect((await manual).state).toBe('unsupported');
+    await providers.reverifyTask;
+    expect((await providers.status())[0]?.state).toBe('unsupported');
     // 較早開始的檢查（重新驗證通過）較晚結束：不丟掉。
     pending[0]?.resolve(PASS);
     expect((await run)?.model).toBe('haiku');
@@ -85,10 +90,10 @@ describe('並行檢查：先開始的較晚結束', () => {
     const { pending, providers, resolve } = setup();
     const run = resolve();
     await waitPending(pending, 1);
-    const manual = providers.recheck('claude');
+    await providers.reverifyClaude();
     await waitPending(pending, 2);
     pending[1]?.resolve(PASS);
-    await manual;
+    await providers.reverifyTask;
     pending[0]?.resolve(LOGGED_OUT);
     expect((await run)?.model).toBe('haiku');
     expect((await providers.status())[0]?.state).toBe('available');
