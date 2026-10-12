@@ -1,5 +1,7 @@
 import type { BridgeFailure } from '@rolecraft/contracts';
 
+import { withUnavailableReason } from '../providers/unavailable-reason.ts';
+
 import type { DraftRefusal } from './service.ts';
 
 /** 固定文字（給人看）；不回填請求內容。 */
@@ -12,8 +14,12 @@ const MESSAGES: Record<DraftRefusal, string> = {
   busy: '這則訊息的草稿正在產生，請稍候',
 };
 
+/** 沒有可用的服務時接上具體原因（P1-T070：未登入、方案不符、CLI 版本待驗證等）。 */
+const messageOf = (reason: DraftRefusal): string =>
+  reason === 'no_service' ? withUnavailableReason(MESSAGES[reason]) : MESSAGES[reason];
+
 export function draftRefused(reason: DraftRefusal): BridgeFailure {
-  return { ok: false, error: { code: 'invalid_request', message: MESSAGES[reason] } };
+  return { ok: false, error: { code: 'invalid_request', message: messageOf(reason) } };
 }
 
 export function messageNotFound(): BridgeFailure {

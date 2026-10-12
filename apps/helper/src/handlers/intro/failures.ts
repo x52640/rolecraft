@@ -1,5 +1,7 @@
 import type { BridgeFailure } from '@rolecraft/contracts';
 
+import { withUnavailableReason } from '../providers/unavailable-reason.ts';
+
 import type { IntroRefusal } from './service.ts';
 
 type IntroFailureReason = IntroRefusal | 'no_intro';
@@ -14,6 +16,10 @@ const MESSAGES: Record<IntroFailureReason, string> = {
   no_intro: '這個職缺還沒有投遞自介：請先產生',
 };
 
+/** 沒有可用的服務時接上具體原因（P1-T070：未登入、方案不符、CLI 版本待驗證等）。 */
+const messageOf = (reason: IntroFailureReason): string =>
+  reason === 'no_service' ? withUnavailableReason(MESSAGES[reason]) : MESSAGES[reason];
+
 export function introFailure(reason: IntroFailureReason): BridgeFailure {
-  return { ok: false, error: { code: 'invalid_request', message: MESSAGES[reason] } };
+  return { ok: false, error: { code: 'invalid_request', message: messageOf(reason) } };
 }

@@ -78,7 +78,7 @@ let n = 0;
 const newCandidateId = () => `c${String(++n).padStart(8, '0')}`;
 
 describe('providers 持久化（P1-T058）', () => {
-  it('選定模型存模型別名；重啟後候選 ID 換新仍對回同一模型，狀態回到需重新檢查', async () => {
+  it('選定模型存模型別名；重啟後候選 ID 換新仍對回同一模型，不沿用舊狀態、查狀態時重新檢查', async () => {
     await session(async (store) => {
       const providers = createProvidersService({
         claudeProbe: fakeProbe({ record: record('11111111-1111-4111-8111-111111111111') }),
@@ -93,13 +93,29 @@ describe('providers 持久化（P1-T058）', () => {
         verification: 'passed',
       });
     });
+    const connection = () => {
+      const { db } = openDatabase(file);
+      const saved = createRepositories(db).providerConnections.get('claude');
+      db.close();
+      return saved;
+    };
+    expect(connection()).toMatchObject({
+      login: 'passed',
+      availableModels: ['sonnet'],
+      checkedAt: OK_CHECK.checkedAt,
+    });
 
     await session(async (store) => {
-      const providers = createProvidersService({ claudeProbe: fakeProbe(), store, newCandidateId });
+      const check = vi.fn<ClaudeProbe['check']>(() =>
+        Promise.resolve({ ...OK_CHECK, login: 'unknown' }),
+      );
+      const probe = { ...fakeProbe(), check };
+      const providers = createProvidersService({ claudeProbe: probe, store, newCandidateId });
       const candidates = await providers.listCandidates('claude');
+      // 上次存的是可用，但重啟後以這次（P1-T070 自動）檢查為準。
       const [claude] = await providers.status();
+      expect(check).toHaveBeenCalledTimes(1);
       expect(claude?.state).toBe('eligibility_unknown');
-      expect(claude?.checkedAt).toBeNull();
       expect(claude?.selectedCandidateId).toBe(candidates[1]?.candidateId);
       expect(candidates[1]?.label).toBe('Claude Sonnet');
     });
@@ -107,10 +123,10 @@ describe('providers 持久化（P1-T058）', () => {
     const { db } = openDatabase(file);
     const repos = createRepositories(db);
     expect(repos.providerSelections.get('claude')).toBe('sonnet');
+    // 重啟後的檢查結果覆寫連接狀態；這個程序還沒短驗證過任何模型。
     expect(repos.providerConnections.get('claude')).toMatchObject({
-      login: 'passed',
-      availableModels: ['sonnet'],
-      checkedAt: OK_CHECK.checkedAt,
+      login: 'unknown',
+      availableModels: [],
     });
     expect(repos.runCheckRecords.listByProvider('claude').map((r) => r.id)).toEqual([
       '11111111-1111-4111-8111-111111111111',

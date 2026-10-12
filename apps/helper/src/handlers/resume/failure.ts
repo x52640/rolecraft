@@ -1,5 +1,7 @@
 import type { BridgeFailure } from '@rolecraft/contracts';
 
+import { withUnavailableReason } from '../providers/unavailable-reason.ts';
+
 import type { ResumeFailureReason, ResumeResult } from './service.ts';
 
 const MESSAGES: Record<ResumeFailureReason, string> = {
@@ -21,9 +23,13 @@ const MESSAGES: Record<ResumeFailureReason, string> = {
   blank_section: '空白段落不需確認',
 };
 
+/** 沒有可用的服務時接上具體原因（P1-T070：未登入、方案不符、CLI 版本待驗證等）。 */
+const messageOf = (reason: ResumeFailureReason): string =>
+  reason === 'no_model' ? withUnavailableReason(MESSAGES[reason]) : MESSAGES[reason];
+
 /** 履歷操作失敗：一律 invalid_request，訊息是固定文字，不回填請求內容。 */
 export function resumeFailure(reason: ResumeFailureReason): BridgeFailure {
-  return { ok: false, error: { code: 'invalid_request', message: MESSAGES[reason] } };
+  return { ok: false, error: { code: 'invalid_request', message: messageOf(reason) } };
 }
 
 export function ackOrFailure(result: ResumeResult): { ok: true } | BridgeFailure {

@@ -23,7 +23,45 @@ import {
 import { claudeServiceOf } from './handlers/providers/providers-service.ts';
 import { ALLOWED_ORIGINS_ENV, dispatch, FrameDecoder, encodeFrame } from './index.ts';
 import { ENGLISH_RESUME, makeTextPdf } from './handlers/import/__fixtures__/pdf.ts';
-import { createServices, nativePickers, type NativePickers } from './main.ts';
+import {
+  type ClaudeCheck,
+  type ClaudeProbe,
+  createHelperClaudeService,
+} from './handlers/providers/claude-probe.ts';
+import type { HelperServices } from './handlers/services.ts';
+import { createServices as createRealServices, nativePickers, type NativePickers } from './main.ts';
+
+/**
+ * 經 createServices 的測試一律用假的 Claude 檢查（P1-T070）：查狀態會自動做連線檢查，
+ * 不能在 verify 時執行真實 `claude`（含 --version、auth status）。登入狀態回「未知」，所以永遠不會是可用。
+ */
+const FAKE_CHECK: ClaudeCheck = {
+  installed: 'passed',
+  login: 'unknown',
+  eligibility: 'unknown',
+  subscriptionOnly: 'unknown',
+  isolation: 'passed',
+  checkedAt: '2026-10-12T00:00:00.000Z',
+};
+const fakeCheck = vi.fn<ClaudeProbe['check']>(() => Promise.resolve(FAKE_CHECK));
+const fakeVerifyModel = vi.fn<ClaudeProbe['verifyModel']>(() =>
+  Promise.reject(new Error('測試不呼叫模型')),
+);
+const FAKE_PROBE: ClaudeProbe = {
+  candidates: ['haiku', 'sonnet', 'opus', 'fable'],
+  check: fakeCheck,
+  verifyModel: fakeVerifyModel,
+};
+const createServices = (
+  storage?: Parameters<typeof createRealServices>[0],
+  pickers?: NativePickers,
+  base?: HelperServices,
+) =>
+  createRealServices(storage, pickers, base, {
+    claudeProbe: FAKE_PROBE,
+    // 有資料區時用 persistedProvidersOptions 接上的 Claude 服務；沒有時照正式入口建一個（不啟動程式）
+    ...(storage ? {} : { service: createHelperClaudeService() }),
+  });
 
 const MAIN = path.join(import.meta.dirname, 'main.ts');
 
@@ -207,10 +245,15 @@ describe('服務組裝（createServices，P1-T043）', () => {
     });
     const services = createServices(storage(), {});
     expect(await send(services, 'analysis.status')).toEqual({ ok: true, analysis: null });
+    // 自動檢查不通過（假檢查的登入狀態是未知）：回具體原因（P1-T070），不呼叫模型。
     expect(await send(services, 'analysis.start')).toMatchObject({
       ok: false,
-      error: { code: 'invalid_request', message: expect.stringContaining('選定') as unknown },
+      error: {
+        code: 'invalid_request',
+        message: expect.stringContaining('登入方式或方案') as unknown,
+      },
     });
+    expect(fakeVerifyModel).not.toHaveBeenCalled();
     expect(await send(services, 'analysis.status')).toEqual({ ok: true, analysis: null });
   });
 
@@ -296,6 +339,7 @@ describe('服務組裝（createServices，P1-T043）', () => {
 
     const second = openDatabase(dbFile).db;
     const s2 = createServices({ db: second, fileStore }, fakePickers());
+    fakeCheck.mockClear();
     expect(await send(s2, 'sources.list_folders')).toEqual({
       ok: true,
       roots: [{ rootId, name: '專案甲', pendingCount: 0, authorizedCount: 1 }],
@@ -311,6 +355,9 @@ describe('服務組裝（createServices，P1-T043）', () => {
       state: 'eligibility_unknown',
       selectedCandidateId: opus,
     });
+    // 重開後第一次查狀態自動做一次連線檢查（只讀版本＋登入，P1-T070），不沿用舊的狀態。
+    expect(fakeCheck.mock.calls).toEqual([[{ reverify: false }]]);
+    expect(fakeVerifyModel).not.toHaveBeenCalled();
     const claude = s2.providers && claudeServiceOf(s2.providers);
     expect(await claude?.gate.load()).toBe(true);
     expect(claude?.gate.isAccepted('9.9.9')).toBe(true);

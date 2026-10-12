@@ -16,6 +16,7 @@ export function SettingsPage() {
   const [checking, setChecking] = useState<Provider | null>(null);
   const [reverifyStarting, setReverifyStarting] = useState(false);
 
+  // helper 重開後第一次讀狀態會自動做一次連線檢查（不呼叫模型，P1-T070），不必手動按「重新檢查」。
   const load = useCallback(async () => {
     const res = await bridge.send({ op: 'providers.status', payload: {} });
     if (res.ok) {
@@ -93,7 +94,7 @@ export function SettingsPage() {
         訂閱帳號登入），完成後按「重新檢查」。
       </p>
       {error ? <p role="alert">{error}</p> : null}
-      {statuses === null && !error ? <p>讀取服務狀態中…</p> : null}
+      {statuses === null && !error ? <p>讀取並檢查服務狀態中…</p> : null}
       <div className="provider-cards">
         {ordered.map((status) => (
           <ProviderCard

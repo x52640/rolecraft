@@ -81,18 +81,23 @@ describe('狀態判定（S9-1、S9-3）', () => {
 });
 
 describe('providers.status／recheck', () => {
-  it('初始：沒有一家是可用；Codex、Antigravity 尚未支援；不觸發檢查', async () => {
-    const { probe, services } = setup();
+  it('初始：建立服務不檢查；Codex、Antigravity 尚未支援；第一次查狀態自動檢查一次（P1-T070）', async () => {
+    const { probe, services } = setup({ login: 'failed' });
+    expect(probe.check).not.toHaveBeenCalled();
     const res = await providersStatus({}, services);
     valid('providers.status', res);
     if (!res.ok) throw new Error('應成功');
     expect(res.services.map((s) => [s.service, s.state])).toEqual([
-      ['claude', 'eligibility_unknown'],
+      ['claude', 'not_logged_in'],
       ['codex', 'unsupported'],
       ['antigravity', 'unsupported'],
     ]);
-    expect(res.services.every((s) => s.checkedAt === null)).toBe(true);
-    expect(probe.check).not.toHaveBeenCalled();
+    // 自動檢查不重新驗證（保證不呼叫模型）；之後查狀態不再檢查。
+    expect(probe.check).toHaveBeenCalledTimes(1);
+    expect(probe.check).toHaveBeenCalledWith({ reverify: false });
+    await providersStatus({}, services);
+    expect(probe.check).toHaveBeenCalledTimes(1);
+    expect(probe.verifyModel).not.toHaveBeenCalled();
   });
 
   it.each(['codex', 'antigravity'] as const)('%s 重新檢查仍是尚未支援，不跑任何檢查', async (s) => {
@@ -287,11 +292,11 @@ describe('對抗驗證修正：被擋後更新狀態、合併重複驗證', () =
     expect(probe.check).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['quota_exhausted', 'not_checked'] as const)(
+  it.each(['quota_exhausted', 'auto_check_failed'] as const)(
     '狀態不是 available（%s）時 select → invalid_request，0 次模型呼叫',
     async (which) => {
       const { probe, providers, services } = setup(
-        {},
+        which === 'auto_check_failed' ? { login: 'failed' } : {},
         { verification: 'failed', quotaExhausted: true },
       );
       const candidateId = await firstCandidate(services);

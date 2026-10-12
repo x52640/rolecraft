@@ -62,6 +62,11 @@ export interface ClaudeService {
   readonly adapter: ClaudeAdapter;
   readonly gate: ClaudeVersionGate;
   ensureVersion(deps: ServiceDeps): Promise<EnsureVersionResult>;
+  /**
+   * 只讀版本、不重新驗證（P1-T070 自動連線檢查用，0 次模型呼叫）：已驗證回 ready；
+   * 停用、未完成、沒有紀錄的版本一律 blocked（重新驗證留給使用者按「重新檢查」或「重新啟用」）。
+   */
+  observeVersion(deps: ServiceDeps): Promise<EnsureVersionResult>;
   /** 使用者重新啟用：目前版本停用或未完成時，重跑一次注入測試（D24），通過才接受。 */
   reverify(deps: ServiceDeps): Promise<ReverifyResult>;
   run(request: RunRequest, deps: ServiceDeps): Promise<ClaudeRunResult>;
@@ -165,6 +170,16 @@ export function createClaudeService(options: ClaudeServiceOptions = {}): ClaudeS
     return reverifyNow(located, deps);
   };
 
+  const observeVersion = async (deps: ServiceDeps): Promise<EnsureVersionResult> => {
+    const located = await locateVersion(deps);
+    if ('status' in located) return located;
+    const { version } = located;
+    const status = gate.statusOf(version);
+    if (status.kind === 'accepted') return { status: 'ready', version };
+    if (status.kind === 'failed' || status.kind === 'incomplete') return blocked(status.reason);
+    return blocked(`Claude CLI ${version} 尚未驗證；請到設定頁按「重新檢查」自動重新驗證`);
+  };
+
   const reverify = async (deps: ServiceDeps): Promise<ReverifyResult> => {
     const located = await locateVersion(deps);
     if ('status' in located) return located;
@@ -181,6 +196,7 @@ export function createClaudeService(options: ClaudeServiceOptions = {}): ClaudeS
     adapter,
     gate,
     ensureVersion,
+    observeVersion,
     reverify,
     async run(request, deps) {
       const runDeps = claudeRunDeps(deps, { acceptVersion: gate.isAccepted });

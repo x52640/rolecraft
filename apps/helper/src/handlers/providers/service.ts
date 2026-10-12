@@ -19,8 +19,16 @@ export type SelectResult =
   | { readonly kind: 'verified'; readonly verification: CheckOutcome };
 
 export interface ProvidersService {
-  /** 三家最近一次檢查的狀態（不觸發新檢查）。 */
+  /**
+   * 三家最近一次檢查的狀態。本程序還沒檢查過 Claude 時先自動做一次連線檢查（不重新驗證、
+   * 不呼叫模型；P1-T070），之後不觸發新檢查。生成端解析選定模型也經這裡。
+   */
   status?(): Promise<readonly ServiceStatus[]>;
+  /**
+   * 使用者發起需要該服務的工作前（P1-T070）：本程序還沒檢查過，或上次只是自動檢查且不可用，
+   * 就做一次一般檢查（D22／D24 照常自動重新驗證），回檢查後的狀態。
+   */
+  prepareRun?(service: Provider): Promise<ServiceStatus>;
   /** 重新檢查一家（安裝、登入、R5 版本閘門、R6），回新的狀態。 */
   recheck?(service: Provider): Promise<ServiceStatus>;
   /** 候選清單；ID 由 helper 配發，同一個 helper 程序內穩定。 */

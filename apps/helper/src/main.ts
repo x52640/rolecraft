@@ -24,7 +24,10 @@ import { createIntroWithClaude } from './handlers/intro/assemble.ts';
 import { createJobsService } from './handlers/jobs/storage-service.ts';
 import { createMessagesService } from './handlers/messages/assemble.ts';
 import { persistedProvidersOptions } from './handlers/providers/persistence.ts';
-import { createProvidersService } from './handlers/providers/providers-service.ts';
+import {
+  createProvidersService,
+  type ProvidersServiceOptions,
+} from './handlers/providers/providers-service.ts';
 import { createResumeWithClaude, pauseInterruptedJobs } from './handlers/resume/assemble.ts';
 import type { HelperServices } from './handlers/services.ts';
 import { assembleSources } from './handlers/sources/assemble.ts';
@@ -53,19 +56,25 @@ export function nativePickers(platform: NodeJS.Platform = process.platform): Nat
 /**
  * 服務組裝：各操作的服務由對應 Task 接上；沒接上的 handler 回「尚未支援」。
  * 沒有本機儲存（尚未設定資料區）時，依賴儲存的服務一律不接。
- * pickers 只供測試替換（不開真的對話框）。
+ * pickers 只供測試替換（不開真的對話框）；providerOptions 只供測試替換 Claude 檢查（假 probe／runDeps，
+ * 不執行真實 CLI，P1-T070）。正式入口不傳。
  */
 export function createServices(
   storage: HelperStorage | null = null,
   pickers: NativePickers = nativePickers(),
   base: HelperServices = {},
+  providerOptions: Partial<ProvidersServiceOptions> = {},
 ): HelperServices {
   const repositories = storage && createRepositories(storage.db);
   const { folder, pdf } = pickers;
   // base：資料區被占用期間已在用的服務；接手後沿用，選定的模型與資料夾不會消失（裁定 #13）
   // 有資料區時選定模型、授權資料夾、已驗證版本存進資料區（P1-T058）
   const providers =
-    base.providers ?? createProvidersService(storage ? persistedProvidersOptions(storage.db) : {});
+    base.providers ??
+    createProvidersService({
+      ...(storage ? persistedProvidersOptions(storage.db) : {}),
+      ...providerOptions,
+    });
   const sources = assembleSources(base.sources, folder, storage?.db);
   return {
     providers,

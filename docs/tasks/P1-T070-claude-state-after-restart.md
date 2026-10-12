@@ -66,3 +66,30 @@ npm run verify
 ### 手動驗證
 
 - 協調者以 harness 重開後直接產生自介
+
+## 完成定義
+
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
+
+## 中斷／接手紀錄
+
+- 最後完成：協調者裁定 A 後的實作（`createServices` 可注入假 probe、D24 走使用者發起的工作、失敗訊息帶具體原因）
+- 已通過驗證：worktree `npm run verify` 綠（Vitest 3445 通過、13 略過）。另外暫時改 providers 的預設 spawn，讓它記錄並拒絕執行，跑完整測試確認沒有任何測試啟動真實 `claude`；只記到 `core/process.test.ts`、`core/connection.test.ts` 本來就會用的暫存假 CLI。檢查完已還原。
+- 下一步：協調者收官；高風險，收官前跑對抗驗證
+- Blocker：無（手動驗證要用 harness 重開，由協調者做）
+
+## 完成結果
+
+- `ClaudeService.observeVersion`：只讀版本、不重新驗證（0 次模型呼叫）；probe 的 `check({ reverify: false })` 改用它。
+- `providers/check-scheduler.ts` 有兩條路：
+  - 自動檢查：本程序第一次讀狀態或選定模型前做，只讀版本與登入，並行請求共用同一次，出錯不算檢查過。
+  - `prepareRun`：使用者發起的工作走這條。本程序還沒檢查過，或上次只做了自動檢查且結果不可用，就做一般檢查，D22／D24 照常自動重新驗證；停用的版本不重試。
+  - 先開始的檢查比較晚結束時，結果丟棄。
+- `ProvidersService.prepareRun`（選填）：`messages/claude-engine.ts` 解析模型前呼叫。解析不到模型時，記下具體原因（`providers/unavailable-reason.ts`，由狀態欄位組成、不含路徑）。analysis、resume 的 `no_model` 和 intro、messages 的 `no_service` 失敗訊息都帶這個原因。
+- `createServices` 新增第 4 個參數 `providerOptions`，只給測試用。`main.test.ts` 全部改用假 probe，並補上斷言：重開後第一次查狀態自動檢查一次、分析失敗回具體原因、不呼叫模型。
+- 設定頁不需要另送請求：開頁讀狀態時由 helper 自動檢查，載入文字改成「讀取並檢查服務狀態中…」。
+- 測試：`providers/auto-check.test.ts`（重開後直接生成、未登入、D24 新版本／未完成會重跑、停用版本不重試、設定頁並行讀取共用一次、檢查出錯下次再試、選定前也自動檢查）；`claude/observe-version.test.ts`；SettingsPage 1 案；既有 providers 測試依新行為更新。
+- 殘餘：
+  - 具體原因靠模組層的「最近一次解析結果」傳給失敗訊息，前提是 helper 單一程序、單一使用者。
+  - 履歷匯入的 AI 整理（`import/`，P1-T069）的 `no_service` 文字沒有接具體原因，不在範圍內。

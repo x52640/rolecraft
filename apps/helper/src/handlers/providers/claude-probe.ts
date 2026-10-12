@@ -52,8 +52,17 @@ export interface ClaudeModelCheck {
   readonly record: RunCheckRecord | null;
 }
 
+/** 連線檢查選項（P1-T070）。 */
+export interface ClaudeCheckOptions {
+  /**
+   * false＝自動連線檢查：只讀版本、不做 D22／D24 重新驗證，保證 0 次模型呼叫。
+   * 預設 true（使用者按「重新檢查」：沒有紀錄或未完成的版本照 D22／D24 重新驗證）。
+   */
+  readonly reverify?: boolean;
+}
+
 export interface ClaudeProbe {
-  check(): Promise<ClaudeCheck>;
+  check(options?: ClaudeCheckOptions): Promise<ClaudeCheck>;
   /** model 只能是 helper 自己的候選常數（呼叫端以 candidateId 查表取得） */
   verifyModel(model: string): Promise<ClaudeModelCheck>;
   /** 目前版本的停用／未完成狀態，從版本閘門即時算（不啟動任何程式）；測試替換的 probe 可省略 */
@@ -114,11 +123,14 @@ export function createClaudeProbe(options: ClaudeProbeOptions = {}): ClaudeProbe
   return {
     candidates: options.candidates ?? CLAUDE_MODEL_CANDIDATES,
 
-    async check() {
+    async check(checkOptions = {}) {
       const d = deps();
       // 先讀目前版本（observe）再做連線檢查：上一個版本被停用時，連線檢查會因閘門短路而讀不到
       // 已更新的新版本，一直回舊版本的失敗（P1-T062 codex review）。
-      const version = await service.ensureVersion(d);
+      const version =
+        checkOptions.reverify === false
+          ? await service.observeVersion(d)
+          : await service.ensureVersion(d);
       const report = await checkConnection(service.adapter, d);
       const { installation, connection } = report;
       let isolation: CheckOutcome = 'unknown';

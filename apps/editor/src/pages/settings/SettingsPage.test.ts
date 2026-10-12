@@ -79,6 +79,15 @@ function renderPage(transport: BridgeTransport | null) {
 const card = (name: RegExp) => screen.getByRole('article', { name });
 
 describe('<SettingsPage />', () => {
+  it('打開時只讀一次狀態（helper 端尚未檢查就自動檢查，P1-T070），不另送重新檢查', async () => {
+    const { transport, requests } = fakeHelper({ state: 'available', login: 'passed' });
+    renderPage(transport);
+    expect(screen.getByText('讀取並檢查服務狀態中…')).toBeTruthy();
+    await screen.findByRole('article', { name: /Claude/ });
+    expect(requests.filter((r) => r.op === 'providers.status')).toHaveLength(1);
+    expect(requests.some((r) => r.op === 'providers.recheck')).toBe(false);
+  });
+
   it('三張狀態卡；Codex、Antigravity 顯示尚未支援且沒有檢查按鈕', async () => {
     const { transport } = fakeHelper({ state: 'not_logged_in', login: 'failed' });
     renderPage(transport);

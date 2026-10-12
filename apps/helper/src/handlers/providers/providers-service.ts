@@ -1,5 +1,6 @@
 // providers.* 服務實作（P1-T030）。有資料區時選定的模型、連接狀態、R6 確認紀錄寫進資料區（P1-T058）；
-// 重啟後狀態一律「需重新檢查」（不沿用舊的可用），選定的模型以模型別名對回這次配發的候選。
+// 重啟後不沿用舊的可用，選定的模型以模型別名對回這次配發的候選。本程序第一次需要 Claude 狀態時
+// （設定頁讀狀態、選定模型、生成端解析模型）自動做一次連線檢查，不呼叫模型（P1-T070）。
 // 候選 ID 由這裡配發（隨機不透明字串）；選定時只拿 ID 查自己的對照表，
 // 查不到一律 unknown_candidate（handler 回 invalid_request），請求字串永遠不會成為 CLI 參數（R7）。
 import { randomUUID } from 'node:crypto';
@@ -15,6 +16,7 @@ import {
   createHelperClaudeService,
 } from './claude-probe.ts';
 import { createClaudeReverifyRunner } from './claude-reverify.ts';
+import { createClaudeCheckScheduler } from './check-scheduler.ts';
 import type { ProvidersStore } from './persistence.ts';
 import type { ProvidersService, SelectResult, ServiceCandidate, ServiceStatus } from './service.ts';
 import { ALL_SERVICES, claudeState, initialStatus } from './state.ts';
@@ -109,7 +111,7 @@ export function createProvidersService(
   const verifiedModels = new Set<string>();
 
   // 重新啟用（D24）：背景重跑注入測試，跑完重新檢查；狀態上疊 versionCheck／lastReverify。
-  const reverify = createClaudeReverifyRunner(probe, () => refresh());
+  const reverify = createClaudeReverifyRunner(probe, () => checks.refresh());
 
   const current = (service: Provider): ServiceStatus => {
     const status = statuses.get(service) ?? initialStatus(service);
@@ -153,7 +155,9 @@ export function createProvidersService(
     return next;
   };
 
-  const refresh = async (): Promise<ServiceStatus> => applyCheck(await probe.check());
+  // 自動連線檢查（P1-T070）：設定頁讀狀態、選定模型前只讀版本＋登入；使用者發起工作前照 D22／D24。
+  const checks = createClaudeCheckScheduler(probe, applyCheck, () => current('claude'));
+  const refresh = (): Promise<ServiceStatus> => checks.refresh();
 
   // Claude 同一時間只跑一個短驗證：被擋時的自動重新檢查會覆寫狀態，
   // 兩個候選並行時可能蓋掉另一個剛設的 quota_exhausted（P1-T044）。
@@ -206,13 +210,19 @@ export function createProvidersService(
       return reverify.task;
     },
 
+    async prepareRun(service) {
+      if (service === 'claude') await checks.prepareRun();
+      return current(service);
+    },
+
     reverifyClaude() {
       const started = reverify.start();
       return Promise.resolve({ started, status: current('claude') });
     },
 
-    status() {
-      return Promise.resolve(ALL_SERVICES.map(current));
+    async status() {
+      await checks.ensureChecked();
+      return ALL_SERVICES.map(current);
     },
 
     recheck(service) {
@@ -226,36 +236,41 @@ export function createProvidersService(
     },
 
     selectCandidate(service, candidateId): Promise<SelectResult> {
-      const entry = candidatesOf(service).find((e) => e.candidate.candidateId === candidateId);
-      if (!entry) return Promise.resolve({ kind: 'unknown_candidate' });
-      // 同一候選進行中的驗證合併成一次（不重複花模型呼叫）；其他候選在進行中一律 not_available。
-      if (inFlight) {
-        return inFlight.candidateId === entry.candidate.candidateId
-          ? inFlight.task
-          : Promise.resolve({ kind: 'not_available' });
-      }
-      // 不是「可用」就不呼叫模型（未檢查、被擋、額度不足等）。
-      if (current('claude').state !== 'available') {
-        return Promise.resolve({ kind: 'not_available' });
-      }
-      // 槽位必定釋放：verify 結束或硬期限到（先到者），不會因 probe 卡住而永遠回 not_available。
-      let released = false;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const deadline = new Promise<SelectResult>((resolve) => {
-        timer = setTimeout(
-          () => resolve({ kind: 'verified', verification: 'unknown' }),
-          CLAUDE_VERIFY_SLOT_DEADLINE_MS,
-        );
-      });
-      const task = Promise.race([verify(entry, () => released), deadline]).finally(() => {
-        released = true;
-        clearTimeout(timer);
-        if (inFlight?.task === task) inFlight = null;
-      });
-      inFlight = { candidateId: entry.candidate.candidateId, task };
-      return task;
+      if (!checks.checked) return checks.ensureChecked().then(() => select(service, candidateId));
+      return select(service, candidateId);
     },
   };
+
+  function select(service: Provider, candidateId: string): Promise<SelectResult> {
+    const entry = candidatesOf(service).find((e) => e.candidate.candidateId === candidateId);
+    if (!entry) return Promise.resolve({ kind: 'unknown_candidate' });
+    // 同一候選進行中的驗證合併成一次（不重複花模型呼叫）；其他候選在進行中一律 not_available。
+    if (inFlight) {
+      return inFlight.candidateId === entry.candidate.candidateId
+        ? inFlight.task
+        : Promise.resolve({ kind: 'not_available' });
+    }
+    // 不是「可用」就不呼叫模型（未檢查、被擋、額度不足等）。
+    if (current('claude').state !== 'available') {
+      return Promise.resolve({ kind: 'not_available' });
+    }
+    // 槽位必定釋放：verify 結束或硬期限到（先到者），不會因 probe 卡住而永遠回 not_available。
+    let released = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<SelectResult>((resolve) => {
+      timer = setTimeout(
+        () => resolve({ kind: 'verified', verification: 'unknown' }),
+        CLAUDE_VERIFY_SLOT_DEADLINE_MS,
+      );
+    });
+    const task = Promise.race([verify(entry, () => released), deadline]).finally(() => {
+      released = true;
+      clearTimeout(timer);
+      if (inFlight?.task === task) inFlight = null;
+    });
+    inFlight = { candidateId: entry.candidate.candidateId, task };
+    return task;
+  }
   if (claudeService) sharedClaude.set(impl, claudeService);
   return impl;
 }

@@ -105,10 +105,16 @@ function setup(initial: ClaudeVersionRecord[], run?: string) {
 }
 
 describe('Claude 停用時的狀態與重新啟用（真實檢查路徑＋假 spawn）', () => {
-  it('建立服務、查狀態都不啟動任何程式', async () => {
+  it('建立服務不啟動任何程式；第一次查狀態自動檢查（只讀版本與登入，不呼叫模型），之後不再啟動', async () => {
     const { cli, providers } = setup([failed]);
-    await providers.status();
     expect(cli.calls).toHaveLength(0);
+    const [claude] = await providers.status();
+    expect(claude?.state).toBe('unsupported');
+    expect(cli.calls.every((c) => c.args[0] === '--version' || c.args[0] === 'auth')).toBe(true);
+    expect(cli.modelCalls()).toBe(0);
+    const before = cli.calls.length;
+    await providers.status();
+    expect(cli.calls).toHaveLength(before);
   });
 
   it('重新檢查：目前版本失敗 → 尚未支援＋原因，不呼叫模型；重新啟用通過 → 可用', async () => {

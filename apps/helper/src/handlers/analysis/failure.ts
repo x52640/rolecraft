@@ -1,5 +1,7 @@
 import type { BridgeFailure } from '@rolecraft/contracts';
 
+import { withUnavailableReason } from '../providers/unavailable-reason.ts';
+
 import type { AnalysisFailureReason } from './service.ts';
 
 const MESSAGES: Record<AnalysisFailureReason, string> = {
@@ -10,7 +12,11 @@ const MESSAGES: Record<AnalysisFailureReason, string> = {
   no_documents: '沒有可分組的文件（需要已授權、已分析過、尚未屬於任何專案的文件），未送出',
 };
 
+/** 沒有可用的服務時接上具體原因（P1-T070：未登入、方案不符、CLI 版本待驗證等）。 */
+const messageOf = (reason: AnalysisFailureReason): string =>
+  reason === 'no_model' ? withUnavailableReason(MESSAGES[reason]) : MESSAGES[reason];
+
 /** 分析操作失敗：一律 invalid_request，訊息是固定文字。 */
 export function analysisFailure(reason: AnalysisFailureReason): BridgeFailure {
-  return { ok: false, error: { code: 'invalid_request', message: MESSAGES[reason] } };
+  return { ok: false, error: { code: 'invalid_request', message: messageOf(reason) } };
 }
