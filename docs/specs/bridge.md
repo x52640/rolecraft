@@ -53,12 +53,13 @@
 | `import.pick_pdf` | helper 開系統檔案選取器（只限 PDF）並解析，回匯入 id 與檔名；取消回 cancelled（P1-T020） |
 | `import.get` | 解析結果：原文（依閱讀順序的行）與欄位草稿；失敗只回原因，不當成功 |
 | `import.save_corrections` | 暫存逐欄校正；不算確認 |
-| `import.confirm` | 以使用者確認當下的內容寫入 Profile 並標為已確認；解析失敗時可確認手動輸入內容（D18）。〔D28／Q8，P1-T079〕資料區已有一份 Profile 時更新那一份（保留 id），沒有才新增，已有多份時不寫入（resume-import「匯入工作階段」） |
+| `import.confirm` | 以使用者確認當下的內容寫入 Profile 並標為已確認；解析失敗時可確認手動輸入內容（D18）。〔D28／Q8，P1-T079〕資料區已有一份 Profile 時更新那一份（保留 id），沒有才新增，已有多份時不寫入（resume-import「匯入工作階段」）。〔D30，P1-T090〕請求形狀不變；helper 依工作階段草稿比對寫下各欄出處（不接受呼叫端的出處文字）、版本號加一 |
 | `import.latest_capture` | 〔D28，P1-T079〕最近一次網頁擷取的 importId、平台、擷取時間、是否截斷；沒有回 null。查詢不觸發 AI 整理 |
 | `import.start_manual` | 〔D28，P1-T079〕建立沒有原文的匯入工作階段，供手動輸入後確認 |
 | `import.ai_parse` | 用使用者選定的 Claude 模型整理已解析的文字（P1-T069，規則見 resume-import「AI 整理欄位」）：在背景執行、立即回狀態；同一筆匯入已有執行中的就不重送。姓名與聯絡資料在本機抽出、不送模型。〔D28，P1-T080〕網頁來源規則見 resume-import「網頁來源的 AI 整理」；相加選填使用者確認的姓名（可多個寫法，只用於本機遮蔽與預填），本次頁面姓名沒辨識出來又沒帶姓名時不呼叫模型。找不到匯入、解析失敗、移除後沒有文字、沒有選定且可用的模型、超過輸入預算回 `invalid_request`（固定訊息），不呼叫模型 |
 | `import.ai_status` | 最近一次 AI 整理：執行中／成功（逐欄照抄檢查過的草稿：本機抽出的個人資料、學歷、經歷、技能、其他段落、被丟棄的欄位與原因）／失敗（原因）；只在 helper 記憶體，沒有整理過為 null |
-| `profile.get` | 〔D28，P1-T079〕唯讀：資料區唯一那份已確認的 Profile（沒有回 null；多份時回固定原因）。供複製按鈕重新讀取比對（resume-output「內容回填到求職網站」） |
+| `profile.get` | 〔D28，P1-T079〕唯讀：資料區唯一那份已確認的 Profile（沒有回 null；多份時回固定原因）。供複製按鈕重新讀取比對（resume-output「內容回填到求職網站」）。〔D30，P1-T090〕回應的 Profile 相加版本號與各欄出處原文 |
+| `profile.update` | 〔D30，P1-T090〕使用者在個人資料頁按儲存：請求帶基準版本號（`profile.get` 讀到的）與整份新內容（基本資料列、經歷、技能；每列標明來自基準的哪一列——基本資料用原標籤、經歷與技能用原位置——或是新增）；不帶出處文字、確認旗標、時間（出處由 helper 依來源列搬移，版本號由 helper 加一）。helper 在同一個寫入比對唯一那份 Profile 的版本號：不符回 `invalid_request`＋`reason: profile_conflict`、不寫入；沒有 Profile 回 `reason: profile_missing`；多份回 `multiple_profiles`；來源列不存在、同一列引用兩次、驗證不過（同 `import.confirm`）回 `invalid_request`。成功回寫入後的整份已確認 Profile（含新版本號）。規則見 resume-import「個人資料編輯（D30）」 |
 | `photo.pick` | 〔D28，P1-T083〕helper 開系統選取器（只限 JPEG／PNG、10 MB 以下），重新編碼、去中繼資料後即設為目前照片；已有照片時是更換（同一交易刪舊加新，套 D19）。回照片資訊（格式、尺寸、雜湊）與縮圖；取消回 cancelled；已有選取視窗開著回 busy（成功形狀 `{ok: true, selection: {status: 'busy'}}`，不是失敗）。選取器操作 |
 | `photo.get` | 〔D28，P1-T083〕目前照片資訊＋縮圖（回應低於 1 MiB）；沒有回 null |
 | `photo.remove` | 〔D28，P1-T083〕刪除目前照片，套 D19（含這張照片、未投遞的匯出版本整份刪除，已投遞的保留） |
@@ -132,7 +133,7 @@
 | `helper_unavailable` | service worker、helper | service worker：本機輔助程式未安裝、未啟動、連線中斷或送不出去。helper（P1-T052，擁有者裁定 #13）：資料區正由另一個 helper 使用時，需要本機儲存的操作（`providers.*`、`sources.*` 以外的全部操作）回固定訊息「RoleCraft 正在另一個瀏覽器使用中，請先關閉該瀏覽器的 RoleCraft」 |
 | `timeout` | service worker | 等待 helper 回覆逾時；不影響同一連線上的其他請求 |
 
-錯誤訊息是給人看的固定文字，不回填請求內容；程式判斷只看代碼。〔D28，P1-T074〕`invalid_request` 可帶選填 `reason`（固定原因：`name_required`＝`import.ai_parse` 網頁來源本次頁面姓名沒辨識出來又沒帶姓名；`multiple_profiles`＝`import.confirm`／`profile.get` 資料區已有多份 Profile），程式只看代碼與 `reason`，不比對文字。
+錯誤訊息是給人看的固定文字，不回填請求內容；程式判斷只看代碼。〔D28，P1-T074〕`invalid_request` 可帶選填 `reason`（固定原因：`name_required`＝`import.ai_parse` 網頁來源本次頁面姓名沒辨識出來又沒帶姓名；`multiple_profiles`＝`import.confirm`／`profile.get`／`profile.update` 資料區已有多份 Profile；〔D30〕`profile_conflict`＝`profile.update` 的基準版本號不是目前版本；`profile_missing`＝`profile.update` 時資料區沒有 Profile），程式只看代碼與 `reason`，不比對文字。
 
 ### 共用常數
 

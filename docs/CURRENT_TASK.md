@@ -9,7 +9,8 @@
 
 ## ready
 
-- P1-T089 editor：網頁來源核對改版（D29 (b)(c)(d)）
+- P1-T089 editor：網頁來源核對改版（D29 (b)(c)(d)、再裁定 2）
+- P1-T090 contracts＋helper：profile.update、Profile 版本號與各欄出處（D30）
 <!-- index:end -->
 
 ## 下一步（2026-10-11 codex 補審後）
@@ -25,6 +26,7 @@
 
 ## 交接（2026-10-12 擁有者要求清空對話後重開）
 
+- 2026-10-13 擁有者裁定 D29 再裁定 2（網頁來源不強制核對，P1-T089 範圍已改）與 D30（個人資料編輯頁）：開 P1-T090（profile.update 契約＋helper，ready）、P1-T091（編輯器個人資料頁，等 T090），皆高風險。未裁定：已產生履歷遇 Profile 修改是否標過期、Profile 刪除是否套 D19（目前都不做）。
 - 2026-10-13 擁有者實跑 104 網頁匯入後裁定 D29（介面字樣過濾、原文收合、欄位出處、網頁來源只看標黃欄位）：開 P1-T088（擴充功能）、P1-T089（編輯器），可平行，皆高風險。
 
 - 2026-10-12 擁有者說「開工」：web-resume-import 已轉正式規格（plan.md D28；`docs/specs/web-resume-capture.md`、`resume-import.md`、`resume-output.md`、`bridge.md`）並拆成 P1-T074～P1-T087；先跑 T074（契約）與 T086（段落複製），T077 等 P1-T017 履歷頁樣本。
