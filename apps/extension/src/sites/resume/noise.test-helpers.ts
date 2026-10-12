@@ -51,11 +51,12 @@ function strings(blocks: readonly ResumeBlock[]): string[] {
   return blocks.flatMap((b) => (b.label === null ? [b.text] : [b.text, b.label]));
 }
 
-/** a 的字元依序出現在 b 裡（可跳過）。 */
-function isSubsequence(a: string, b: string): boolean {
+/** a 的字元依序出現在 b 裡（可跳過）；兩邊都以 code point 為單位（擴充區漢字、emoji）。 */
+export function isSubsequence(a: string, b: string): boolean {
+  const want = Array.from(a);
   let at = 0;
-  for (const ch of b) if (at < a.length && a[at] === ch) at += 1;
-  return at === a.length;
+  for (const ch of b) if (at < want.length && want[at] === ch) at += 1;
+  return at === want.length;
 }
 
 /**

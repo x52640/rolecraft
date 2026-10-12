@@ -3,7 +3,15 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { extractBlocks } from './extract.ts';
 import { filterNoiseBlocks, noiseElementMatcher } from './noise.ts';
-import { BASE, blocksOf, extractWithRules, h, p, RULES } from './noise.test-helpers.ts';
+import {
+  BASE,
+  blocksOf,
+  extractWithRules,
+  h,
+  isSubsequence,
+  p,
+  RULES,
+} from './noise.test-helpers.ts';
 import { simpleOracle } from './simple-oracle.ts';
 
 // blocksOf／extractWithRules 每次都以同一 DOM 跑未過濾版本，斷言過濾後只少不多（noise.test-helpers）。
@@ -141,5 +149,23 @@ describe('個資範圍不擴大', () => {
     expect(blocksOf('<main id="resume"><button>編輯</button><p>前往查看</p></main>')).toBe(
       'not_found',
     );
+  });
+});
+
+describe('通則比對以 code point 為單位（codex 複審）', () => {
+  it('子序列：擴充區漢字與 emoji 相同字串、刪字後都算；多出來的不算', () => {
+    expect(isSubsequence('𠮷', '𠮷')).toBe(true);
+    expect(isSubsequence('👍🏽好', '👍🏽 很好')).toBe(true);
+    expect(isSubsequence('𠮷野', '𠮷 前往 野')).toBe(true);
+    expect(isSubsequence('😀', '😃')).toBe(false);
+    expect(isSubsequence('𠮷𠮷', '𠮷')).toBe(false);
+  });
+
+  it('含擴充區漢字與 emoji 的頁面：過濾前後通則成立', () => {
+    const payload = blocksOf(
+      '<main id="resume"><p>𠮷</p><p>店長 👍🏽<button>編輯</button></p><h2>學歷 🎓 排在第一筆的會當作最高學歷</h2></main>',
+    );
+    if (typeof payload === 'string') throw new Error(payload);
+    expect(payload.blocks).toEqual([p('𠮷'), p('店長 👍🏽'), h(2, '學歷 🎓')]);
   });
 });
