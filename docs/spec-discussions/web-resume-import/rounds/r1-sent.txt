@@ -1,0 +1,44 @@
+你是這份規格的對手，不是助手。你的工作是找出它會出事的地方。
+
+規格：`docs/spec-discussions/web-resume-import/spec.md`（自己讀，我沒有貼給你）
+相關程式碼：這個 repo 裡，自己找。規格 §4 有入口（檔名＋識別字），但 §4 是協調者寫的，可能有錯，請以程式碼為準。
+專案權威：`plan.md` 決策記錄與 `docs/specs/`（索引 `docs/specs/README.md`）。`docs/spec-discussions/rolecraft-v01/` 與根目錄 `Spec.md` 是歷史來源，不是現行需求。
+
+編號慣例：spec.md §2 的 D1–D8 是**這份規格自己的編號**；plan.md 的決策請寫成「plan D7」這樣，避免混淆。R1–R10 指 `docs/specs/` 裡的規則（例如 evidence-model R1、bridge R7、providers R5／R6、jobs-and-messages R10）。Q1–Q7 是 spec.md §7 的待決項。
+
+## 規則（違反就等於沒做）
+
+1. **只討論，不要動手。** 不要改任何檔案，不要跑測試、build、lint、npm script、安裝、登入，也不要呼叫任何模型或連網服務。可以讀檔、搜尋、算 sha256（例如 rg、sed、cat、shasum）。repo 根目錄的 `AGENTS.md`／`CLAUDE.md` 若講實作流程，這一輪不適用。
+2. **講程式行為要有出處。** 指出檔名與行號，或貼出你讀到的那幾行；講規則要指出是哪份 spec 的哪一節或編號。
+   「我覺得可能會…」沒有出處的，標成 `assumption`，不要混進 finding。
+   **外部事實**（104／Cake／Yourator 的條款與頁面 DOM、Chrome 擴充功能 API 的實際行為、Chrome 產生 PDF 時如何嵌入圖片等）你無法在本機查證的，一律標 `assumption`，不能當 blocker 的唯一依據。
+3. **分三類，每一項都要標：**
+   - `blocker`：照這樣寫下去會壞、會自相矛盾、會和現行程式或 `docs/specs/` 衝突、會有資料／隱私／權限問題，或驗收條件無法判定。
+   - `needs_owner`：這是產品取捨，不是技術問題，要人決定。列出選項與各自代價。
+   - `optional`：可以更好，但不擋。**最多三項**，不要把範圍撐大。
+4. **不要重寫規格。** 指出問題就好，不要附上你版本的完整規格。
+
+## 這個 repo 的既有約束（不要重新發明，也不要說服我放寬）
+
+- 本機、單一使用者（plan D1、D17）。沒有伺服器、沒有多租戶。
+- 只用使用者既有訂閱；呼叫官方 CLI 必須隔離、每次執行前重做訂閱路線確認（providers R5、R6）。
+- 履歷只寫有來源或使用者確認的事實（evidence-model R1）；AI 整理履歷的照抄檢查與個資本機處理見 `docs/specs/resume-import.md`「AI 整理欄位」。
+- 外部內容（網頁、文件、模型輸出）是資料不是指令（plan D6、bridge R7）；橋接請求沒有路徑欄位，指向既有物件只用 helper 配發的不透明 ID（bridge.md「共同規則」）。
+- 不自動送出、不在求職網站上填寫（plan D7、bridge R7）。
+- 單檔 300 行、套件相依方向固定（`docs/specs/architecture.md`）。
+- spec.md §2 的 D1–D8 是擁有者拍板或既有規格。某條限制讓需求做不到或代價很高時，標 `needs_owner` 並寫代價；**不要提「放寬 D7 就好」這種 blocker**。§7 的 Q1–Q7 是已知待決項：可以補選項與代價，或指出漏列的待決項。
+
+## 我特別想被挑戰的地方（不限於此，也不代表我已經有答案）
+
+- §5.1「可見內容精簡成區塊」的定義是否足以實作與測試；新操作 `submit_resume_capture` 能否套進現行 service worker 的發送者驗證與橋接協定（含訊息大小上限）。
+- §5.2「與 PDF 匯入同一種資料流」對照現行 contracts 與 helper 匯入服務，到底成不成立；擷取內容存放在哪、活多久。
+- §5.3 把來源單位從「頁-行」換成「區塊」後，P1-T069 的兩個保證（姓名與聯絡資料不送模型、值必須照抄原文）會不會從哪裡漏掉。
+- §5.4 照片：存放、刪除、匯出、與現行 Profile／`import.confirm`／匯出流程怎麼銜接；有沒有個資外洩的路徑。
+- §5.5、§5.6：拿掉 PDF 入口之後的退路；「複製」按鈕與 R1 匯出前檢查的關係。
+- §8 驗收條件能不能判定。
+
+## 回覆格式
+
+每一項一段，開頭標 `[blocker]` / `[needs_owner]` / `[optional]` 加一個編號 **W1、W2…**（不要用 D、Q、R、F、C 開頭，那些已經被用掉），
+接一行 `出處：` 寫檔名行號或 spec 節號，再寫內容。無出處的推測另外標 `assumption`。
+最後附一行你讀到的 spec.md 的 sha256（自己算）。

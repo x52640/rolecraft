@@ -1,0 +1,85 @@
+{
+  "slug": "web-resume-import",
+  "threadId": "01a12f5c-774c-7d61-8e46-d1980df0af38",
+  "status": "converged",
+  "rounds": [
+    {
+      "label": "r1",
+      "sentAt": "2026-10-12T09:13:49.444Z",
+      "mode": "fresh",
+      "specSha256": "b5dd77b3f25bfcb6084ea036b533431360dc4bcd6bcb201c184b0856ccaad738",
+      "gitHead": "423bad1e8fe8bbd6d92f00fbca1459b014699d85",
+      "sentFile": "docs/spec-discussions/web-resume-import/rounds/r1-sent.txt",
+      "codexFile": "docs/spec-discussions/web-resume-import/rounds/r1-codex.txt",
+      "durationMs": 478074,
+      "exitCode": 0,
+      "outcome": "ok",
+      "usage": {
+        "input_tokens": 1790441,
+        "cached_input_tokens": 1624448,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 12662,
+        "reasoning_output_tokens": 5875
+      }
+    },
+    {
+      "label": "r2",
+      "sentAt": "2026-10-12T09:39:35.706Z",
+      "mode": "resume",
+      "specSha256": "a5cba898d28b38a56019a21915dd0656c32b2255f11090def7999e7c483653e8",
+      "gitHead": "423bad1e8fe8bbd6d92f00fbca1459b014699d85",
+      "sentFile": "docs/spec-discussions/web-resume-import/rounds/r2-sent.txt",
+      "codexFile": "docs/spec-discussions/web-resume-import/rounds/r2-codex.txt",
+      "durationMs": 834319,
+      "exitCode": 0,
+      "outcome": "ok",
+      "usage": {
+        "input_tokens": 3305732,
+        "cached_input_tokens": 3073024,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 31568,
+        "reasoning_output_tokens": 19938
+      }
+    },
+    {
+      "label": "final",
+      "sentAt": "2026-10-12T09:45:52.232Z",
+      "mode": "resume",
+      "specSha256": "e1e13cfa69b58f82bd924f70fb97e0d47923bd7bce45233ec8e5cf0517047eca",
+      "gitHead": "423bad1e8fe8bbd6d92f00fbca1459b014699d85",
+      "sentFile": "docs/spec-discussions/web-resume-import/rounds/final-sent.txt",
+      "codexFile": "docs/spec-discussions/web-resume-import/rounds/final-codex.txt",
+      "durationMs": 85782,
+      "exitCode": 0,
+      "outcome": "ok",
+      "usage": {
+        "input_tokens": 3816707,
+        "cached_input_tokens": 3323136,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 33123,
+        "reasoning_output_tokens": 21337
+      }
+    },
+    {
+      "label": "final2",
+      "sentAt": "2026-10-12T10:09:34.050Z",
+      "mode": "resume",
+      "specSha256": "3831ec5b6dfa31e270a0e749274bb54b1a964a5fcf80b857c0bb37b1cf77ac48",
+      "gitHead": "d069fcd4848e57ff3f7925b56b1c88adc27f289e",
+      "sentFile": "docs/spec-discussions/web-resume-import/rounds/final2-sent.txt",
+      "codexFile": "docs/spec-discussions/web-resume-import/rounds/final2-codex.txt",
+      "durationMs": 87879,
+      "exitCode": 0,
+      "outcome": "ok",
+      "usage": {
+        "input_tokens": 4647223,
+        "cached_input_tokens": 3869312,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 34646,
+        "reasoning_output_tokens": 22600
+      }
+    }
+  ],
+  "createdAt": "2026-10-12T09:05:51.363Z",
+  "updatedAt": "2026-10-12T10:09:49.624Z"
+}

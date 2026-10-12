@@ -1,0 +1,28 @@
+再一次定稿確認。上一次定稿確認（final，sha256 e1e13cfa…）之後，擁有者做了裁決，規格因此改過：`docs/spec-discussions/web-resume-import/spec.md`（sha256: 3831ec5b6dfa31e270a0e749274bb54b1a964a5fcf80b857c0bb37b1cf77ac48）。
+
+這次的改動（spec.md 裡標〔擁有者 2026-10-12 裁決〕；協調者為了落實裁決補的細節標〔裁決後補〕）：
+- Q1：條款明文禁止 → 該站不開放；查不到明文 → 擁有者自負風險照樣開放（§3、5.5「可用」的定義）。
+- Q4＝B：網頁來源一律按鈕。開啟擷取、核對區塊與截斷後按「用 AI 整理」才呼叫模型；擷取送達、`import.latest_capture`、開啟或切換工作階段都不觸發；PDF 維持現行（5.3、§8）。
+- Q5＝B、Q7（保留 104 PDF 版面規則作備援）、Q8＝A、Q9＝A、Q10＝A（第一個網站可用就全部拿掉 PDF 入口，拿掉入口是那時另開的 Task）、Q11＝A、Q12＝A：把原本的暫定做法改成定案（D7、5.2、5.3、5.5、5.6、§6、§7）。
+- 照片：更換視同刪除舊照片，套 D19（5.4，原本是協調者解讀）。
+- **新裁決 D9（推翻第 1 輪 N2）**：點工具列圖示時，目前分頁符合某站登記的履歷頁網址規則 → 擷取該頁；其他頁面（含職缺頁）照舊開編輯器；快捷鍵 `capture-page` 照舊。細節在 5.1「觸發」：
+  - 權限：不加任何權限。協調者查證：現行 manifest 已有 `activeTab`＋`scripting`（`apps/extension/src/manifest.ts` 的 `PERMISSIONS`）；Chrome 官方 activeTab 說明（2026-10-12 讀）列出「Executing an action」與「Executing a keyboard shortcut from the commands API」都會授予 activeTab，授予期間可 `scripting.executeScript` 並從 `tabs.Tab` 取得網址；現行快捷鍵路徑（`background/main.ts` 的 `chrome.commands.onCommand` → `actions.ts` 的 `triggerCapture`）本來就靠同一種授權。
+  - 履歷擷取成功（helper 回成功）後 service worker 開一個編輯器分頁（預設頁就是匯入頁，editor `app/routes.ts` 的 `DEFAULT_ROUTE_PATH`），顯示 `import.latest_capture`，仍要按「使用這份」；找不到本文根節點、送出失敗、注入失敗都不開編輯器，只提示。
+  - 職缺頁、履歷頁的擷取腳本分開兩支，由 service worker 依網址選；同一站的兩種網址規則不得重疊。
+  - 說明文字（圖示提示、擴充功能說明、快捷鍵說明）改成講清楚兩種行為；不做依頁面變換的提示。
+- §7 只剩 Q2（各站樣本）。
+
+請重新讀它，然後**只回答一件事：照這份規格實作，會不會撞牆。**
+
+## 規則（這一輪特別窄，請照做）
+
+1. 只討論，不要動手。不要改檔、不要跑測試或任何 npm script；唯一需要的指令是讀檔與對 spec.md 算 sha256。
+2. **禁止提出新的改善建議。** 不要提 `optional`、不要提「順便可以…」、不要提風格。
+   讀到新版文件想出新點子是正常的，但這一輪不收——那會讓討論永遠結不了。
+3. 只列**會擋住實作**的問題。每一項都要有出處（spec.md 的哪一節，或哪個檔的哪幾行）。
+4. §2 的 D1–D9 與 §7「已裁決」表是擁有者（或先前輪次）定案的，不能被放寬，也不要把「裁決本身不是最好的選擇」列成 blocker。只有某個裁決照現在的寫法會讓規格自相矛盾或無法實作時，才可以列。Q2 是等樣本的已登記項目，不要把「還沒決定」本身重複列成 blocker。
+5. 外部事實（網站條款與 DOM、Chrome 的實際行為）無法在本機查證的，不能當 blocker 的唯一依據。
+6. 沒有 blocker 就回空陣列，`verdict` 給 `no_blockers`。
+7. `spec_sha256` 填你這次實際讀到的版本。跟我給的對不上就直接說，不要硬回答。
+
+輸出必須符合我給的 JSON schema。

@@ -1,0 +1,69 @@
+[blocker] **W1：「可見內容精簡成區塊」沒有唯一可判定的結果。**
+出處：`docs/spec-discussions/web-resume-import/spec.md` §5.1、§8（54、109 行）。
+「可見」沒有界定是目前視窗內，還是整份已載入且未隱藏的內容；也沒有履歷本文範圍、巢狀元素去重、表格閱讀順序、表單值如何轉成文字的規則。例如合成 DOM `<li><p>完成付款系統</p></li>`，輸出一個區塊或兩個都符合目前文字。「標籤＋值」也沒有說明標籤是否包含在來源文字中。這直接影響截斷、個資移除及完整區塊照抄檢查；只要求「有 fixture、有測試」無法判定哪個結果才正確。
+
+[blocker] **W2：新操作不能直接套用現行發送者驗證。**
+出處：規格 §5.1（55 行）；`apps/extension/src/relay/sender.ts:46–53`；`apps/extension/src/sites/registry.ts:35–49`；`docs/specs/bridge.md`「操作」（25 行）。
+現行驗證要求發送頁是職缺頁，而且所有 content script 擷取都必須有 `captureMethod === 'auto'`；新 payload 沒有這個欄位，直接沿用會被拒。若只把履歷網址加入共用 registry，又會讓職缺／訊息操作取得履歷頁的授權。需要按「操作×頁型」界定授權。另外現行程式只檢查 `sender.url` 與平台，沒有比對 `payload.url`；規格應明確區分發送頁驗證、來源 URL 驗證及兩者一致性，§8 目前也沒有涵蓋操作與頁型錯配。
+
+[blocker] **W3：字數上限沒有守住橋接大小，而且截斷標記無處傳遞。**
+出處：規格 §5.1–§5.2（54–62 行）；`apps/helper/src/bridge/framing.ts:6–13,42–48,80–88`；`apps/helper/src/bridge/host.ts:68–77,138–148`；`docs/specs/bridge.md`「信封與請求 id」（116 行）。
+repo 自訂的請求上限與回應上限都是 **1 MiB**；超大請求會造成協定斷線，超大回應改回 `internal_error`。區塊數與字數不能直接保證 UTF-8 JSON 加信封的位元組數合格，也沒有涵蓋原文、草稿重複出現在回應的大小。更直接的矛盾是：54 行要求「截斷並標示」，55 行 payload 卻只有 `{platform,url,capturedAt,blocks[]}`，沒有完整性狀態；helper／編輯器無法區分完整來源與截斷來源。
+
+[blocker] **W4：「同一種資料流」目前沒有容納區塊來源的契約。**
+出處：規格 §5.2–§5.3；`packages/contracts/src/bridge/editor/import.ts:24–28,67–79,112–119`；`apps/helper/src/handlers/import/ai-runner.ts:28–31`；`packages/pipeline/src/resume-parse/output.ts:23,44–52`；`apps/editor/src/pages/import/ParsePreview.tsx:12–13,45–53`。
+現行結果、AI 草稿、AI 輸入與預覽都使用頁碼／行號；模型輸出的來源編號甚至只接受 `頁-行` 格式，`b12` 會使整份輸出不合格。Q3 選新增查詢或擴充 `import.get`，都不能單獨解決這些契約。規格尚未界定網頁來源如何貫穿原文預覽、欄位出處、AI 狀態與校正流程；把區塊偽裝成 PDF 行則會丟失種類／層級，並產生假的出處。
+
+[needs_owner] **W5：擷取內容活多久，不能引用不存在的「PDF 暫存期限」。**
+出處：規格 §5.2（62 行）；`apps/helper/src/handlers/import/import-service.ts:3,38–51,63–86,117–126`。
+PDF 原始 bytes 解析後不保留；結果、校正與 AI 來源留在記憶體，預設最多 20 筆、超量淘汰最舊，確認後也沒有立即清除，更沒有時間型 TTL。選項 A：網頁完全沿用這個生命週期，代價是 helper 重開後原文與工作階段消失。選項 B：落在資料區並訂期限，代價是新增持久儲存、清除與重啟恢復規則，也延長未遮罩個資的留存。兩者不能同時稱為「與 PDF 暫存一致」。
+
+[blocker] **W6：現有去個資規則依賴 PDF 額外提供的姓名線索。**
+出處：規格 D7、§5.3、§8；`apps/helper/src/handlers/import/ai-source.ts:23–47`；`packages/pipeline/src/resume-parse/personal.ts:70–71,119–137,143–160`；`packages/pipeline/src/resume-parse/redact.ts:43–49`。
+PDF 路徑會額外提供版面姓名、頁首姓名與英文別名；`extractPersonal` 本身不會因來源是 h1 就知道那是姓名，通用遮罩也只有 email、電話及身分證格式。合成輸入若只有 h1「林測試」、沒有姓名標籤且 `names` 為空，現行邏輯會保留它。網頁規格沒有定義這些姓名線索如何取得、取得失敗是否停止送出；「標籤比較可靠」不足以支撐 D7。此外聯絡區移除仍有最多八行與固定標題詞彙限制，不能直接把它當成任意層級區塊的保證。
+
+[blocker] **W7：個資遮罩後會還原，後續生成又可能送出去。**
+出處：規格 D7、§5.3；`packages/pipeline/src/resume-parse/check.ts:58–76`；`apps/editor/src/pages/import/ai-form.ts:56–63`；`packages/pipeline/src/generation/prompt.ts:139–150`；`packages/pipeline/src/intro/prompt.ts:89–102`。
+依程式可構造這條路徑：描述含 email → 整理前換成佔位字 → 模型完整照抄 → 檢查通過後還原 email → 使用者確認存入經歷描述。履歷生成與投遞自介提示接著都會送出該描述。這不是模型猜個資，而是本機還原後再次送出。§8 只驗整理提示沒有個資，會漏掉這條符合整理檢查、卻違反未限定階段的 D7 的路徑。
+
+[blocker] **W8：`match.ts` 的「行」規則不能直接替換成「區塊」。**
+出處：規格 §5.3（68 行）；`packages/pipeline/src/resume-parse/match.ts:36–51,62–75,99–109`；`packages/pipeline/src/resume-parse/check.ts:62–72`。
+有兩個可由程式推導的反例。第一，完整區塊文字若是「負責開發\n維護系統」，模型原封不動回傳，`coversWholeLines` 卻會把回傳值拆成兩段、把來源區塊視為一段，因而拒絕。第二，年月與「至今」分別是兩個區塊：只引用「至今」缺年份；一起引用年月又無法滿足「值必須用到每個引用來源」。兩者都會拒絕真實原文。需要界定區塊內換行與日期上下文如何處理，不能只寫「沿用」。
+
+[blocker] **W9：第二次匯入若沿用現行確認流程，會讓生成與匯出失效。**
+出處：規格 §5.2；`apps/helper/src/handlers/import/import-service.ts:99,117–124`；`apps/helper/src/handlers/resume/generation.ts:126–131`；`apps/helper/src/handlers/export/export-create.ts:68–75`。
+每個新工作階段的 `profileId` 都從 null 開始，第一次確認便建立新的 Profile；只有同一工作階段重複確認才覆寫原 ID。但生成與匯出都要求資料庫恰好只有一份 Profile。因此沿用流程確認兩次獨立網頁擷取，會得到兩份 Profile，後續被拒。規格需要交代「新擷取」如何更新既有單一使用者資料，而不是把擷取工作階段等同於新 Profile。
+
+[blocker] **W10：照片的內部檔案參照與橋接輸入沒有分界。**
+出處：規格 §5.4（73–75 行）；`packages/contracts/src/bridge/editor/import.ts:149–154,188–190`；`docs/specs/bridge.md`「共同規則」（29、31 行）。
+`ProfileInput` 直接從 `Profile` 去掉 id 與確認旗標，因此新增 `Profile.photo` 也會自動進入 `import.confirm`／校正請求。若「檔案參照」是路徑，就直接違反橋接請求沒有路徑欄位的規則；即使是 ID，也必須是 helper 配發且驗證歸屬的 ID。目前規格沒有照片選取、更換、刪除的操作與回應契約，無法判斷哪些資料只留 helper、哪些能跨橋接。
+
+[blocker] **W11：照片何時存入、如何保留，與現行確認流程不相容。**
+出處：規格 §5.4；`apps/editor/src/pages/import/ImportPage.tsx:56–63,116–129`；`apps/editor/src/pages/import/form-model.ts:26–30,176`；`apps/helper/src/handlers/import/import-service.ts:122–125`；`packages/storage/src/repositories/json-table.ts:61–69`。
+AI 完成會重建整份表單，目前表單與送出內容只包含個人資料、經歷、技能；確認則整筆取代 Profile，不合併舊資料。只相加選填 `photo`，既有送出路徑省略它就會丟掉參照。規格也沒說「加入照片」是立即持久寫入，還是等 `import.confirm`；取消匯入、AI 重整、再次匯入及確認失敗各會留下什麼照片，§8 的選取／更換／刪除無法判定。
+
+[blocker] **W12：照片沒有接上檔案清掃及含照匯出版本的刪除。**
+出處：規格 §5.4；`packages/storage/src/export/pdf-cleanup.ts:19–24,68–85`；`apps/helper/src/services/runtime.ts:121–123`；`packages/storage/src/application/materials.ts:9,23–35`；`packages/contracts/src/entities/export-version.ts:11–25`；`docs/specs/resume-output.md` R3；`plan.md:42`（plan D19）。
+若照片沿用現有 FileStore，啟動清掃只認 `export_versions.pdf_hash`，照片雜湊會被當成孤兒刪掉。另一方面，現行素材種類與匯出版本都沒有照片身分，刪除照片時找不到哪些 PDF 保存其副本。規格必須區分原圖、目前 Profile 附照與已匯出副本，並銜接 plan D19 的未投遞刪除、已投遞保留並明示；不能只刪目前參照便讓使用者以為照片已不存在。
+
+[blocker] **W13：「畫面已確認」不足以授權複製生成內容。**
+出處：規格 §5.6、§8（83、113 行）；`docs/specs/evidence-model.md` R1（21–30 行）；`docs/specs/jobs-and-messages.md`「投遞自介」（34–38 行）；`apps/editor/src/pages/jobs/useIntro.ts:228–264`。
+R1 明確區分接受措辭、確認事實與逐段確認；已接受的修改稿仍可能不能匯出。現行自介複製還會重新向 helper 讀取、重跑檢查，確認文字與目前編輯框一致才寫剪貼簿。新增「每欄複製」若只照畫面值，便可能複製未過 R1、引用已失效或未儲存的文字。規格也沒有區分複製的是已確認 Profile 原文，還是 ResumeVersion 修改稿；這兩條路徑的把關條件不同。
+
+[blocker] **W14：藏掉 PDF 後，擷取前失敗沒有可操作的退路。**
+出處：規格 D3、D5、§5.3、§5.5；`apps/editor/src/pages/import/ImportPage.tsx:69–90,160–175,197–201`；`apps/helper/src/handlers/import/import-service.ts:117–119`。
+现行手動輸入是在選 PDF、取得 importId 後的核對流程裡；沒有獨立建立手動工作階段的入口。§5.3 的退路只涵蓋已擷取後 AI 失敗，沒有涵蓋網址不支援、擷取失敗或沒有可用區塊。移除 PDF 入口後，保留程式不等於使用者仍能進入備援流程，也沒有交代 D5 的 LinkedIn 手動內容如何進入確認。這需要補足操作路徑，不需要推翻 D3。
+
+[needs_owner] **W15：Q4 必須區分擷取授權與模型送出授權。**
+出處：規格 D4、§5.2、§5.3、Q4；`apps/editor/src/pages/import/useAiParse.ts:101–110`；`docs/specs/providers.md` F01（31 行）。
+選項 A：使用者明確選定某次擷取後自動整理，代價是選定動作同時消耗額度並把遮罩後內容送供應商，介面必須清楚表達，且不能由背景查詢「最近一次」就觸發。選項 B：另按整理按鈕，代價是多一步操作，但可以先核對來源完整性。不能直接照搬「非 104 PDF 自動行為」，因為現行 effect 在載入新 importId 時就會開始整理。
+
+[needs_owner] **W16：「某網站可用」的門檻與 PDF 隱藏範圍尚未決定。**
+出處：規格 D3、§5.5、Q2、§8（79、100、109、114 行）；`docs/specs/open-verifications.md` S10（12 行）；`plan.md:28`（plan D8）。
+選項 A：第一個網站通過門檻就全域藏 PDF，代價是尚未支援的平台也失去可見 PDF 路線，W14 的手動退路必須先完成。選項 B：以使用者選定平台的可用狀態切換，代價是要有平台選擇與能力狀態。兩者都遵守可用後隱藏入口，但「可用」仍需具體判準；目前 §8 要求 fixture／測試存在，沒有定義預期欄位、失敗與截斷如何影響上線，而真實瀏覽器實跑只指定 104。
+
+[optional] **W17：照片驗收宜檢查實際 PDF，而不只檢查模板輸入。**
+出處：規格 §8（112 行）；`packages/pdf-export/src/inspect/inspect.ts:13–23,121–138`。
+現行 PDF 檢查涵蓋文字、字型、連結及分頁，沒有圖片存在或圖片版面檢查。照片新增後，即使圖片漏印，文字檢查仍可能全部通過。可把「含照版實際顯示照片、未遮住文字」列成視覺驗收的明確判準。本輪沒有查證 Chrome 如何嵌入圖片，也未據此提出 blocker。
+
+spec.md sha256：`b5dd77b3f25bfcb6084ea036b533431360dc4bcd6bcb201c184b0856ccaad738`
