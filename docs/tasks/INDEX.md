@@ -71,6 +71,7 @@
 | [P1-T062](P1-T062-claude-reverify-recovery.md) | Claude 重新驗證：中斷不算失敗、失敗只綁版本、可手動重新啟用 | done | 1 | providers | P1-T058 |
 | [P1-T063](P1-T063-project-grouping.md) | AI 建議專案分組、使用者確認建立，重新分析自動歸入 | done | 1 | helper | P1-T061 |
 | [P1-T064](P1-T064-application-intro.md) | 針對職缺產生 300 字內投遞自介 | done | 1 | helper | P1-T060、P1-T062 |
+| [P1-T065](P1-T065-multipage-disorder-check.md) | 104 履歷 PDF 匯入：多頁誤判讀取順序、部首相似字 | in_progress | 1 | resume-import | P1-T009 |
 
 ## 依賴清單
 
@@ -87,7 +88,7 @@
 - P1-T006：P1-T001 → P1-T007、P1-T014、P1-T033
 - P1-T007：P1-T006 → P1-T027、P1-T040
 - P1-T008：P1-T001 → P1-T021、P1-T022
-- P1-T009：P1-T001 → P1-T020
+- P1-T009：P1-T001 → P1-T020、P1-T065
 - P1-T010：P1-T001 → P1-T011
 - P1-T011：P1-T010 → P1-T012
 - P1-T012：P1-T011 → P1-T022、P1-T030、P1-T039
@@ -143,3 +144,4 @@
 - P1-T062：P1-T058 → P1-T064
 - P1-T063：P1-T061 → —
 - P1-T064：P1-T060、P1-T062 → —
+- P1-T065：P1-T009 → —
