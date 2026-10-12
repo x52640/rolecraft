@@ -1,7 +1,7 @@
 ---
 id: P1-T080
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T078", "P1-T079"]
 specs: ["resume-import.md", "providers.md", "bridge.md"]
 track: helper
@@ -84,7 +84,7 @@ npm run verify
 
 - 最後完成：「審查待修」6 項已修（第二個 commit，fix）
 - 已通過驗證：`npm run verify` 綠（Vitest 4153 通過、21 略過）；重現測試在修正前失敗、修正後通過
-- 下一步：協調者收官（修正 diff 複審、開發入口手動實跑一次）
+- 下一步：已收官（2026-10-12 協調者：對抗＋codex 審查 6 項已修，修正 diff codex 無發現；main `npm run verify` 綠，Vitest 4175 通過）。用擁有者真實 104 履歷頁實跑併入 P1-T087 前置
 - Blocker：無
 - write_paths 擴充（2026-10-12 協調者）：加入 `packages/pipeline/src/resume-parse/`（匯出 `isNameLabel`、網頁區塊用的已知標籤分類、修 redact 比對規則）與 `docs/specs/resume-import.md`（寫回送出條件的保守變更）；理由：審查 1～4 的修法落在 pipeline 與規格，helper 端無法單獨修好。
 
