@@ -4,8 +4,15 @@ import { useEffect, type ReactNode } from 'react';
 /** 原文區塊在畫面上的元素 id（欄位出處連過去時捲到這裡）。 */
 export const rawBlockDomId = (prefix: string, blockId: string): string => `${prefix}-${blockId}`;
 
+/** 從欄位出處連過來的區塊；seq 每次跳轉遞增，連到同一區塊也會再捲動、聚焦。 */
+export interface RawTarget {
+  readonly blockId: string;
+  readonly seq: number;
+}
+
 type Run =
-  | { kind: 'list'; blocks: ImportWebBlock[] }
+  /** 每一項是一個清單項：第一個區塊＋同一元素換行切出的續行區塊（continues） */
+  | { kind: 'list'; items: ImportWebBlock[][] }
   | { kind: 'pairs'; blocks: ImportWebBlock[] }
   | { kind: 'single'; block: ImportWebBlock };
 
@@ -26,8 +33,14 @@ function groupBlocks(blocks: readonly ImportWebBlock[]): Group[] {
     const last = runs.at(-1);
     const kind =
       block.kind === 'list_item' ? 'list' : block.kind === 'label_value' ? 'pairs' : null;
-    if (kind && last?.kind === kind) last.blocks.push(block);
-    else if (kind) runs.push({ kind, blocks: [block] });
+    if (kind === 'list' && last?.kind === 'list') {
+      // 清單項的續行併回前一項（不多出項目符號），各自保留區塊錨點
+      const item = last.items.at(-1);
+      if (block.continues && item) item.push(block);
+      else last.items.push([block]);
+    } else if (kind === 'list') runs.push({ kind, items: [[block]] });
+    else if (kind === 'pairs' && last?.kind === 'pairs') last.blocks.push(block);
+    else if (kind === 'pairs') runs.push({ kind, blocks: [block] });
     else runs.push({ kind: 'single', block });
   }
   return groups.filter((g) => g.heading !== null || g.runs.length > 0);
@@ -40,16 +53,18 @@ function groupBlocks(blocks: readonly ImportWebBlock[]): Group[] {
 export function WebRawBlocks(props: {
   blocks: readonly ImportWebBlock[];
   prefix: string;
-  target: string | null;
+  target: RawTarget | null;
 }) {
-  const { blocks, prefix, target } = props;
+  const { blocks, prefix } = props;
+  const target = props.target?.blockId ?? null;
+  const seq = props.target?.seq ?? 0;
 
   useEffect(() => {
     if (target === null) return;
     const el = document.getElementById(rawBlockDomId(prefix, target));
     el?.scrollIntoView?.({ block: 'center' });
     el?.focus({ preventScroll: true });
-  }, [target, prefix]);
+  }, [target, seq, prefix]);
 
   const attrs = (block: ImportWebBlock) => ({
     id: rawBlockDomId(prefix, block.id),
@@ -64,11 +79,23 @@ export function WebRawBlocks(props: {
     if (r.kind === 'list') {
       return (
         <ul key={i} className="import-raw-list">
-          {r.blocks.map((b) => (
-            <li key={b.id} {...attrs(b)} style={{ marginLeft: `${String((b.level ?? 1) - 1)}rem` }}>
-              {b.text} {idTag(b)}
-            </li>
-          ))}
+          {r.items.map(([first, ...rest]) =>
+            first ? (
+              <li key={first.id} style={{ marginLeft: `${String((first.level ?? 1) - 1)}rem` }}>
+                <span {...attrs(first)}>
+                  {first.text} {idTag(first)}
+                </span>
+                {rest.map((b) => (
+                  <span key={b.id} className="import-raw-continues">
+                    <br />
+                    <span {...attrs(b)}>
+                      {b.text} {idTag(b)}
+                    </span>
+                  </span>
+                ))}
+              </li>
+            ) : null,
+          )}
         </ul>
       );
     }

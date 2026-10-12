@@ -17,14 +17,14 @@ const b = (
   id: string,
   kind: Kind,
   text: string,
-  extra: { level?: number; label?: string } = {},
+  extra: { level?: number; label?: string; continues?: boolean } = {},
 ) => ({
   id,
   kind,
   level: extra.level ?? null,
   label: extra.label ?? null,
   text,
-  continues: false,
+  continues: extra.continues ?? false,
 });
 
 const WEB: ImportResult = {
@@ -39,8 +39,9 @@ const WEB: ImportResult = {
     b('b3', 'paragraph', '2019/03 ~ 至今'),
     b('b4', 'list_item', '負責後端服務', { level: 1 }),
     b('b5', 'list_item', '帶領三人團隊', { level: 2 }),
-    b('b6', 'heading', '學歷', { level: 2 }),
-    b('b7', 'label_value', '範例大學 資訊工程系', { label: '最高學歷' }),
+    b('b6', 'list_item', '並負責新人訓練', { level: 2, continues: true }),
+    b('b7', 'heading', '學歷', { level: 2 }),
+    b('b8', 'label_value', '範例大學 資訊工程系', { label: '最高學歷' }),
   ],
 };
 
@@ -68,7 +69,7 @@ const f = (value: string, blockId: string, containsPersonalData = false) => ({
 
 const DRAFT: ImportWebAiDraft = {
   personalInfo: [],
-  education: [f('範例大學 資訊工程系', 'b7')],
+  education: [f('範例大學 資訊工程系', 'b8')],
   experiences: [
     {
       company: f('範例科技股份有限公司', 'b2'),
@@ -146,7 +147,11 @@ describe('<ImportPage /> 網頁來源核對（P1-T089／D29）', () => {
         .getAllByRole('heading')
         .map((h) => h.textContent?.trim()),
     ).toEqual(['工作經驗', '學歷']);
-    expect(within(raw).getAllByRole('listitem')).toHaveLength(2);
+    // 清單項的續行（continues）併回前一項：不多出項目符號（codex 審查 2）
+    const items = within(raw).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    expect(items[1]?.textContent).toContain('帶領三人團隊');
+    expect(items[1]?.textContent).toContain('並負責新人訓練');
     expect(within(raw).getByText('最高學歷').tagName).toBe('DT');
     expect(screen.getByRole('note', { name: '內容不完整' })).toBeTruthy();
   });
@@ -180,6 +185,30 @@ describe('<ImportPage /> 網頁來源核對（P1-T089／D29）', () => {
     expect(target.textContent).toContain('區塊 b4');
     expect(document.activeElement).toBe(target);
     expect(raw.textContent?.match(/區塊 b\d/gu)).toEqual(['區塊 b4']);
+  });
+
+  it('再點引用同一區塊的另一欄位出處：仍會捲到並聚焦（codex 審查 1）', async () => {
+    setup();
+    await openAndParse();
+    const origin = (label: string) =>
+      within(field(label) as HTMLElement).getByRole('button', { name: /^出處原文：/u });
+    fireEvent.click(origin('第 1 段經歷公司'));
+    const raw = screen.getByRole('group', { name: '擷取原文內容' });
+    const target = within(raw).getByText(/範例科技股份有限公司 資深工程師/u);
+    expect(document.activeElement).toBe(target);
+    screen.getByLabelText('第 1 段經歷職稱').focus();
+    fireEvent.click(origin('第 1 段經歷職稱'));
+    expect(document.activeElement).toBe(target);
+  });
+
+  it('清單項的續行併回前一項，並保留自己的區塊錨點（codex 審查 2）', async () => {
+    setup();
+    fireEvent.click(await screen.findByRole('button', { name: '使用這份' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看擷取原文' }));
+    const raw = screen.getByRole('group', { name: '擷取原文內容' });
+    const part = within(raw).getByText('並負責新人訓練');
+    expect(part.closest('li')?.textContent).toContain('帶領三人團隊');
+    expect(part.id).toMatch(/-b6$/u);
   });
 
   it('改過標黃欄位就不再標黃', async () => {

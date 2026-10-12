@@ -2,7 +2,7 @@ import type { ImportWebCaptureResult } from '@rolecraft/contracts';
 import { useId } from 'react';
 
 import { PLATFORM_LABELS, formatTime } from '../../jobs/labels.ts';
-import { WebRawBlocks } from './WebRawBlocks.tsx';
+import { WebRawBlocks, type RawTarget } from './WebRawBlocks.tsx';
 
 /**
  * 網頁擷取的原文（D28／W4；D29 (b)）：預設收合，按「查看擷取原文」才展開，照原結構呈現、
@@ -13,7 +13,7 @@ export function WebPreview(props: {
   result: ImportWebCaptureResult;
   open: boolean;
   onToggle: () => void;
-  target: string | null;
+  target: RawTarget | null;
 }) {
   const { result, open, onToggle, target } = props;
   const id = useId();

@@ -5,6 +5,7 @@ import type { PrefillSource } from './ai-form.ts';
 import { AiParsePanel } from './components/AiParsePanel.tsx';
 import { ConfirmBar } from './components/ConfirmBar.tsx';
 import { WebPreview } from './components/WebPreview.tsx';
+import type { RawTarget } from './components/WebRawBlocks.tsx';
 import { FAILURE_TEXT, type ProfileForm } from './form-model.ts';
 import { ParsePreview } from './ParsePreview.tsx';
 import { ProfileFormFields } from './ProfileForm.tsx';
@@ -42,7 +43,8 @@ export function ImportReview(props: ImportReviewProps) {
   const kind = importSourceOf(result);
   const hasPreview = result.status === 'parsed' || result.status === 'web_capture';
   const [rawOpen, setRawOpen] = useState(false);
-  const [target, setTarget] = useState<string | null>(null);
+  // 每次跳轉帶遞增序號：連續點引用同一區塊的欄位也會再捲動、聚焦（codex 審查 1）
+  const [target, setTarget] = useState<RawTarget | null>(null);
   // 每開一次核對（新的 import.get 結果）原文區回到預設收合
   const [shownFor, setShownFor] = useState(result);
   if (shownFor !== result) {
@@ -57,7 +59,7 @@ export function ImportReview(props: ImportReviewProps) {
         blocks: new Map(blocks.map((b) => [b.id, b])),
         jump: (blockId) => {
           setRawOpen(true);
-          setTarget(blockId);
+          setTarget((prev) => ({ blockId, seq: (prev?.seq ?? 0) + 1 }));
         },
       },
     [blocks],

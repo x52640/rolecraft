@@ -91,6 +91,7 @@ npm run verify
 - 已通過驗證：`npm run verify` 綠兩次
 - 下一步：協調者跑對抗驗證（E3）與 codex review；手動看一次畫面
 - Blocker：無
+- codex 審查待修 2 項（2026-10-13）：(1) `ImportReview.tsx` 連到某區塊後再點引用同一區塊的另一欄位（公司與職稱共用一行）不會再捲動／聚焦（狀態值沒變、導覽 effect 不重跑）→ 每次跳轉給遞增序號；(2) `WebRawBlocks.tsx` 清單項的續行（continues）被渲染成獨立 `<li>`、多出項目符號 → 併回前一個清單項，保留各自區塊錨點
 
 ## 完成結果
 
@@ -100,4 +101,5 @@ npm run verify
 - 高風險：網頁來源的確認鈕改成 `type="button"`，表單 Enter（隱式送出）不寫入；`submit` 另檢查 PDF／手動未勾選不送。沒有新增自動呼叫 `import.confirm` 或 `import.ai_parse` 的路徑。
 - 偶發失敗（`ImportPage.web.test.ts`「AI 失敗」）：`useAiParse` 換核對時，上一個 effect 的收尾（cancel）在 React 排程讓出時會晚於使用者按「用 AI 整理」才執行，把剛送出的那次整理作廢：`import.ai_parse` 已送出、結果被丟掉、畫面卡在「整理中」。這是產品 bug（使用者手快也會遇到），不只是測試問題。修法：整理記下所屬核對（runKey），effect 收尾只作廢屬於自己那次核對的整理；新核對已由按鈕開始的整理保留。回歸測試 `ImportPage.ai-race.test.ts` 讓排程每次讓出、在 effect 前按鈕，舊程式穩定重現、新程式通過。
 - 新測試：`web-origin.test.ts`（判定與 formFromAiDraft 出處）、`ImportPage.web-review.test.ts`（收合／結構、標黃、出處連結、改過取消標黃、有標黃可確認、Enter 不寫入、摘要、PDF 不變）、`ImportPage.ai-race.test.ts`。既有網頁測試改為對應收合原文與無勾選。
+- codex 審查 2 項已修（另一個 commit）：(1) 跳轉目標改成 `{ blockId, seq }`，每次點出處 seq 遞增，導覽 effect 依 seq 重跑，連續點引用同一區塊的欄位也會再捲動、聚焦；(2) 清單項的續行區塊併進前一個 `<li>`（換行接在同一項），每段保留自己的區塊錨點與 title。測試先寫並確認舊程式失敗：`ImportPage.web-review.test.ts`「再點引用同一區塊的另一欄位出處」「清單項的續行併回前一項」與結構測試的清單項數。
 - 殘餘：手動輸入工作階段仍用勾選（裁定只提網頁來源）；畫面未實機看過（待協調者手動驗證）。
