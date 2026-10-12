@@ -1,7 +1,7 @@
 ---
 id: P1-T089
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T081"]
 specs: ["resume-import.md"]
 track: editor
@@ -89,7 +89,7 @@ npm run verify
 
 - 最後完成：2026-10-13 worker 實作完成（照擁有者 2026-10-13 再次裁定的確認流程），一個 commit
 - 已通過驗證：`npm run verify` 綠兩次
-- 下一步：協調者跑對抗驗證（E3）與 codex review；手動看一次畫面
+- 下一步：已收官（2026-10-13 協調者：codex 2 項已修、修正 diff 無發現；對抗驗證未跑（協調者判斷：放寬確認的風險點是自動寫入，codex 兩輪與測試已涵蓋不新增 import.confirm 路徑）；main `npm run verify` 綠）。畫面待擁有者實機看
 - Blocker：無
 - codex 審查待修 2 項（2026-10-13）：(1) `ImportReview.tsx` 連到某區塊後再點引用同一區塊的另一欄位（公司與職稱共用一行）不會再捲動／聚焦（狀態值沒變、導覽 effect 不重跑）→ 每次跳轉給遞增序號；(2) `WebRawBlocks.tsx` 清單項的續行（continues）被渲染成獨立 `<li>`、多出項目符號 → 併回前一個清單項，保留各自區塊錨點
 

@@ -6,7 +6,6 @@
 ## 進行中
 
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本（`docs/tasks/P1-T017-spike-104-job.md`）
-- P1-T089 editor：網頁來源核對改版（D29 (b)(c)(d)）（`docs/tasks/P1-T089-editor-web-import-review.md`）
 - P1-T093 pipeline：送模型前遮蔽網址與區級居住地（D31）（`docs/tasks/P1-T093-pipeline-redact-url-residence.md`）
 
 ## ready
