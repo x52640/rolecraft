@@ -28,12 +28,19 @@ const FIXTURES = path.resolve(
 const fixture = (name: string): string => readFileSync(path.join(FIXTURES, name), 'utf8');
 
 const V = '2.1.300';
-const withVersion = (jsonl: string) =>
-  jsonl.replaceAll('"claude_code_version":"2.1.296"', `"claude_code_version":"${V}"`);
+const B = '2.1.301';
+const withVersion = (jsonl: string, version = V) =>
+  jsonl.replaceAll('"claude_code_version":"2.1.296"', `"claude_code_version":"${version}"`);
 
-/** 依工作目錄分流的假 CLI：誘餌沙箱回專案 apiKeyHelper 的 auth status（重新驗證要偵測得到）。 */
-function fakeCli(run = withVersion(fixture('run-ok.jsonl'))) {
+/**
+ * 依工作目錄分流的假 CLI：誘餌沙箱回專案 apiKeyHelper 的 auth status（重新驗證要偵測得到）。
+ * cli.version／cli.toolUse 可中途改（模擬 CLI 自動更新、新版本隔離失效）。
+ */
+function fakeCli(run?: string) {
   const calls: { args: readonly string[] }[] = [];
+  const cli = { version: V, toolUse: false };
+  const runOutput = () =>
+    run ?? withVersion(fixture(cli.toolUse ? 'run-tool-use.jsonl' : 'run-ok.jsonl'), cli.version);
   const spawn: SpawnFn = (_file, args, options) => {
     calls.push({ args });
     const decoy = String(options.cwd).includes('rolecraft-claude-live-');
@@ -43,17 +50,22 @@ function fakeCli(run = withVersion(fixture('run-ok.jsonl'))) {
     Object.assign(child, { kill: () => true });
     const out =
       args[0] === '--version'
-        ? `${V} (Claude Code)\n`
+        ? `${cli.version} (Claude Code)\n`
         : args[0] === 'auth'
           ? fixture(decoy ? 'auth-api-key-helper.json' : 'auth-subscription.json')
-          : run;
+          : runOutput();
     setImmediate(() => {
       stdout.end(out);
       setImmediate(() => child.emit('close', 0));
     });
     return child;
   };
-  return { spawn, modelCalls: () => calls.filter((c) => c.args[0] === '-p').length, calls };
+  return {
+    cli,
+    spawn,
+    modelCalls: () => calls.filter((c) => c.args[0] === '-p').length,
+    calls,
+  };
 }
 
 function memoryStore(initial: ClaudeVersionRecord[]) {
@@ -89,7 +101,7 @@ function setup(initial: ClaudeVersionRecord[], run?: string) {
     service,
     runDeps: { spawn: cli.spawn, parentEnv: { HOME: '/Users/owner' } },
   });
-  return { cli, saved, providers };
+  return { cli, saved, providers, service };
 }
 
 describe('Claude 停用時的狀態與重新啟用（真實檢查路徑＋假 spawn）', () => {
@@ -195,5 +207,54 @@ describe('背景重新啟用（替換的 probe）', () => {
     expect(redactPaths('Claude CLI 2.1.300 重新驗證失敗（2026-10-09T00:00:00Z）')).toBe(
       'Claude CLI 2.1.300 重新驗證失敗（2026-10-09T00:00:00Z）',
     );
+  });
+});
+
+describe('對抗驗證與 codex review 修正（P1-T062）', () => {
+  const verifiedB: ClaudeVersionRecord = { ...failed, version: B, outcome: 'verified', cases: [] };
+
+  it('A 版停用後 CLI 換成已驗證的 B：重新檢查讀到 B、恢復可用', async () => {
+    const { cli, providers } = setup([failed, verifiedB]);
+    expect((await providers.recheck('claude')).versionCheck).toMatchObject({ state: 'failed' });
+    cli.cli.version = B;
+    const after = await providers.recheck('claude');
+    expect(after.state).toBe('available');
+    expect(after.versionCheck).toBeNull();
+    expect(cli.modelCalls()).toBe(0);
+  });
+
+  it('重新啟用回「不需要」（CLI 已換成已驗證版本）：狀態即時更新，不留舊的停用', async () => {
+    const { cli, providers } = setup([failed, verifiedB]);
+    await providers.recheck('claude');
+    cli.cli.version = B;
+    await providers.reverifyClaude();
+    await providers.reverifyTask;
+    const [after] = await providers.status();
+    expect(after?.lastReverify).toMatchObject({ outcome: 'not_needed' });
+    expect(after?.versionCheck).toBeNull();
+    // 不直接當可用：要重新檢查
+    expect(after?.state).toBe('eligibility_unknown');
+    expect(cli.modelCalls()).toBe(0);
+  });
+
+  it('生成路徑的自動重新驗證停用了新版本：狀態查詢即時顯示停用與重新啟用', async () => {
+    const { cli, providers, service } = setup([]);
+    cli.cli.version = '2.1.296';
+    expect((await providers.recheck('claude')).state).toBe('available');
+    cli.cli.version = B;
+    cli.cli.toolUse = true;
+    const res = await service.run(
+      { model: 'haiku', prompt: 'x', trigger: 'run_start' },
+      {
+        spawn: cli.spawn,
+        parentEnv: { HOME: '/Users/owner' },
+        now: () => new Date(),
+        newId: () => 'r',
+      },
+    );
+    expect(res.version.status).toBe('blocked');
+    const [after] = await providers.status();
+    expect(after?.versionCheck).toMatchObject({ state: 'failed' });
+    expect(after?.state).toBe('unsupported');
   });
 });

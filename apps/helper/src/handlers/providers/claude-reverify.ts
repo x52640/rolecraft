@@ -1,4 +1,4 @@
-// Claude「重新啟用」的背景執行（D24、P1-T062）。重新驗證要跑數分鐘，橋接請求不能等它：
+// Claude「重新啟用」的背景執行（D24、P1-T062），以及狀態上的版本問題（即時從閘門算）。重新驗證要跑數分鐘，橋接請求不能等它：
 // 按下後立即回覆，背景跑完再重新檢查狀態；進度與結果放在 Claude 狀態的 versionCheck／lastReverify，
 // 編輯器輪詢 providers.status 取得。同一時間只跑一個；與一般執行的互斥由版本閘門負責。
 import type { LastReverify, VersionCheck } from '@rolecraft/contracts';
@@ -21,7 +21,7 @@ export interface ClaudeReverifyRunner {
 }
 
 export function createClaudeReverifyRunner(
-  probe: Pick<ClaudeProbe, 'reverify'>,
+  probe: Pick<ClaudeProbe, 'reverify' | 'versionIssue'>,
   refresh: () => Promise<unknown>,
   now: () => Date = () => new Date(),
 ): ClaudeReverifyRunner {
@@ -47,8 +47,18 @@ export function createClaudeReverifyRunner(
 
   return {
     decorate(status) {
-      const running: VersionCheck = { state: 'running', reason: REVERIFY_RUNNING_REASON };
-      return { ...status, versionCheck: task ? running : issue, lastReverify: last };
+      if (task) {
+        const running: VersionCheck = { state: 'running', reason: REVERIFY_RUNNING_REASON };
+        return { ...status, versionCheck: running, lastReverify: last };
+      }
+      // 狀態查詢時從閘門即時算（不呼叫模型）：重新啟用回「不需要／沒開始」、或生成路徑的自動
+      // 重新驗證停用了版本時，上次重新檢查的快照已過期（P1-T062 對抗驗證、codex review）。
+      const live = probe.versionIssue ? probe.versionIssue() : issue;
+      let { state } = status;
+      // 目前版本停用或未完成 → 不可用；先前因版本問題不可用、現在問題已不在 → 需重新檢查，不直接當可用。
+      if (live) state = 'unsupported';
+      else if (issue && state === 'unsupported') state = 'eligibility_unknown';
+      return { ...status, state, versionCheck: live, lastReverify: last };
     },
     noteCheck(next) {
       issue = next;

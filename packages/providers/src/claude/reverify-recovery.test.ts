@@ -221,3 +221,55 @@ describe('不在背景呼叫模型', () => {
     expect(fake.calls()).toHaveLength(0);
   });
 });
+
+describe('失敗結果寫不進資料區（P1-T062 對抗驗證）', () => {
+  /** 前 skip 次寫入成功，接著 fail 次寫入丟錯，之後又成功。 */
+  function flakyStore(skip: number, fail: number) {
+    const records: ClaudeVersionRecord[] = [];
+    let writes = 0;
+    const store: ClaudeVersionStore = {
+      load: () => Promise.resolve([...records]),
+      save: (r) => {
+        writes += 1;
+        if (writes > skip && writes <= skip + fail) return Promise.reject(new Error('disk busy'));
+        records.push(r);
+        return Promise.resolve();
+      },
+    };
+    return { store, records };
+  }
+
+  it('結果寫入失敗一次 → 再寫精簡失敗紀錄；重啟後仍停用、不再呼叫模型', async () => {
+    const fake = versionedFake({ version: A, injection: toolUse(A) });
+    const { store, records } = flakyStore(1, 1);
+    const first = await service(store).run(REQ, runDeps(fake.spawn));
+    expect(first.version.status).toBe('blocked');
+    expect(records.map((r) => r.outcome)).toEqual(['incomplete', 'failed']);
+    expect(records[1]?.cases.every((c) => !c.passed)).toBe(true);
+
+    const calls = fake.modelCalls().length;
+    const restarted = service(store);
+    const again = await restarted.run(REQ, runDeps(fake.spawn));
+    expect(again.version.status).toBe('blocked');
+    expect(restarted.gate.state.kind).toBe('disabled');
+    expect(fake.modelCalls()).toHaveLength(calls);
+  });
+
+  it('兩次都寫不進去 → 這次仍停用；資料區最後一筆是暫定紀錄（退化為未完成）', async () => {
+    const fake = versionedFake({ version: A, injection: toolUse(A) });
+    const { store, records } = flakyStore(1, 2);
+    const svc = service(store);
+    await svc.run(REQ, runDeps(fake.spawn));
+    expect(svc.gate.state.kind).toBe('disabled');
+    expect(records.map((r) => r.outcome)).toEqual(['incomplete']);
+  });
+
+  it('通過但寫不進去 → 不補寫失敗紀錄（只在記憶體停用）', async () => {
+    const fake = versionedFake({ version: A });
+    const { store, records } = flakyStore(1, 1);
+    const svc = service(store);
+    await svc.run(REQ, runDeps(fake.spawn));
+    expect(svc.gate.state.kind).toBe('disabled');
+    expect(records.map((r) => r.outcome)).toEqual(['incomplete']);
+  });
+});

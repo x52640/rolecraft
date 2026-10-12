@@ -6,7 +6,7 @@ depends_on: ["P1-T058"]
 specs: ["providers.md", "bridge.md", "architecture.md"]
 track: providers
 primary_repo: rolecraft
-write_paths: ["docs/specs/providers.md", "docs/specs/bridge.md", "packages/providers/src/claude/", "packages/providers/src/index.ts", "packages/contracts/src/bridge/editor/providers.ts", "packages/contracts/src/bridge/operations.ts", "packages/contracts/src/bridge/__fixtures__/editor-requests.ts", "packages/contracts/src/index.ts", "apps/helper/src/handlers/providers/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "apps/editor/src/pages/settings/", "apps/editor/src/bridge/", "docs/adr/0006-contracts-interim-fields.md"]
+write_paths: ["docs/specs/providers.md", "docs/specs/bridge.md", "packages/providers/src/claude/", "packages/providers/src/index.ts", "packages/contracts/src/bridge/editor/providers.ts", "packages/contracts/src/bridge/operations.ts", "packages/contracts/src/bridge/__fixtures__/editor-requests.ts", "packages/contracts/src/index.ts", "apps/helper/src/handlers/providers/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "apps/editor/src/pages/settings/", "apps/editor/src/bridge/", "docs/adr/0006-contracts-interim-fields.md", "docs/RESIDUALS.md"]
 contract_change: additive
 expected_commit: "feat(P1-T062): Claude 重新驗證中斷不算失敗、失敗只綁版本、設定頁可重新啟用"
 ---
@@ -86,9 +86,9 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：版本閘門改以版本為單位（verified／failed／incomplete）、`providers.reverify_claude` 背景重新啟用、設定頁原因與按鈕、spec 規則
-- 已通過驗證：worktree 內 `npm run verify` 綠（3008 個測試：2995 通過、13 略過）；全部用假 spawn，未呼叫真實 CLI
-- 下一步：協調者收官（高風險：對抗驗證）
+- 最後完成：對抗驗證與 codex review 三項修正（重新檢查先讀新版本、狀態即時算、失敗結果寫入重試）＋回歸測試
+- 已通過驗證：worktree 內 `npm run verify` 綠；新增 6 個回歸測試中 4 個在修正前失敗（另 2 個鎖住退化與不補寫的邊界）；全部用假 spawn，未呼叫真實 CLI
+- 下一步：協調者收官
 - Blocker：無
 
 ## 完成結果
@@ -102,4 +102,14 @@ npm run verify
 - 範圍外改動：`packages/contracts/src/bridge/operations.ts`（操作列舉加一項）與 `packages/contracts/src/bridge/__fixtures__/editor-requests.ts`（fixture 加一項）。新增橋接操作一定要改這兩個檔，write_paths 沒列；協調者訊息允許本 Task 改 contracts，兩處都只加一行。
 - 保守選擇：重新檢查（使用者按的）遇到 incomplete 或新版本會自動重跑，與 D22 原本行為一致；重新啟用時 R6 不通過也會記一筆 failed（注入測試的 auth-subscription 案例在模型呼叫之前失敗）。
 - 手動驗證：無（live 測試不在本 Task）。
+
+### 對抗驗證／codex 修正
+
+| 缺陷 | 修正 | 測試 |
+| --- | --- | --- |
+| （codex P1）A 版停用後 CLI 換成 B，重新檢查因連線檢查被閘門短路而讀不到 B | `claude-probe.ts` 的 `check()` 先 `ensureVersion`（讀並 observe 目前版本），再做連線檢查 | helper `reverify-claude.test.ts`：A 停用→換已驗證 B→重新檢查可用 |
+| （codex P2＋對抗）設定頁 `versionCheck` 是上次重新檢查的快照：重新啟用回不需要／沒開始、或生成路徑停用版本時不更新 | `claude-reverify.ts` 的 `decorate` 從閘門即時算（probe 新增 `versionIssue()`，不啟動程式）；有問題 → `unsupported`，先前因版本問題不可用而問題已不在 → `eligibility_unknown` | 同檔：not_needed 後狀態更新；生成路徑停用新版本後狀態即時顯示停用 |
+| （對抗）真的失敗但結果寫不進資料區，最後一筆仍是暫定紀錄，重啟後讀成 incomplete而再花模型呼叫 | `version-gate.ts` 的 `finishReverify`：失敗結果寫入失敗時再寫一次精簡失敗紀錄；兩次都失敗才退化為 incomplete（providers.md 已寫）；通過但寫不進去不補寫失敗 | `reverify-recovery.test.ts`：寫入失敗一次→重啟仍停用、0 次模型呼叫；兩次失敗退化；通過寫不進去不補寫 |
+
+- `docs/RESIDUALS.md` 刪除「Claude 自動重新驗證失敗或中途被中斷…永久停用」一行（協調者授權，write_paths 已補）。
 

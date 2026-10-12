@@ -250,6 +250,8 @@ export class ClaudeVersionGate {
 
   /**
    * 結束重新驗證：先保存，保存成功且通過才接受這個版本；保存失敗一律視為失敗（停用這個版本）。
+   * 真的失敗而寫不進去時再試一次寫入精簡失敗紀錄（只留未通過的案例），不然最後一筆仍是暫定紀錄，
+   * 重啟後會被讀成「未完成」而再花模型呼叫；兩次都失敗才退化為「未完成」（providers.md）。
    * 回傳最後實際生效的紀錄。
    */
   async finishReverify(record: ClaudeVersionRecord): Promise<ClaudeVersionRecord> {
@@ -259,6 +261,15 @@ export class ClaudeVersionGate {
     } catch (error) {
       const why = error instanceof Error ? error.message : '未知錯誤';
       final = { ...record, outcome: 'failed', reason: `無法保存驗證結果（${why}）` };
+      if (record.outcome === 'failed' && this.store) {
+        const compact = { ...record, cases: record.cases.filter((c) => !c.passed) };
+        try {
+          await this.store.save(compact);
+          final = compact;
+        } catch {
+          // 兩次都寫不進去：記憶體停用，資料區最後一筆仍是暫定紀錄（重啟後讀成未完成）。
+        }
+      }
     }
     this.reverifying = null;
     this.apply(final);

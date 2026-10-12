@@ -56,6 +56,8 @@ export interface ClaudeProbe {
   check(): Promise<ClaudeCheck>;
   /** model 只能是 helper 自己的候選常數（呼叫端以 candidateId 查表取得） */
   verifyModel(model: string): Promise<ClaudeModelCheck>;
+  /** 目前版本的停用／未完成狀態，從版本閘門即時算（不啟動任何程式）；測試替換的 probe 可省略 */
+  versionIssue?(): VersionCheck | null;
   /** 使用者重新啟用：目前版本停用或未完成時重跑注入測試（呼叫模型 3 次以內）；測試替換的 probe 可省略 */
   reverify?(): Promise<ClaudeReverify>;
   /** 候選別名（CLI 沒有列模型的指令，所以是常數；可用與否要 verifyModel） */
@@ -114,11 +116,13 @@ export function createClaudeProbe(options: ClaudeProbeOptions = {}): ClaudeProbe
 
     async check() {
       const d = deps();
+      // 先讀目前版本（observe）再做連線檢查：上一個版本被停用時，連線檢查會因閘門短路而讀不到
+      // 已更新的新版本，一直回舊版本的失敗（P1-T062 codex review）。
+      const version = await service.ensureVersion(d);
       const report = await checkConnection(service.adapter, d);
       const { installation, connection } = report;
       let isolation: CheckOutcome = 'unknown';
       if (installation.installed === 'passed') {
-        const version = await service.ensureVersion(d);
         isolation = version.status === 'blocked' ? 'failed' : 'passed';
       }
       if (service.adapter.support.state !== 'supported') isolation = 'failed';
@@ -132,6 +136,8 @@ export function createClaudeProbe(options: ClaudeProbeOptions = {}): ClaudeProbe
         checkedAt: connection.checkedAt,
       };
     },
+
+    versionIssue: () => versionIssueOf(service),
 
     async reverify() {
       const result = await service.reverify(deps());
