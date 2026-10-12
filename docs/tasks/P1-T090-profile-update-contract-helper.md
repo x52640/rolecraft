@@ -6,7 +6,7 @@ depends_on: ["P1-T079"]
 specs: ["resume-import.md", "bridge.md", "architecture.md", "evidence-model.md"]
 track: contracts
 primary_repo: rolecraft
-write_paths: ["packages/contracts/src/", "apps/helper/src/handlers/profile/", "apps/helper/src/handlers/import/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/bridge/__fixtures__/", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "apps/extension/src/bridge/client.test.ts", "packages/domain/src/evidence/profile-sources.test.ts", "packages/pipeline/src/generation/profile-sources.test.ts", "packages/pipeline/src/intro/profile-sources.test.ts"]
+write_paths: ["packages/contracts/src/", "apps/helper/src/handlers/profile/", "apps/helper/src/handlers/import/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/bridge/__fixtures__/", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "apps/extension/src/bridge/client.test.ts", "packages/domain/src/evidence/profile-sources.test.ts", "packages/pipeline/src/generation/profile-sources.test.ts", "packages/pipeline/src/intro/profile-sources.test.ts", "packages/pipeline/src/resume-parse/check.ts", "packages/pipeline/src/resume-parse/web-check.ts", "packages/pipeline/src/resume-parse/types.ts", "apps/editor/src/pages/resumes/profile/useProfileCopy.ts", "apps/editor/src/pages/resumes/profile/ProfileCopy.test.ts"]
 contract_change: additive
 expected_commit: "feat(P1-T090): profile.update 契約與 helper：個人資料編輯、版本衝突、各欄出處"
 ---
@@ -25,6 +25,10 @@ expected_commit: "feat(P1-T090): profile.update 契約與 helper：個人資料�
 - helper `profile.update`：照 resume-import「個人資料編輯（D30）」與 bridge.md `profile.update`——同一個寫入比對版本號、依來源列搬移出處並判定「已修改」、新增列沒有出處、驗證同 `import.confirm`、成功回整份已確認 Profile
 - helper `import.confirm`：請求形狀不變；依該工作階段草稿（AI 整理成功用 AI 草稿，否則本機預填）比對寫下出處（經歷以公司＋職稱＋開始對、技能以值、「學歷」列比所有學歷欄位接合值；正規化同照抄檢查）；出處文字一律從工作階段原文取；版本號加一
 - 防退步測試（新檔，只加測試、不改這兩個套件的原始碼）：R1 檢查 3 不認出處原文裡的數字（domain）；生成與自介提示不含出處原文（pipeline）
+
+- 協調者補充（2026-10-13，D30 文件 codex review）：
+  1. pipeline 照抄檢查（`check.ts`、`web-check.ts`）目前只保留第一個引用來源；D30 要求多區塊／多行欄位的出處原文完整，須保留全部引用來源（只加欄位、不改既有檢查結果），PDF 與網頁既有測試不得退步。
+  2. 既有 `apps/editor/src/pages/resumes/profile/useProfileCopy.ts` 以 `JSON.stringify` 比對整份 Profile；`profile.get` 帶出處與版本號後，比對要排除出處、版本號等中繼資料，只比欄位值。補「只有出處不同時仍可複製」回歸測試。
 
 ### 不包含
 
