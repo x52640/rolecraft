@@ -74,7 +74,7 @@
 | [P1-T065](P1-T065-multipage-disorder-check.md) | 104 履歷 PDF 匯入：多頁誤判讀取順序、部首相似字 | done | 1 | resume-import | P1-T009 |
 | [P1-T066](P1-T066-resume-import-104-layout.md) | 104 履歷 PDF 版面辨識 | done | 1 | resume-import | P1-T065 |
 | [P1-T067](P1-T067-import-page-layout.md) | 匯入頁版面重整 | done | 1 | editor | P1-T020 |
-| [P1-T068](P1-T068-dev-web-harness.md) | 開發用網頁測試入口（協調者自測用） | in_progress | 1 | dev-tooling | P1-T059 |
+| [P1-T068](P1-T068-dev-web-harness.md) | 開發用網頁測試入口（協調者自測用） | done | 1 | dev-tooling | P1-T059 |
 | [P1-T069](P1-T069-resume-import-ai-parse.md) | 履歷 PDF 用 AI 整理欄位 | in_progress | 1 | resume-import | P1-T066、P1-T064 |
 
 ## 依賴清單

@@ -5,7 +5,6 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T068 開發用網頁測試入口（協調者自測用）（`docs/tasks/P1-T068-dev-web-harness.md`）
 - P1-T069 履歷 PDF 用 AI 整理欄位（`docs/tasks/P1-T069-resume-import-ai-parse.md`）
 
 ## ready

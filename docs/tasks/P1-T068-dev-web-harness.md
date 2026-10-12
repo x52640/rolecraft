@@ -1,7 +1,7 @@
 ---
 id: P1-T068
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T059"]
 specs: ["bridge.md", "architecture.md"]
 track: dev-tooling
