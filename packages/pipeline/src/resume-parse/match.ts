@@ -85,8 +85,6 @@ const DATE_FORMATS = [
   String.raw`(?:${MONTHS})[a-z]*\.?,?(?:19|20)\d{2}`,
 ];
 const DATE = new RegExp(String.raw`^(?:${DATE_FORMATS.join('|')})$`, 'iu');
-/** 引用行裡有與日期驗證相同格式的年份（西元、民國；codex 審查 3）。 */
-const HAS_DATE = new RegExp(String.raw`(?<!\d)(?:${DATE_FORMATS.join('|')})(?!\d)`, 'iu');
 
 /** 開始或結束日期的值是年份或年月格式（「100人」「3年」不算）。 */
 export function isDateValue(value: string): boolean {
@@ -94,18 +92,32 @@ export function isDateValue(value: string): boolean {
 }
 
 /**
- * 「至今」類字眼的出處：引用行要有年份（西元或民國，與日期驗證同格式），且字眼緊接在區間分隔符（~ - – — 至 to）後，
- * 或自己獨占一欄（Tab 分隔）／一行；「目前負責…」「I now lead…」都不算。
+ * 「至今」前面的區間起點（對抗審查 2026-10-12）：在保留空白的 NFKC 文字上找，數字 token 的邊界不會因去空白而黏住
+ * （「01 2019–Present」的 2019 認得）。西元年（可帶月日）、月／西元年、英文月份＋年、民國年必須帶「民國」或「年」；
+ * 純小數（98.5、3.10.12、v10.2）不算。前面不能緊接數字、小數點或英文字。
+ */
+const START_DATE = [
+  String.raw`(?:19|20)\d{2}(?:[./\-]\d{1,2}(?:[./\-]\d{1,2})?|\s*年\s*\d{1,2}\s*月?)?\s*年?`,
+  String.raw`\d{1,2}[./\-](?:19|20)\d{2}`,
+  String.raw`(?:${MONTHS})[a-z]*\.?,?\s*(?:19|20)\d{2}`,
+  String.raw`民國\s*\d{2,3}(?:\s*[./年]\s*\d{1,2}\s*月?)?\s*年?`,
+  String.raw`\d{2,3}\s*年(?:\s*\d{1,2}\s*月)?`,
+].join('|');
+const RANGE = String.raw`(?:[~〜\-–—至]|to(?![A-Za-z]))`;
+
+/**
+ * 「至今」類字眼的出處：字眼前面緊接「日期起點＋區間分隔符（~ - – — 至 to）」，或字眼獨占一欄（Tab）／一行且
+ * 前一欄／前一行以日期起點結尾（可帶分隔符）；「目前負責…」「I now lead…」「98.5% — 至今」都不算。
  */
 export function currentWordGrounded(word: string, parts: readonly string[]): boolean {
   const key = normalizeForMatch(word).toLowerCase();
-  const texts = parts.map((p) => p.normalize('NFKC'));
-  if (!texts.some((t) => HAS_DATE.test(normalizeForMatch(t)))) return false;
+  const text = parts.map((p) => p.normalize('NFKC')).join('\n');
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-  const afterRange = new RegExp(String.raw`(?:[~\-–—至]|\bto)\s*${escaped}(?![A-Za-z])`, 'iu');
-  return texts.some(
-    (t) =>
-      afterRange.test(t) ||
-      t.split('\t').some((segment) => normalizeForMatch(segment).toLowerCase() === key),
+  const start = String.raw`(?<![\d.A-Za-z])(?:${START_DATE})`;
+  const afterRange = new RegExp(String.raw`${start}\s*${RANGE}\s*${escaped}(?![A-Za-z])`, 'iu');
+  const ownColumn = new RegExp(
+    String.raw`${start}[ ]*(?:${RANGE}[ ]*)?[\t\n]\s*${escaped}[ ]*(?=[\t\n]|$)`,
+    'iu',
   );
+  return afterRange.test(text) || ownColumn.test(text);
 }

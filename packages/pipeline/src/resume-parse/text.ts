@@ -19,12 +19,18 @@ export interface MappedText {
 /** 字素叢集（基底字＋後面的組合記號、韓文字母序列）要一起正規化，分解式重音才會合成（codex 審查 1）。 */
 const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
-export function nfkcMapped(original: string): MappedText {
+/** 去掉組合記號（NFKD 後刪 \p{M} 再 NFKC）：「Amý」「José」比對成「Amy」「Jose」（對抗審查 3）。 */
+export function foldMarks(text: string): string {
+  return text.normalize('NFKD').replace(/\p{M}/gu, '').normalize('NFKC');
+}
+
+/** fold＝true 時每個叢集再去掉組合記號；位置仍對回整個原文叢集。 */
+export function nfkcMapped(original: string, fold = false): MappedText {
   let text = '';
   const start: number[] = [];
   const end: number[] = [];
   for (const { segment, index } of GRAPHEMES.segment(original)) {
-    const normalized = segment.normalize('NFKC');
+    const normalized = fold ? foldMarks(segment) : segment.normalize('NFKC');
     // 叢集內所有正規化字元都對應整個原文叢集，片段邊界不會切在叢集中間
     for (let i = 0; i < normalized.length; i += 1) {
       start.push(index);

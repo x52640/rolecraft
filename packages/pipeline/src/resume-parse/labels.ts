@@ -33,6 +33,7 @@ const CJK_KEYWORDS = [
   '婚姻',
   '兵役',
   '國籍',
+  '本名',
   '個人資料',
   '基本資料',
 ];
@@ -102,71 +103,65 @@ export function isPersonalLabel(label: string): boolean {
     .toLowerCase()
     .replace(/e-mail/gu, 'email')
     .split(/[^a-z]+/u);
-  return words.some((w) => ASCII_WORDS.has(w));
+  // 嚴格辨識認得的（Line帳號、LineID）一定也算
+  return words.some((w) => ASCII_WORDS.has(w)) || isStrictPersonalLabel(label);
 }
 
-/** 嚴格辨識時可以伴隨關鍵字出現的修飾字（「聯絡電話」「Mobile Phone」「E-mail Address」）。 */
-const CJK_FILLERS = [
-  '號碼',
-  '帳號',
-  '日期',
-  '方式',
-  '資訊',
-  '狀況',
-  '行動',
-  '住家',
-  '戶籍',
-  '現居',
-];
-const ASCII_FILLERS = new Set([
-  'number',
-  'no',
-  'id',
-  'personal',
-  'home',
-  'work',
-  'office',
-  'primary',
-  'current',
-  'mailing',
-  'full',
-  'first',
-  'last',
-  'english',
-  'chinese',
-  'info',
-  'information',
-  'details',
-  'date',
-  'of',
-  'account',
-  'url',
-]);
-const ASCII_KEYWORDS = new Set([...ASCII_WORDS, 'name', 'line']);
-const CJK_STRICT = new RegExp(`^(?:${[...CJK_KEYWORDS, ...CJK_FILLERS].join('|')})+$`, 'u');
-
 /**
- * 嚴格的個資標籤（codex 審查 2）：整個標籤只由關鍵字與修飾字組成，且至少有一個關鍵字。
- * 單獨一行沒有冒號時用這個判斷，「Mobile Developer」「GitHub Actions」「通訊軟體開發」不算。
+ * 嚴格辨識（標籤獨占一行、會連下一行一起移除時用；對抗審查 2026-10-12 改寫）。拿不準時偏向當成個資。
+ * - 精確別名：去空白、連字號、轉小寫後等於 ASCII_EXACT／NAME_EXACT（LineID、FullName、中文姓名）。
+ * - 中文部分（去掉空白、英數、標點；中間夾全形空白的「地址」也認得）限 8 字內，且以「關鍵字」或「關鍵字＋結尾字」
+ *   （號、號碼、字號、帳號、年月日、地、處、人…）結尾；前面可接任意修飾（居住地址、公司電話、緊急聯絡人、
+ *   出生年月日、身分證字號、英文本名）。關鍵字後面接一般詞（通訊軟體開發、網站改版）不算。
+ * - 英文部分每個字（不在詞彙裡時試駝峰拆字）都必須屬個資詞彙（關鍵字或修飾字），且至少一個關鍵字；
+ *   「Mobile Developer」「GitHub Actions」「Product Line」不算。
+ * - 中英混合（Line帳號、電話 Phone）：英文字全屬個資詞彙，中文部分符合上條或只由結尾字組成。
  */
-export function isStrictPersonalLabel(label: string): boolean {
-  if (!isPersonalLabel(label)) return false;
-  const parts =
+const CJK_SUFFIXES = '號碼 字號 帳號 帳戶 年月日 日期 方式 資訊 資料 狀況 狀態 號 地 處 人'.split(
+  ' ',
+);
+const ASCII_FILLERS = new Set(
+  (
+    'number no id personal home work office primary current present permanent residential residence ' +
+    'mailing postal emergency person alternate secondary full first last given family legal english ' +
+    'chinese info information details date place of account url profile page link site web handle user username'
+  ).split(' '),
+);
+const ASCII_KEYWORDS = new Set([...ASCII_WORDS, 'name', 'line']);
+const SUFFIX = `(?:${CJK_SUFFIXES.join('|')})`;
+const CJK_TAIL = new RegExp(`(?:${CJK_KEYWORDS.join('|')})${SUFFIX}?$`, 'u');
+const CJK_SUFFIX_ONLY = new RegExp(`^${SUFFIX}+$`, 'u');
+const isVocabulary = (w: string) => ASCII_KEYWORDS.has(w) || ASCII_FILLERS.has(w);
+
+/** 英文字全屬個資詞彙時回傳是否含關鍵字；有任何非個資字回 null。 */
+function asciiVocabulary(label: string): boolean | null {
+  let keyword = false;
+  const words =
     label
       .normalize('NFKC')
-      .toLowerCase()
-      .replace(/e-mail/gu, 'email')
-      .match(/[a-z]+|[^\p{ASCII}\p{P}\s]+/gu) ?? [];
-  let keyword = false;
-  for (const part of parts) {
-    if (/^[a-z]+$/u.test(part)) {
-      if (ASCII_KEYWORDS.has(part)) keyword = true;
-      else if (!ASCII_FILLERS.has(part)) return false;
-    } else if (CJK_STRICT.test(part)) {
-      if (CJK_KEYWORDS.some((k) => part.includes(k))) keyword = true;
-    } else return false;
+      .replace(/e-mail/giu, 'email')
+      .match(/[A-Za-z]+/gu) ?? [];
+  for (const word of words) {
+    const tries = [[word], word.split(/(?<=[a-z])(?=[A-Z])/u)].map((t) =>
+      t.map((w) => w.toLowerCase()),
+    );
+    const pieces = tries.find((t) => t.every(isVocabulary));
+    if (!pieces) return null;
+    if (pieces.some((w) => ASCII_KEYWORDS.has(w))) keyword = true;
   }
   return keyword;
+}
+
+export function isStrictPersonalLabel(label: string): boolean {
+  const key = compact(label);
+  if (key === '') return false;
+  if (ASCII_EXACT.has(key) || NAME_EXACT.has(key)) return true;
+  const cjk = key.replace(/[\p{ASCII}\p{P}\p{S}]/gu, '');
+  if ([...cjk].length > 8) return false;
+  const asciiKeyword = asciiVocabulary(label);
+  if (asciiKeyword === null) return false;
+  if (cjk === '') return asciiKeyword;
+  return CJK_TAIL.test(cjk) || (asciiKeyword && CJK_SUFFIX_ONLY.test(cjk));
 }
 
 /** 這個標籤的值是姓名（抽到的值一律加入遮蔽集合）。 */

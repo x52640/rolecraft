@@ -106,6 +106,7 @@ npm run verify
 - 最後完成：首次實作（pipeline resume-parse、helper import.ai_parse／ai_status、編輯器自動整理與退路、規格）；頁首姓名去標語；main.ts 接上 AI 整理服務（協調者擴充 write_paths 後另一個 commit）；第二輪：104 改用規則（擁有者改裁定 #16）、個資遮蔽 8 項與捏造檢查 4 項修正
 - 已通過驗證：worktree `npm run verify` 綠（見完成結果「第二輪」）；第二輪新增的 15 項回歸測試換回舊實作全部失敗；全程假 provider
 - codex 審查待修 3 項已修（先寫測試重現，3 項都重現；見完成結果「codex 審查項修正」）
+- 對抗審查待修 3 項＋codex review cc63fdb 追加 3 項已修（先寫測試重現，修正前 30 個案例失敗；見完成結果「對抗審查項修正」）
 - 下一步：協調者對本次修正 diff 跑 codex review
 - Blocker：無
 
@@ -142,3 +143,12 @@ npm run verify
   3. `match.ts` `currentWordGrounded` 的年份判斷改用與 `isDateValue` 同一組 `DATE_FORMATS`（`HAS_DATE`），`民國110年7月～至今` 得 `current: true`。
 - verify：Vitest 3527 通過、13 略過。
 - 殘餘（未在本次範圍）：同一行「標籤⇥值」「標籤：值」仍用寬鬆辨識（例：「GitHub Actions：CI 自動化」整行當個資移除，寧可少送、不外洩）。
+
+### 對抗審查項修正（2026-10-12，修正 cc63fdb；含 codex review cc63fdb 追加 3 項）
+
+- 先以測試重現（`resume-parse/adversarial-fixes.test.ts`，修正前 30 個案例失敗）再修：
+  1. 個資標籤（`labels.ts` `isStrictPersonalLabel` 改寫，不列特例清單）：精確別名（去空白、連字號、小寫後等於 `LineID`、`FullName`、`中文姓名` 等既有別名）直接算；中文部分去掉空白（含全形空白）、英數、標點後限 8 字，且以「個資關鍵字」或「關鍵字＋結尾字（號、號碼、字號、帳號、年月日、日期、地、處、人…）」結尾，前面可接任意修飾；英文每個字（不在詞彙時試駝峰拆字）都要屬個資詞彙（關鍵字或修飾字，新增 residential、permanent、present、profile、emergency 等）且至少一個關鍵字；中英混合（`Line帳號`）英文全屬詞彙、中文只有結尾字也算。寬鬆辨識另加「嚴格認得的也算」與關鍵字「本名」。對抗審查列的標籤、雙欄 `姓名⇥出生年月日`、`Line帳號：`／`abc123`、codex 追加的 `地　　址：`、`LineID`、`FullName`、`中文姓名：` 都連下一行移除；`Mobile Developer`、`GitHub Actions`、`通訊軟體開發`、`Product Line`、`Company Name`、`網站改版專案負責` 與下一行照送。
+  2. 「至今」（`match.ts` `currentWordGrounded`）：改在保留空白的 NFKC 文字上找「日期起點＋區間分隔符＋至今」，或「至今」獨占一欄／一行且前一欄／行以日期起點結尾。日期起點：西元年（可帶月日）、月／西元年、英文月份＋年、民國年（必須帶「民國」或「年」），前面不能緊接數字、小數點、英文字；純小數不算。`98.5% — 至今`、`Python 3.10.12 ~ 至今`、`12.5 人 - 至今`、`v10.2 模組 – 至今` 丟棄；`民國110年7月～至今`、`2021/07~至今`、`01 2019–Present`、`2019.07⇥至今` 通過。移除 `HAS_DATE`。
+  3. 組合記號姓名（`text.ts` `foldMarks`、`nfkcMapped(…, fold)`；`redact.ts`）：姓名在原樣比對之後，再對「去掉組合記號」的文字比一次（NFKD 刪 `\p{M}` 再 NFKC，以字素叢集為單位），位置對回整個原文叢集；名單 `Amy`／內文 `Amý`、名單 `Jose`／內文分解式或組合式 `José` 都遮蔽，codex 審查 1 的情況仍通過。
+- verify：Vitest 3576 通過、13 略過。
+- 殘餘：中文規則偏向當成個資，8 字內以個資關鍵字結尾的單獨一行（如「產品官方網站」「負責對外聯絡人」）會連下一行一起不送；「12 年 - 至今」這類兩三位數＋年會被當成民國年起點。
