@@ -1,0 +1,170 @@
+/* 匯入頁校正表單（P1-T067）：卡片、欄位、個人資料格線、技能 chip。色彩變數定義在 import.css 的 .import-page。 */
+/* 表單 */
+.import-form {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.import-form input:not([type='checkbox']),
+.import-form textarea {
+  font: inherit;
+  color: inherit;
+  background: var(--import-subtle);
+  border: 1px solid var(--import-border);
+  border-radius: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.import-form input:disabled {
+  opacity: 0.5;
+}
+
+.import-form textarea {
+  resize: vertical;
+  min-height: 9rem;
+  line-height: 1.6;
+}
+
+.import-section {
+  display: grid;
+  gap: 0.9rem;
+  justify-items: stretch;
+}
+
+.import-section > .import-btn,
+.import-card > .import-btn-secondary {
+  justify-self: start;
+}
+
+.import-section-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.import-card {
+  position: relative;
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  min-width: 0;
+  border: 1px solid var(--import-border);
+  border-radius: var(--import-radius);
+  padding: 0.9rem 1rem 1rem;
+}
+
+.import-card-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+/* 右上角留給刪除鈕。 */
+.import-card-title-padded {
+  padding-right: 4.5rem;
+  overflow-wrap: anywhere;
+}
+
+.import-card-remove {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+}
+
+.import-field {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.import-field > label {
+  font-size: 0.85em;
+  color: var(--import-muted);
+}
+
+.import-experience-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.import-end-date {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.import-inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+/* 個人資料：欄位名稱｜內容｜刪除 */
+.import-info-grid {
+  display: grid;
+  grid-template-columns: minmax(6rem, 11rem) minmax(0, 1fr) auto;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+}
+
+.import-info-row {
+  display: contents;
+}
+
+.import-info-head {
+  font-size: 0.85em;
+  color: var(--import-muted);
+}
+
+.import-form .import-info-label {
+  font-weight: 600;
+}
+
+/* 技能 chip */
+.import-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.import-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--import-border);
+  border-radius: 999px;
+  background: var(--import-subtle);
+  padding: 0 0.25rem 0 0.75rem;
+}
+
+.import-form .import-chip input {
+  border: 0;
+  background: transparent;
+  padding: 0.2rem 0;
+  width: auto;
+}
+
+.import-chip-remove {
+  font: inherit;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: var(--import-muted);
+  border-radius: 999px;
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.import-chip-remove:hover:not(:disabled) {
+  color: var(--import-danger);
+}

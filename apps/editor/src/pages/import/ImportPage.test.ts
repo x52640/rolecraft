@@ -222,4 +222,36 @@ describe('<ImportPage />（P1-T020）', () => {
     await screen.findByRole('button', { name: '確認並寫入個人資料' });
     expect(screen.getByLabelText<HTMLInputElement>('姓名').value).toBe('王大明');
   });
+
+  it('版面（P1-T067）：每個輸入框都有 <label>；確認列只在表單存在時出現', async () => {
+    setup(PARSED);
+    expect(screen.queryByRole('group', { name: '確認列' })).toBeNull();
+    await pickFile();
+    fireEvent.click(screen.getByRole('button', { name: '新增技能' }));
+    fireEvent.click(screen.getByRole('button', { name: '新增一段經歷' }));
+    const fields = document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+      'input, textarea',
+    );
+    expect(fields.length).toBeGreaterThan(5);
+    for (const field of fields) expect(field.labels?.length ?? 0, field.outerHTML).toBe(1);
+    const bar = screen.getByRole('group', { name: '確認列' });
+    within(bar).getByRole('checkbox', { name: '我已逐欄核對，以上內容正確' });
+    within(bar).getByRole('button', { name: '確認並寫入個人資料' });
+  });
+
+  it('經歷卡片標題帶公司／職稱，空白顯示「未填」；技能可刪單一個', async () => {
+    setup(PARSED);
+    await pickFile();
+    screen.getByRole('group', { name: '第 1 段：宏碁股份有限公司｜資深工程師' });
+    fireEvent.click(screen.getByRole('button', { name: '新增一段經歷' }));
+    screen.getByRole('group', { name: '第 2 段：未填｜未填' });
+    expect(screen.getByLabelText('第 1 段經歷描述').getAttribute('rows')).toBe('6');
+    fireEvent.click(screen.getByRole('button', { name: '新增技能' }));
+    fireEvent.click(screen.getByRole('button', { name: '新增技能' }));
+    fireEvent.change(screen.getByLabelText('技能 1'), { target: { value: 'SQL' } });
+    fireEvent.change(screen.getByLabelText('技能 2'), { target: { value: 'Go' } });
+    fireEvent.click(screen.getByRole('button', { name: '刪除技能 1' }));
+    expect(screen.getByLabelText<HTMLInputElement>('技能 1').value).toBe('Go');
+    expect(screen.queryByLabelText('技能 2')).toBeNull();
+  });
 });

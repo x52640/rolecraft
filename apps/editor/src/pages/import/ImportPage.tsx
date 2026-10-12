@@ -10,8 +10,11 @@ import {
   toProfileInput,
   type ProfileForm,
 } from './form-model.ts';
+import { ConfirmBar } from './components/ConfirmBar.tsx';
 import { ParsePreview } from './ParsePreview.tsx';
 import { ProfileFormFields } from './ProfileForm.tsx';
+
+import './import.css';
 
 type Phase =
   | { kind: 'idle' }
@@ -83,76 +86,86 @@ export function ImportPage() {
   }
 
   return (
-    <section className="page">
-      <h1>匯入</h1>
-      <p>匯入既有履歷 PDF（例如 104 下載的履歷）。只在本機讀取 PDF 文字層。</p>
-      <p role="note" className="placeholder-note">
-        掃描檔（沒有文字層）的文字辨識尚未實作；遇到時請改用手動輸入。
-      </p>
+    <section className="page import-page">
+      <header className="import-header">
+        <h1>匯入</h1>
+        <p className="import-hint">
+          匯入既有履歷 PDF（例如 104 下載的履歷），只在本機讀取文字層。掃描檔的文字辨識尚未實作，
+          遇到時請改用手動輸入。
+        </p>
+      </header>
 
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p role="alert" className="import-error">
+          {error}
+        </p>
+      )}
 
-      {phase.kind === 'busy' && <p role="status">{phase.what}</p>}
+      {phase.kind === 'busy' && (
+        <p role="status" className="import-hint">
+          {phase.what}
+        </p>
+      )}
 
       {(phase.kind === 'idle' || phase.kind === 'confirmed') && (
-        <>
+        <div className="import-start">
           {phase.kind === 'confirmed' && (
-            <p role="status">
+            <p role="status" className="import-success">
               已確認並寫入個人資料（來源：{phase.displayName}）。之後產生履歷只會用已確認的內容。
             </p>
           )}
-          <button type="button" onClick={() => void pick()}>
+          <button
+            type="button"
+            className="import-btn import-btn-primary"
+            onClick={() => void pick()}
+          >
             {phase.kind === 'idle' ? '選擇履歷 PDF' : '再匯入一份'}
           </button>
-        </>
+        </div>
       )}
 
       {phase.kind === 'review' && (
         <form
+          className="import-review"
           onSubmit={(e) => {
             e.preventDefault();
             void submit(phase);
           }}
         >
-          <p>
-            檔案：{phase.result.displayName}{' '}
-            <button type="button" onClick={() => void pick()}>
+          <div className="import-file-bar">
+            <span>
+              檔案：<strong>{phase.result.displayName}</strong>
+            </span>
+            <button
+              type="button"
+              className="import-btn import-btn-secondary"
+              onClick={() => void pick()}
+            >
               改選其他檔案
             </button>
-          </p>
-          {phase.result.status === 'failed' ? (
-            <div role="alert" aria-label="解析失敗">
+          </div>
+          {phase.result.status === 'failed' && (
+            <div role="alert" aria-label="解析失敗" className="import-warning">
               <p>無法可靠解析這份 PDF：{FAILURE_TEXT[phase.result.reason]}</p>
               <p>解析結果不會被使用。請在下方手動輸入個人資料、經歷與技能。</p>
             </div>
-          ) : (
-            <ParsePreview result={phase.result} />
           )}
 
-          <ProfileFormFields form={form} onChange={changeForm} />
+          <div className={phase.result.status === 'parsed' ? 'import-layout' : undefined}>
+            <div className="import-form-column">
+              <ProfileFormFields form={form} onChange={changeForm} />
+              {problems.length > 0 && (
+                <ul role="alert" aria-label="需要修正" className="import-error">
+                  {problems.map((problem) => (
+                    <li key={problem}>{problem}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {phase.result.status === 'parsed' && <ParsePreview result={phase.result} />}
+          </div>
 
-          {problems.length > 0 && (
-            <ul role="alert" aria-label="需要修正">
-              {problems.map((problem) => (
-                <li key={problem}>{problem}</li>
-              ))}
-            </ul>
-          )}
-          <p role="note" aria-label="尚未存入提醒">
-            存入前離開頁面，修改不會保留。
-          </p>
-
-          <label>
-            <input
-              type="checkbox"
-              checked={checked}
-              onChange={(e) => setChecked(e.target.checked)}
-            />
-            我已逐欄核對，以上內容正確
-          </label>
-          <button type="submit" disabled={!checked}>
-            確認並寫入個人資料
-          </button>
+          <ConfirmBar checked={checked} onCheck={setChecked} />
         </form>
       )}
     </section>

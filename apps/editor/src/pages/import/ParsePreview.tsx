@@ -14,7 +14,7 @@ const where = (field: ImportDraftField): string =>
 
 function DraftList({ label, fields }: { label: string; fields: readonly ImportDraftField[] }) {
   return (
-    <div>
+    <div className="import-draft-group">
       <h4>{label}</h4>
       {fields.length === 0 ? (
         <p className="placeholder-note">沒找到</p>
@@ -31,33 +31,30 @@ function DraftList({ label, fields }: { label: string; fields: readonly ImportDr
   );
 }
 
-/** 解析預覽：原文（依閱讀順序、附行號）與偵測到的欄位（全部未確認，附出處）。 */
+/** 解析預覽：原文（依頁分組、淡色行號、可捲動）與偵測到的欄位（全部未確認，附出處）。 */
 export function ParsePreview({ result }: { result: Parsed }) {
   return (
-    <section aria-label="解析預覽">
-      <h2>解析預覽</h2>
-      <p>
-        以下是從 PDF 文字層讀到的內容，欄位都是自動猜的、尚未確認；請對照原文在下方表單逐欄校正。
-      </p>
+    <section aria-label="解析預覽" className="import-source">
+      <h2 className="import-section-title">PDF 原文</h2>
+      <p className="import-hint">左邊欄位都是自動猜的、尚未確認；請對照這裡的原文逐欄校正。</p>
       {result.pagesWithoutText.length > 0 && (
-        <p role="note">
+        <p role="note" className="import-warning">
           第 {result.pagesWithoutText.join('、')} 頁沒有文字（可能是圖片），內容請自行補到表單。
         </p>
       )}
-      <details open>
-        <summary>原文</summary>
+      <div className="import-source-scroll" tabIndex={0} role="group" aria-label="原文內容">
         {result.pages.map((page) => (
-          <div key={page.pageNumber}>
+          <div key={page.pageNumber} className="import-source-page">
             <h3>第 {page.pageNumber} 頁</h3>
-            <ol aria-label={`第 ${String(page.pageNumber)} 頁原文`}>
+            <ol aria-label={`第 ${String(page.pageNumber)} 頁原文`} className="import-lines">
               {page.lines.map((line, i) => (
                 <li key={i}>{line}</li>
               ))}
             </ol>
           </div>
         ))}
-      </details>
-      <details>
+      </div>
+      <details className="import-draft">
         <summary>偵測到的欄位（未確認）</summary>
         <DraftList label="姓名" fields={result.draft.name ? [result.draft.name] : []} />
         {DRAFT_GROUPS.map(([key, label]) => (
