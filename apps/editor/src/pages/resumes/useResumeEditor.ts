@@ -23,6 +23,10 @@ export const EDITING_BLOCKS_GENERATE_TEXT =
 export const NEW_VERSION_HELD_TEXT =
   '新版本已產生，但你有段落正在編輯，所以沒有自動切換：儲存或取消後，從「版本」選單選新版本。';
 
+/** 段落編輯中按重新整理：只更新版本清單，不切版本、不重讀內容，保留未存的編輯。 */
+export const REFRESH_HELD_TEXT =
+  '版本清單已更新；你有段落正在編輯，所以沒有切換或重新讀取：儲存或取消後再重新整理，或從「版本」選單選版本。';
+
 type JobsList = Extract<ResponseOf<'jobs.list'>, { ok: true }>['snapshots'];
 export type CheckResult = Extract<ResponseOf<'resume.check_export'>, { ok: true }>;
 
@@ -113,7 +117,10 @@ export function useResumeEditor(poll: ResumePollOptions = DEFAULT_RESUME_POLL) {
       const res = await bridge.send({ op: 'resume.get', payload: { resumeVersionId: id } });
       if (stale()) return;
       if (!res.ok) {
+        // 畫面清掉、編輯框跟著消失：編輯狀態也要清，否則「產生」一直被看不見的編輯鎖住（codex）
         setView(null);
+        editingRef.current = null;
+        setEditingState(null);
         setNotice(errorOf(res));
         return;
       }
@@ -184,10 +191,25 @@ export function useResumeEditor(poll: ResumePollOptions = DEFAULT_RESUME_POLL) {
     busy,
     notice,
     allClaims,
-    /** 重新讀取版本清單；選到的版本沒變時（effect 不會重跑）也明確重新讀取它的內容。 */
+    /**
+     * 重新讀取版本清單；選到的版本沒變時（effect 不會重跑）也明確重新讀取它的內容。
+     * 段落編輯中只更新清單、不切版本也不重讀，避免丟掉未存的編輯。
+     */
     refresh: async () => {
       if (jobId === null) return;
       const before = currentVersion.current;
+      if (editingRef.current !== null) {
+        // 編輯中：只更新清單，保留目前版本與編輯框，不重讀內容（codex）
+        const res = await bridge.send({ op: 'resume.list', payload: { jobSnapshotId: jobId } });
+        if (currentJob.current !== jobId) return;
+        if (!res.ok) {
+          setNotice(errorOf(res));
+          return;
+        }
+        setVersions(res.versions);
+        setNotice(REFRESH_HELD_TEXT);
+        return;
+      }
       const next = await loadVersions(jobId);
       if (next !== undefined && next !== null && next === before) await loadView(next);
     },
