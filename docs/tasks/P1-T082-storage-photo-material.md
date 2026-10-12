@@ -85,6 +85,9 @@ npm run verify
 - 協調者 2026-10-12 擴充 write_paths：加 `packages/storage/src/migrate.test.ts`（新增 photos 表需同步寫死的資料表清單，前例 P1-T064）
 - 下一步：協調者收官；高風險 Task，收官前跑對抗驗證（E3）與 codex review（尚未跑）
 - Blocker：無
+- 審查待修（2026-10-12，51375eb 的對抗審查與 codex review 同一項，協調者寫入）：
+  1. （D19）`INSERT OR REPLACE INTO photos`（同 ID 或 slot 衝突）在 recursive_triggers 關閉時繞過 `photos_no_update` 與 `photos_record_deleted`：舊照片沒有已刪紀錄，含舊照片的未投遞版本與 PDF 不會刪；同 ID 也能換內容。改法：新增 migration 0010（不改 0009），已有照片時 `BEFORE INSERT` 一律拒絕，加進 `IMMUTABILITY_TRIGGERS`；測試同 ID REPLACE、slot 衝突 REPLACE、replacePhoto 仍可、0009 升級到 0010。
+  - 已修（`fix(P1-T082): 擋 REPLACE 覆寫照片（審查）`）：migration `0010_photos_no_replace.sql` 的 `photos_insert_only_when_empty`，四項測試在 `application/photo-replace-guard.test.ts`。
 
 ## 完成結果
 
@@ -95,3 +98,4 @@ npm run verify
 - 測試：`application/photo-material.test.ts`、`application/photo-storage.test.ts` 共 18 案例（刪除、更換、更換中途失敗全不變、刪後再加同一張不被擋、孤兒清掃不碰照片、直接 SQL 刪照片由清掃補做 D19、0008→0009 升級）
 - 保守選擇：(1) 刪除與更換放 application 層、repository 不給刪除（同其他素材）；(2) 匯出照片須是目前照片，不只擋已刪；(3) 沒照片時更換＝加入、刪除不動也不記紀錄；(4) 不存縮圖（由 P1-T083 處理）
 - 規格落差：(1) Task 寫 repository 負責更換與刪除，但 D19 要刪 PDF、repository 拿不到檔案區，故放 `application/photo-material.ts`；(2) `ExportVersion.photo.sha256` 是寬鬆 `ContentHash`、`Photo.sha256` 是 `Sha256Hash`，storage 與目前照片比對所以實際等同嚴格，契約未改
+- 審查修正：migration `0010_photos_no_replace.sql` 加 `photos_insert_only_when_empty`（已有照片時拒絕任何新增，擋 `INSERT OR REPLACE` 繞過刪除紀錄與 D19），列入 `IMMUTABILITY_TRIGGERS`；測試 `application/photo-replace-guard.test.ts`（同 ID／slot 衝突 REPLACE 被擋、replacePhoto 仍可、0009→0010 升級）

@@ -45,7 +45,7 @@ describe('photo repository', () => {
            VALUES ('x', 'jpeg', 1, 1, ?, x'01', 't')`,
         )
         .run('a'.repeat(64)),
-    ).toThrow(/UNIQUE/);
+    ).toThrow(/already exists/);
     expect(Object.keys(t.repos.photos)).not.toContain('delete');
   });
 
@@ -111,7 +111,7 @@ describe('migration 0009 on an existing database', () => {
          VALUES ('ev-old', 'rv', 't', 'h', json_object('id', 'ev-old', 'resumeVersionId', 'rv', 'pdfHash', 'h'))`,
       ).run();
 
-      expect(migrate(db).applied).toEqual([9]);
+      expect(migrate(db).applied).toEqual([9, 10]);
 
       expect(db.prepare('SELECT kind, material_id FROM deleted_materials').all()).toEqual([
         { kind: 'claim', material_id: 'c-old' },

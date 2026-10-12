@@ -26,6 +26,8 @@ export const IMMUTABILITY_TRIGGERS = [
   'photos_no_reuse_deleted_id',
   'photos_record_deleted',
   'export_versions_no_deleted_photo',
+  // 0010：擋 REPLACE 覆寫照片（繞過刪除紀錄與 D19）
+  'photos_insert_only_when_empty',
 ] as const;
 
 export function assertImmutabilityGuards(db: DatabaseSync): void {
