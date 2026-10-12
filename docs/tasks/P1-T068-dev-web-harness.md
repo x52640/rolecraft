@@ -31,6 +31,10 @@ expected_commit: "feat(P1-T068): 開發用網頁測試入口：編輯器跑在 l
 - 文件 `docs/dev-harness.md`：用途、啟動、安全限制（只限本機、只供開發）、會呼叫真實 Claude（額度）
 - 測試：token／Host／來源檢查、選取器注入只在 harness 生效、transport 選擇；全程假 helper 或假 provider，不呼叫真實 CLI
 
+- 對抗驗證與 codex review（2026-10-12）屬實項：
+  - URL 編碼的 `/%69ndex.html`、`/index%2Ehtml` 繞過頁面 token 檢查，回傳含 token 的頁面 → 授權判斷與送檔用同一份解碼、正規化後的路徑；解碼失敗回 400；測試涵蓋編碼別名
+  - 格式錯誤的請求目標（如 `//[`）讓 URL 解析同步丟錯、整個 harness 結束 → 請求檢查包 try/catch 回 400
+
 ### 不包含
 
 - 改變正式擴充功能、service worker、安裝腳本行為
