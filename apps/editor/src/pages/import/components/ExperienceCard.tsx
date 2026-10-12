@@ -1,6 +1,7 @@
 import { useId } from 'react';
 
 import type { ExperienceKey, ExperienceRow } from '../form-model.ts';
+import { FieldSource, flaggedClass } from './FieldSource.tsx';
 import { PersonalMark } from './PersonalMark.tsx';
 
 type TextKey = 'company' | 'title' | 'startDate';
@@ -18,9 +19,11 @@ export function ExperienceCard(props: {
   const id = useId();
   const n = String(index + 1);
   const mark = (key: ExperienceKey) => (row.personal?.includes(key) ? <PersonalMark /> : null);
+  const field = (key: ExperienceKey) => `import-field${flaggedClass(row.origins?.[key])}`;
+  const source = (key: ExperienceKey) => <FieldSource origin={row.origins?.[key]} />;
 
   const text = (key: TextKey, label: string) => (
-    <div className="import-field">
+    <div className={field(key)}>
       <label htmlFor={`${id}-${key}`}>
         {label}
         {mark(key)}
@@ -31,6 +34,7 @@ export function ExperienceCard(props: {
         value={row[key]}
         onChange={(e) => onChange({ ...row, [key]: e.target.value })}
       />
+      {source(key)}
     </div>
   );
 
@@ -55,7 +59,7 @@ export function ExperienceCard(props: {
         {text('company', '公司')}
         {text('title', '職稱')}
         {text('startDate', '開始日期')}
-        <div className="import-field">
+        <div className={field('endDate')}>
           <label htmlFor={`${id}-endDate`}>
             結束日期
             {mark('endDate')}
@@ -78,9 +82,10 @@ export function ExperienceCard(props: {
               至今
             </label>
           </div>
+          {source('endDate')}
         </div>
       </div>
-      <div className="import-field">
+      <div className={field('description')}>
         <label htmlFor={`${id}-description`}>
           描述
           {mark('description')}
@@ -92,6 +97,7 @@ export function ExperienceCard(props: {
           value={row.description}
           onChange={(e) => onChange({ ...row, description: e.target.value })}
         />
+        {source('description')}
       </div>
     </section>
   );

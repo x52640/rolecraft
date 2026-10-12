@@ -1,0 +1,108 @@
+/* 網頁來源的核對（D29）：欄位出處、標黃提醒、擷取原文的結構呈現、確認前摘要。 */
+.import-review {
+  --import-flag-bg: light-dark(#fff3b0, #4a3f0c);
+  --import-flag-edge: light-dark(#d9a400, #e6c34d);
+}
+
+/* 標黃：只是提醒，不擋確認。 */
+.import-flagged {
+  background: var(--import-flag-bg);
+  box-shadow: -0.3rem 0 0 var(--import-flag-edge);
+  border-radius: 0.3rem;
+}
+
+.import-origin {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  font-size: 0.82em;
+}
+
+.import-origin-flag {
+  font-weight: 600;
+}
+
+/* 出處原文最多兩行，超過截斷（完整內容在 title 與原文區）。 */
+.import-origin-link {
+  font: inherit;
+  text-align: start;
+  color: var(--import-muted);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.import-origin-link:hover,
+.import-origin-link:focus-visible {
+  color: var(--import-accent);
+  text-decoration: underline;
+}
+
+.import-chip:has(.import-origin) {
+  flex-wrap: wrap;
+  border-radius: var(--import-radius);
+  padding: 0.2rem 0.4rem 0.2rem 0.75rem;
+}
+
+.import-chip .import-origin {
+  flex-basis: 100%;
+  max-width: 16rem;
+}
+
+/* 擷取原文：照原結構呈現（標題、清單、標籤＋值兩欄、依標題分組）。 */
+.import-raw-group + .import-raw-group {
+  margin-top: 0.75rem;
+}
+
+.import-raw-group > [role='heading'] {
+  font-weight: 700;
+  margin: 0.25rem 0;
+}
+
+.import-raw-group p {
+  margin: 0.25rem 0;
+}
+
+.import-raw-list {
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}
+
+.import-raw-pairs {
+  margin: 0.25rem 0;
+}
+
+.import-raw-pairs > div {
+  display: grid;
+  grid-template-columns: minmax(5rem, 1fr) 3fr;
+  gap: 0.75rem;
+}
+
+.import-raw-pairs dt {
+  color: var(--import-muted);
+}
+
+.import-raw-pairs dd {
+  margin: 0;
+}
+
+.import-raw-target {
+  background: var(--import-flag-bg);
+  outline: 2px solid var(--import-accent);
+  border-radius: 0.2rem;
+}
+
+.import-raw-id {
+  color: var(--import-muted);
+}
+
+.import-summary ul {
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}

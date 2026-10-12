@@ -8,11 +8,23 @@ import {
   type ResumeImportFailureReason,
 } from '@rolecraft/contracts';
 
+/**
+ * 網頁來源欄位的出處（D29）：出處區塊編號，以及是否標黃（值不包含於單一出處區塊、或含個資標示）。
+ * 標黃只是提醒，不擋確認（擁有者 2026-10-13 再裁定）；使用者改過該欄就不再標黃。
+ */
+export interface FieldOrigin {
+  readonly blockId: string;
+  /** 標黃原因：值跨多個區塊（不包含於單一出處區塊）、含姓名或聯絡資料；null＝免標示 */
+  readonly flag: 'cross_block' | 'personal' | null;
+}
+
 export interface InfoRow {
   label: string;
   value: string;
   /** AI 草稿還原出姓名或聯絡資料（D28／W7）：該欄標示「含姓名或聯絡資料」；跟著這一列移動 */
   personal?: boolean;
+  /** 網頁來源的出處（D29）；跟著這一列移動 */
+  origin?: FieldOrigin | undefined;
 }
 
 /** 經歷裡可能被標示「含姓名或聯絡資料」的欄位。 */
@@ -28,6 +40,8 @@ export interface ExperienceRow {
   description: string;
   /** 還原出姓名或聯絡資料的欄位（D28／W7）；跟著這一段移動 */
   personal?: readonly ExperienceKey[];
+  /** 網頁來源各欄的出處（D29）；跟著這一段移動 */
+  origins?: Partial<Record<ExperienceKey, FieldOrigin>>;
 }
 
 export interface ProfileForm {
@@ -39,6 +53,8 @@ export interface ProfileForm {
    * 使用者編輯後仍保留標示（保守；不靠和原值比對）。
    */
   personalSkills?: readonly boolean[];
+  /** 與 skills 同索引：網頁來源技能的出處（D29）；新增的項目為 null */
+  skillOrigins?: readonly (FieldOrigin | null)[];
 }
 
 export const EMPTY_EXPERIENCE: ExperienceRow = {

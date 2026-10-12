@@ -117,7 +117,7 @@ const click = (name: string | RegExp) => fireEvent.click(screen.getByRole('butto
 
 async function openCapture() {
   fireEvent.click(await screen.findByRole('button', { name: '使用這份' }));
-  await screen.findByRole('list', { name: '擷取到的區塊' });
+  await screen.findByRole('button', { name: '查看擷取原文' });
 }
 
 afterEach(cleanup);
@@ -155,11 +155,11 @@ describe('<ImportPage /> 網頁擷取（P1-T081）', () => {
     expect(sent('import.ai_parse')).toEqual([]);
   });
 
-  it('「使用這份」只開啟核對：顯示區塊 bN 與持續的「內容不完整」，不送 AI；按「用 AI 整理」才送一次', async () => {
+  it('「使用這份」只開啟核對：原文預設收合、持續的「內容不完整」，不送 AI；按「用 AI 整理」才送一次', async () => {
     const { sent } = setup();
     await openCapture();
     expect(sent('import.get')).toEqual([{ op: 'import.get', payload: { importId: 'web-1' } }]);
-    expect(screen.getByRole('list', { name: '擷取到的區塊' }).textContent).toContain('區塊 b3');
+    expect(screen.queryByRole('group', { name: '擷取原文內容' })).toBeNull();
     expect(screen.getByRole('note', { name: '內容不完整' })).toBeTruthy();
     expect(screen.queryByText(/第 1 頁/u)).toBeNull();
     await settle();
@@ -179,7 +179,7 @@ describe('<ImportPage /> 網頁擷取（P1-T081）', () => {
     );
     await openCapture();
     click('使用這份');
-    await screen.findByRole('list', { name: '擷取到的區塊' });
+    await screen.findByRole('button', { name: '查看擷取原文' });
     await settle();
     expect(sent('import.ai_parse')).toEqual([]);
     click('改選履歷 PDF');
@@ -192,7 +192,7 @@ describe('<ImportPage /> 網頁擷取（P1-T081）', () => {
       ),
     ).toBe(true);
     click('使用這份');
-    await screen.findByRole('list', { name: '擷取到的區塊' });
+    await screen.findByRole('button', { name: '查看擷取原文' });
     await settle();
     expect(sent('import.ai_parse')).toHaveLength(pdfCalls);
   });
@@ -252,7 +252,7 @@ describe('<ImportPage /> 網頁擷取（P1-T081）', () => {
     click('用 AI 整理');
     const status = await screen.findByText(/AI 整理沒有完成/u);
     expect(status.textContent).toContain('區塊手動輸入');
-    expect(screen.getByRole('list', { name: '擷取到的區塊' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '查看擷取原文' })).toBeTruthy();
     expect(screen.getByRole('group', { name: '校正內容' })).toHaveProperty('disabled', false);
   });
 });
@@ -288,10 +288,9 @@ describe('<ImportPage /> 手動輸入與確認（P1-T081）', () => {
     await openCapture();
     expect(screen.getByRole('button', { name: '手動輸入' })).toBeTruthy();
     fireEvent.change(screen.getByLabelText('姓名'), { target: { value: '林測試' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: '我已逐欄核對，以上內容正確' }));
     click('確認並寫入個人資料');
     expect((await screen.findByRole('alert')).textContent).toContain('多份個人資料');
-    expect(screen.getByRole('list', { name: '擷取到的區塊' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '查看擷取原文' })).toBeTruthy();
   });
 
   it('查不到最近擷取（helper 沒開）：只在擷取區塊提示，不出現錯誤警示', async () => {

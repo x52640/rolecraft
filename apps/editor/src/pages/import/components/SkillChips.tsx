@@ -1,5 +1,7 @@
 import { useId } from 'react';
 
+import type { FieldOrigin } from '../form-model.ts';
+import { FieldSource, flaggedClass } from './FieldSource.tsx';
 import { PersonalMark } from './PersonalMark.tsx';
 
 /** 輸入框寬度跟著字數，但有上限；更長的交給 CSS 限制在欄寬內。 */
@@ -10,11 +12,13 @@ export function SkillChips(props: {
   skills: readonly string[];
   /** 與 skills 同索引：該技能還原出姓名或聯絡資料（D28／W7），跟著項目走 */
   personal?: readonly boolean[] | undefined;
+  /** 與 skills 同索引：網頁來源的出處（D29） */
+  origins?: readonly (FieldOrigin | null)[] | undefined;
   onChange: (index: number, value: string) => void;
   onRemove: (index: number) => void;
   onAdd: () => void;
 }) {
-  const { skills, personal = [], onChange, onRemove, onAdd } = props;
+  const { skills, personal = [], origins = [], onChange, onRemove, onAdd } = props;
   const id = useId();
   return (
     <section className="import-card" aria-labelledby={`${id}-title`}>
@@ -26,7 +30,7 @@ export function SkillChips(props: {
         {skills.map((skill, i) => {
           const n = String(i + 1);
           return (
-            <li key={i} className="import-chip">
+            <li key={i} className={`import-chip${flaggedClass(origins[i])}`}>
               <label className="import-visually-hidden" htmlFor={`${id}-${n}`}>
                 技能 {n}
               </label>
@@ -46,6 +50,7 @@ export function SkillChips(props: {
                 ×
               </button>
               {personal[i] === true && <PersonalMark />}
+              <FieldSource origin={origins[i]} />
             </li>
           );
         })}

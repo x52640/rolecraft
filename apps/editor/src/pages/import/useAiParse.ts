@@ -63,6 +63,10 @@ export function useAiParse(
   const bridge = useBridge();
   const [state, setState] = useState<AiParseState>({ kind: 'idle' });
   const opRef = useRef(0);
+  // 目前這次整理屬於哪一次核對（session.key）。換核對的 effect 只作廢「別次核對」的整理：
+  // 開啟核對的 effect 可能晚於使用者按「用 AI 整理」才執行（React 的 passive effect 延後），
+  // 不能把剛送出的這次也作廢，否則已送出的 import.ai_parse 結果被丟掉、畫面卡在未整理（偶發失敗的原因）。
+  const runKey = useRef<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onDraftRef = useRef(onDraft);
   onDraftRef.current = onDraft;
@@ -102,8 +106,9 @@ export function useAiParse(
     }, poll.intervalMs);
   };
 
-  const start = (id: string, names?: readonly string[]) => {
+  const start = (key: number, id: string, names?: readonly string[]) => {
     cancel();
+    runKey.current = key;
     const token = opRef.current;
     setState({ kind: 'running' });
     const payload = names ? { importId: id, names: [...names] } : { importId: id };
@@ -118,13 +123,23 @@ export function useAiParse(
   };
 
   useEffect(() => {
+    const key = session?.key ?? null;
+    // 收尾只作廢屬於這次核對（或沒有歸屬）的整理；新核對已由按鈕開始的整理不動
+    const release = () => {
+      if (runKey.current !== null && runKey.current !== key) return;
+      runKey.current = null;
+      cancel();
+    };
+    // 這次核對已由使用者按鈕開始整理（effect 晚到）：保留，不作廢、不重設
+    if (key !== null && runKey.current === key) return release;
+    runKey.current = null;
     if (session === null || !session.auto) {
       cancel();
       setState({ kind: 'idle' });
-      return cancel;
+      return release;
     }
-    start(session.importId);
-    return cancel;
+    start(session.key, session.importId);
+    return release;
     // 只在換一次核對時決定一次（auto 跟著核對一起設定）
   }, [session?.key]);
 
@@ -133,7 +148,7 @@ export function useAiParse(
     running: state.kind === 'running',
     /** 使用者按「用 AI 整理」／「用 AI 重新整理」或確認姓名：整理中不重送 */
     restart: (names?: readonly string[]) => {
-      if (session !== null && state.kind !== 'running') start(session.importId, names);
+      if (session !== null && state.kind !== 'running') start(session.key, session.importId, names);
     },
   };
 }

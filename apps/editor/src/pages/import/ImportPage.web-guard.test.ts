@@ -73,7 +73,7 @@ const nameField = () => screen.getByLabelText<HTMLInputElement>('姓名');
 
 async function openCapture() {
   fireEvent.click(await screen.findByRole('button', { name: '使用這份' }));
-  await screen.findByRole('list', { name: '擷取到的區塊' });
+  await screen.findByRole('button', { name: '查看擷取原文' });
 }
 
 /** 有「含姓名或聯絡資料」標示的技能值。 */

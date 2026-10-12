@@ -1,6 +1,7 @@
 import { useId } from 'react';
 
 import type { InfoRow } from '../form-model.ts';
+import { FieldSource, flaggedClass } from './FieldSource.tsx';
 import { PersonalMark } from './PersonalMark.tsx';
 
 /** 個人資料：欄位名稱＋內容兩欄格線，每列一個次要的刪除鈕。 */
@@ -43,13 +44,14 @@ export function InfoRows(props: {
                 <label className="import-visually-hidden" htmlFor={`${id}-${n}-value`}>
                   {valueName}
                 </label>
-                <div className="import-info-value">
+                <div className={`import-info-value${flaggedClass(row.origin)}`}>
                   <input
                     id={`${id}-${n}-value`}
                     value={row.value}
                     onChange={(e) => onChange(i, { ...row, value: e.target.value })}
                   />
                   {row.personal === true && <PersonalMark />}
+                  <FieldSource origin={row.origin} />
                 </div>
                 <button
                   type="button"

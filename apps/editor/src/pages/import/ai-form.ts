@@ -2,7 +2,7 @@
 // 這裡只搬進表單，一律未確認，由使用者逐欄核對後才寫入（R10）。
 import type { ImportAiDiscardReason, ImportAiFailure, ImportDraft } from '@rolecraft/contracts';
 
-import type { ExperienceKey, ProfileForm } from './form-model.ts';
+import type { ExperienceKey, FieldOrigin, ProfileForm } from './form-model.ts';
 
 /** 表單目前是用什麼預填的（畫面標明來源）。 */
 export type PrefillSource = 'ai' | 'layout104' | 'rules' | 'manual';
@@ -41,7 +41,12 @@ export const DISCARD_TEXT: Record<ImportAiDiscardReason, string> = {
 export interface AiFieldLike {
   readonly value: string;
   readonly containsPersonalData?: boolean | undefined;
+  /** 網頁來源的出處區塊（第一個引用區塊）；PDF 來源沒有 */
+  readonly blockId?: string | undefined;
 }
+
+/** 由表單一格背後的草稿欄位（可能多個：學歷併列、技能去重）算出處；PDF 來源不給。 */
+export type OriginOf = (fields: readonly AiFieldLike[]) => FieldOrigin | undefined;
 
 /** PDF 的 ImportAiDraft 與網頁的 ImportWebAiDraft 共同的形狀（D28：結構相同、出處不同）。 */
 export interface AiDraftLike {
@@ -63,13 +68,25 @@ export interface AiDraftLike {
 const flagged = (field: AiFieldLike | null | undefined): boolean =>
   field?.containsPersonalData === true;
 
-/** 技能去空白、去重；同一值任何一個有個資旗標就標示（與 skills 同索引）。 */
-function skillRows(skills: readonly { value: string; personal: boolean }[]) {
-  const personal = new Map<string, boolean>();
+const oneEachBlock = (list: readonly AiFieldLike[]): AiFieldLike[] =>
+  list.filter((f, i) => list.findIndex((g) => g.blockId === f.blockId) === i);
+
+/** 技能去空白、去重；同一值任何一個有個資旗標就標示（與 skills 同索引）；出處依同值的全部欄位算。 */
+function skillRows(skills: readonly AiFieldLike[], originOf: OriginOf | undefined) {
+  const groups = new Map<string, AiFieldLike[]>();
   for (const s of skills) {
-    if (s.value !== '') personal.set(s.value, (personal.get(s.value) ?? false) || s.personal);
+    const value = s.value.trim();
+    if (value !== '') groups.set(value, [...(groups.get(value) ?? []), s]);
   }
-  return { skills: [...personal.keys()], personalSkills: [...personal.values()] };
+  const lists = [...groups.values()];
+  return {
+    skills: [...groups.keys()],
+    personalSkills: lists.map((list) => list.some(flagged)),
+    // 同值技能出自同一個區塊只算一次（同一個區塊仍是單一出處）
+    ...(originOf
+      ? { skillOrigins: lists.map((list) => originOf(oneEachBlock(list)) ?? null) }
+      : {}),
+  };
 }
 
 const EXPERIENCE_KEYS: readonly ExperienceKey[] = [
@@ -80,22 +97,52 @@ const EXPERIENCE_KEYS: readonly ExperienceKey[] = [
   'description',
 ];
 
+function experienceOrigins(
+  e: AiDraftLike['experiences'][number],
+  originOf: OriginOf,
+): Partial<Record<ExperienceKey, FieldOrigin>> {
+  const origins: Partial<Record<ExperienceKey, FieldOrigin>> = {};
+  for (const key of EXPERIENCE_KEYS) {
+    const field = e[key];
+    const origin = field ? originOf([field]) : undefined;
+    if (origin) origins[key] = origin;
+  }
+  return origins;
+}
+
 /**
  * AI 草稿 → 表單：姓名列固定第一；學歷併成一列「學歷」；其他段落不進表單（不寫入個人資料）。
  * 還原出姓名或聯絡資料的欄位（D28／W7）帶標示，提醒使用者確認前刪掉。
+ * 網頁來源另給 originOf（D29）：每格帶出處與是否標黃。
  */
-export function formFromAiDraft(draft: AiDraftLike): ProfileForm {
+export function formFromAiDraft(draft: AiDraftLike, originOf?: OriginOf): ProfileForm {
+  const at = (fields: readonly AiFieldLike[]) =>
+    originOf ? { origin: originOf(fields) } : ({} as const);
   const name = draft.personalInfo.find((row) => row.label === '姓名');
   const others = draft.personalInfo
     .filter((row) => row.label !== '姓名')
-    .map((row) => ({ label: row.label, value: row.value.value, personal: flagged(row.value) }));
+    .map((row) => ({
+      label: row.label,
+      value: row.value.value,
+      personal: flagged(row.value),
+      ...at([row.value]),
+    }));
   const education = draft.education.map((field) => field.value).join('\n');
   const hasEducation = others.some((row) => row.label === '學歷');
-  const educationRow = { label: '學歷', value: education, personal: draft.education.some(flagged) };
-  const skills = draft.skills.map((s) => ({ value: s.value.trim(), personal: flagged(s) }));
+  const educationRow = {
+    label: '學歷',
+    value: education,
+    personal: draft.education.some(flagged),
+    ...at(draft.education),
+  };
   return {
     info: [
-      { label: '姓名', value: name?.value.value ?? '', personal: flagged(name?.value) },
+      {
+        label: '姓名',
+        value: name?.value.value ?? '',
+        personal: flagged(name?.value),
+        ...at(name ? [name.value] : []),
+      },
       ...others,
       ...(education !== '' && !hasEducation ? [educationRow] : []),
     ],
@@ -107,7 +154,8 @@ export function formFromAiDraft(draft: AiDraftLike): ProfileForm {
       current: e.current,
       description: e.description?.value ?? '',
       personal: EXPERIENCE_KEYS.filter((key) => flagged(e[key])),
+      ...(originOf ? { origins: experienceOrigins(e, originOf) } : {}),
     })),
-    ...skillRows(skills),
+    ...skillRows(draft.skills, originOf),
   };
 }

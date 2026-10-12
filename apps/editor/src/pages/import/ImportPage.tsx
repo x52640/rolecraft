@@ -9,6 +9,7 @@ import { LatestCapturePanel } from './components/LatestCapturePanel.tsx';
 import { ImportReview } from './ImportReview.tsx';
 import { DEFAULT_AI_POLL, useAiParse, type AiPollOptions, type AiSession } from './useAiParse.ts';
 import { useLatestCapture } from './useLatestCapture.ts';
+import { webOriginOf } from './web-origin.ts';
 
 import './import.css';
 
@@ -56,7 +57,10 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
   // 使用者確認過的姓名（網頁來源 helper 回「需確認姓名」後才有）；重新整理時一併帶上
   const [names, setNames] = useState<string[] | undefined>(undefined);
   const ai = useAiParse(aiSession, aiPoll, (draft) => {
-    setForm(formFromAiDraft(draft));
+    // 網頁來源（D29）：每格帶出處與是否標黃（標黃只是提醒）
+    const result = phase.kind === 'review' ? phase.result : null;
+    const blocks = result?.status === 'web_capture' ? result.blocks : null;
+    setForm(formFromAiDraft(draft, blocks ? webOriginOf(blocks) : undefined));
     setSource('ai');
     setEdited(false);
     setRerunArmed(false);
@@ -160,6 +164,8 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
   async function submit(review: Extract<Phase, { kind: 'review' }>) {
     setError(null);
     if (ai.running) return;
+    // PDF、手動輸入要先勾選核對；網頁來源（D29）不勾選，但只由確認鈕呼叫（不自動寫入，D4）
+    if (review.result.status !== 'web_capture' && !checked) return;
     const input = toProfileInput(form);
     if (!input.ok) {
       setProblems(input.problems);

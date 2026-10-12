@@ -19,7 +19,7 @@ function IdleText({ web, source }: { web: boolean; source: PrefillSource }) {
   if (web) {
     return (
       <p role="status" className="import-hint">
-        還沒有使用 AI。核對右邊擷取到的區塊與「內容不完整」標示後，按「用 AI
+        還沒有使用 AI。可先看右邊的擷取原文與「內容不完整」標示，按「用 AI
         整理」才會送出（用你選定的 Claude
         模型、會用到訂閱額度；姓名與聯絡資料不會送出）。也可以直接手動輸入。
       </p>
@@ -53,13 +53,16 @@ export function AiParsePanel(props: AiParsePanelProps) {
       {state.kind === 'failed' && (
         <p role="status" className="import-warning">
           AI 整理沒有完成：{state.message}。目前欄位是用「{PREFILL_LABELS[source]}」預填的，
-          {web ? '請對照右邊擷取到的區塊手動輸入或逐欄核對。' : '請逐欄核對。'}
+          {web ? '請展開右邊的擷取原文，對照區塊手動輸入。' : '請逐欄核對。'}
         </p>
       )}
       {state.kind === 'succeeded' && (
         <>
           <p role="status" className="import-success">
-            預填來源：{PREFILL_LABELS[source]}。仍請逐欄核對後再確認。
+            預填來源：{PREFILL_LABELS[source]}。
+            {web
+              ? '每個欄位旁有出處原文；標黃的欄位建議看一下（不看也能確認）。'
+              : '仍請逐欄核對後再確認。'}
           </p>
           {state.draft.discarded.length > 0 && (
             <div className="import-warning">
