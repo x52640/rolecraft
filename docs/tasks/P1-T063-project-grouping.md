@@ -1,7 +1,7 @@
 ---
 id: P1-T063
 phase: 1
-status: blocked
+status: in_progress
 depends_on: ["P1-T061"]
 specs: ["evidence-model.md", "bridge.md", "providers.md", "sources-and-authorization.md", "runtime-and-budget.md", "architecture.md"]
 track: helper
@@ -95,7 +95,7 @@ npm run verify
 - 最後完成：
 - 已通過驗證：
 - 下一步：
-- Blocker：等 P1-T061（未歸專案清單）
+- Blocker：
 
 ## 完成結果
 

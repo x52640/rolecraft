@@ -6,6 +6,7 @@
 ## 進行中
 
 - P1-T062 Claude 重新驗證：中斷不算失敗、失敗只綁版本、可手動重新啟用（`docs/tasks/P1-T062-claude-reverify-recovery.md`）
+- P1-T063 AI 建議專案分組、使用者確認建立，重新分析自動歸入（`docs/tasks/P1-T063-project-grouping.md`）
 
 ## ready
 
