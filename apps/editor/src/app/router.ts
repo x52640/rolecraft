@@ -69,6 +69,8 @@ export function useLeaveGuard(message: string | null) {
     shownHash ??= currentHash();
     const beforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
+      // Chrome 116–118 只認舊寫法：returnValue 設成非空字串才跳確認（與 preventDefault 並存）
+      event.returnValue = message;
     };
     window.addEventListener('beforeunload', beforeUnload);
     return () => {

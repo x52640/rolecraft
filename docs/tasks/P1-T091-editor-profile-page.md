@@ -84,7 +84,7 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：審查項修正（worker，2026-10-13）
+- 最後完成：審查項修正＋codex 複審 beforeunload returnValue（worker，2026-10-13）
 - 已通過驗證：見完成結果
 - 下一步：協調者合併、範圍稽核、收官
 - Blocker：無
@@ -111,4 +111,5 @@ npm run verify
   3. 出處一律可展開（是否被兩行截斷取決於視窗寬度，不再用字數判斷）。
   4. `app/router.ts` 加通用「離開前確認」`useLeaveGuard(message)`：有註冊時站內換頁（導覽列、頁內連結、上一頁）先 `confirm`，不確認就把 hash 換回原頁（replaceState，不新增歷史）、畫面不動；同時處理 beforeunload。只有註冊的頁面受影響；個人資料頁有未存修改時註冊。`App.tsx` 不需改。
   5. 只修剪使用者改過的欄位：與基準完全相同的值原樣送回（`sendValue`），「已修改」、對不到經歷、驗證都以要送出的值判斷。
+- codex 複審（第三個 commit）：beforeunload 除 `preventDefault()` 外補回 `event.returnValue = 提示文字`（Chrome 116–118 只認舊寫法），`router.test.ts` 斷言兩者都有設。
 - 殘餘：被擋下的「上一頁」會以 replaceState 把該筆歷史改回本頁網址（歷史少一筆往回的目標）；離開確認用瀏覽器原生 `confirm` 對話框。

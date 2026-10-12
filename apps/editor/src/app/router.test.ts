@@ -69,11 +69,14 @@ describe('離開前確認', () => {
     expect(shown()).toBe('a');
   });
 
-  it('有訊息時關閉分頁請瀏覽器確認', () => {
+  it('有訊息時關閉分頁請瀏覽器確認（preventDefault 與 returnValue 都設）', () => {
     window.history.replaceState(null, '', '#/a');
     render(createElement(Shell, { message: '有未存修改' }));
     const event = new Event('beforeunload', { cancelable: true });
+    // jsdom 沒有 BeforeUnloadEvent：在這個事件上放一個字串 returnValue 供檢查舊寫法
+    Object.defineProperty(event, 'returnValue', { value: '', writable: true });
     window.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
+    expect((event as unknown as { returnValue: unknown }).returnValue).toBe('有未存修改');
   });
 });
