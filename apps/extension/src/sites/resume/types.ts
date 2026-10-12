@@ -31,8 +31,11 @@ export interface RenderOracle {
   hidesChildren(el: Element): boolean;
   /** 元素裡文字節點的換行是否保留（white-space: pre、pre-wrap、pre-line、break-spaces） */
   preservesNewlines(el: Element): boolean;
-  /** 元素有 shadow root 時，被分配到（可見）slot 的子節點；沒有 shadow root 回 null */
-  slottedChildren(el: Element): ReadonlySet<Node> | null;
+  /**
+   * 元素有 shadow root 時，shadow tree 裡全部的 slot（含封閉的 shadow root）；沒有 shadow root 回 null。
+   * slot 是否被渲染、分配到哪些子節點由 `render.ts` 判定。
+   */
+  shadowSlots(el: Element): HTMLSlotElement[] | null;
 }
 
 export type ResumeBlock = ResumeCaptureBlock;

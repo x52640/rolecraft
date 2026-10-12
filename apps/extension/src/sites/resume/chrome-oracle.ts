@@ -28,17 +28,6 @@ export function displayKind(display: string): DisplayKind {
   return INLINE_DISPLAYS.has(display) || outer === 'inline' ? 'inline' : 'block';
 }
 
-/** slot 在 shadow tree 裡有沒有被藏起來（自己或祖先 display:none、content-visibility:hidden）。 */
-function slotHidden(slot: Element, style: (el: Element) => CSSStyleDeclaration): boolean {
-  for (let cur: Element | null = slot; cur; cur = cur.parentElement) {
-    const decl = style(cur);
-    if (decl.display === 'none' || decl.getPropertyValue('content-visibility') === 'hidden') {
-      return true;
-    }
-  }
-  return false;
-}
-
 /**
  * Chrome 實際渲染的判定（web-resume-capture 區塊抽取規則 6），每次擷取建一個（快取計算後樣式）。
  * 不用 `checkVisibility`：它對 display:contents 回 false，會把整棵子樹丟掉；祖先改由抽取時逐層判定。
@@ -72,15 +61,9 @@ export function createChromeOracle(chromeApi?: ChromeDom): RenderOracle {
       if (PRESERVE_NEWLINES.has(decl.whiteSpace.split(' ')[0] ?? '')) return true;
       return PRESERVE_COLLAPSE.has(decl.getPropertyValue('white-space-collapse'));
     },
-    slottedChildren: (el) => {
+    shadowSlots: (el) => {
       const shadow = shadowOf(el);
-      if (!shadow) return null;
-      const nodes = new Set<Node>();
-      for (const slot of Array.from(shadow.querySelectorAll('slot'))) {
-        if (slotHidden(slot, style)) continue;
-        for (const node of slot.assignedNodes()) nodes.add(node);
-      }
-      return nodes;
+      return shadow ? Array.from(shadow.querySelectorAll('slot')) : null;
     },
   };
 }

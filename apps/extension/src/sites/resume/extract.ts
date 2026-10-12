@@ -1,7 +1,7 @@
 import { RESUME_BLOCK_MAX_LEVEL } from '@rolecraft/contracts';
 
 import { controlValue, findPairs, isControl, type Pairs } from './dom.ts';
-import { isChildRendered, isSkipped, renderedChildNodes, textOf } from './render.ts';
+import { isChildRendered, isSkipped, renderedChildNodes, scopedOracle, textOf } from './render.ts';
 import { joinLines, splitLines } from './text.ts';
 import type { RenderOracle, ResumeBlock } from './types.ts';
 
@@ -182,7 +182,8 @@ function rowBlocks(tr: Element, ctx: Ctx): ResumeBlock[] {
  * 從根節點抽出區塊（未套上限）。根節點本身走同一套分類（標題、清單項、表格列、控制項…）；
  * 根節點的祖先是否可見由呼叫端判定。
  */
-export function extractBlocks(root: Element, oracle: RenderOracle): ResumeBlock[] {
+export function extractBlocks(root: Element, base: RenderOracle): ResumeBlock[] {
+  const oracle = scopedOracle(base);
   const ctx: Ctx = { oracle, root, pairs: findPairs(root, oracle) };
   const items: Item[] = [];
   scanElement(root, ctx, 'paragraph', items);

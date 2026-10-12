@@ -82,8 +82,8 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：審查待修 1–6 已修（2026-10-12）
-- 已通過驗證：`npm run verify` 綠（Vitest 3863 通過、13 略過）
+- 最後完成：審查待修 1–6、複審 2 項已修（2026-10-12）
+- 已通過驗證：`npm run verify` 綠（Vitest 3872 通過、13 略過）
 - 下一步：協調者複審修正 diff；標「需真實 Chrome」的項目由 P1-T077 驗證
 - Blocker：無
 
@@ -101,6 +101,11 @@ codex review：
 5. `extract.ts` 根節點本身是標題、li、tr、表單控制項時只讀子節點，沒走元素分類。
 6. `extract.ts` 用 `push(...blocks)` 展開大陣列，超過引數上限丟 RangeError（擷取失敗而不是截斷到 2,000 塊）。
 
+## 複審待修（2026-10-12 codex 複審修正 diff）
+
+1. （個資）slot 判定只看 slot 本身的 display／content-visibility；slot 在 shadow tree 裡位於未展開 details（或其他收合邊界）內時，被分配的 light DOM 子節點仍被讀出。
+2. （效能）未展開 details 每個子節點都重算 `firstSummary`（每次複製全部子元素）、shadow host 每個子節點都重建分配集合，O(N²)，大量子節點時同步卡住分頁。
+
 ## 完成結果
 
 - 程式（`apps/extension/src/sites/resume/`）：`extract.ts` `extractBlocks`（抽取規則 1–6）、`dom.ts`（`isSkipped`、`controlValue`、`flatText`、`findPairs` 標籤＋值配對）、`text.ts`（正規化）、`limits.ts` `applyLimits`、`capture.ts`（`buildResumeCapture`、`runResumeCapture`、`resumeNoticeText`）、`start.ts` `startResumeCapture`（各站腳本入口，P1-T077 用）、`notice.ts`（提示文字與 `showResumeNotice`）、`chrome-oracle.ts`／`simple-oracle.ts`（N6 判定分開）。
@@ -115,3 +120,7 @@ codex review：
   5. 根節點本身走 `scanElement` 同一套分類；清單項根節點層級記 1。
   6. 改成逐一附加（`append`、`concat`），15 萬行 textarea 截斷到 2,000 塊。
 - 需 P1-T077 在真實 Chrome 驗證：`createChromeOracle` 的計算後樣式判定（display:contents、visibility 繼承與子元素 visible、content-visibility:hidden、white-space／white-space-collapse）、封閉 shadow root 與 slot 分配（含藏起來的 slot）、未展開 details。
+- 複審待修修正（`review-fixes-2.test.ts` 逐項重現；修前 2 萬子節點案例分別跑 190 秒、13 秒）：
+  1. 判定介面的 `slottedChildren` 改成 `shadowSlots`（只回 shadow tree 裡的 slot），slot 是否渲染改由 `render.ts` `isSlotRendered` 判定：slot 自己與到 shadow root 的每層祖先都要讀得到、被父節點渲染（未展開 details 的非第一個 summary、display:none、hidden、aria-hidden、content-visibility:hidden、巢狀 host 沒分配都算藏，巢狀 shadow 會遞迴）；走不到 shadow root 就當藏起來。
+  2. `scopedOracle` 每次擷取建一份快取（first summary、每個 host 的分配集合各算一次）；`firstSummary` 改成逐一走兄弟元素，不再複製子元素。2 萬子節點案例在 1 秒內完成。
+- 需 P1-T077 在真實 Chrome 驗證（追加）：shadow tree 內收合區裡的 slot。

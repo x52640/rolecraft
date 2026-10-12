@@ -99,11 +99,11 @@ describe('2 display:contents 與 visibility', () => {
     const slot = document.createElement('slot');
     slot.name = 's';
     shadow.append(slot);
-    const oracle = createChromeOracle({ dom: { openOrClosedShadowRoot: () => shadow } });
-    expect(Array.from(oracle.slottedChildren(host) ?? [], (node) => node.textContent)).toEqual([
-      '分配',
-    ]);
-    expect(createChromeOracle().slottedChildren(el)).toBeNull();
+    const oracle = createChromeOracle({
+      dom: { openOrClosedShadowRoot: (target) => (target === host ? shadow : null) },
+    });
+    expect(texts(extractBlocks(el, oracle))).toEqual(['分配']);
+    expect(createChromeOracle().shadowSlots(el)).toBeNull();
   });
 });
 

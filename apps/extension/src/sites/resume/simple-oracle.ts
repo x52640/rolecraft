@@ -100,13 +100,8 @@ export const simpleOracle: RenderOracle = {
     }
     return false;
   },
-  slottedChildren(el) {
+  shadowSlots(el) {
     const shadow = el.shadowRoot;
-    if (!shadow) return null;
-    const nodes = new Set<Node>();
-    for (const slot of Array.from(shadow.querySelectorAll('slot'))) {
-      for (const node of slot.assignedNodes()) nodes.add(node);
-    }
-    return nodes;
+    return shadow ? Array.from(shadow.querySelectorAll('slot')) : null;
   },
 };

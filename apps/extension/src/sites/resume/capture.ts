@@ -9,7 +9,7 @@ import { flatText } from './dom.ts';
 import { extractBlocks } from './extract.ts';
 import { applyLimits } from './limits.ts';
 import { RESUME_FAILED_MESSAGE, RESUME_NOT_FOUND_MESSAGE } from './notice.ts';
-import { isReadableChain } from './render.ts';
+import { isReadableChain, scopedOracle } from './render.ts';
 import { joinLines } from './text.ts';
 import type { RenderOracle, ResumeSiteConfig } from './types.ts';
 
@@ -65,7 +65,8 @@ export function buildResumeCapture(
   config: ResumeSiteConfig,
   deps: Pick<ResumeCaptureDeps, 'doc' | 'pageUrl' | 'oracle' | 'now'>,
 ): SubmitResumeCaptureRequest | 'not_found' | 'invalid' {
-  const { doc, oracle } = deps;
+  const { doc } = deps;
+  const oracle = scopedOracle(deps.oracle);
   const root = query(doc, config.rootSelector);
   if (!root || !isReadableChain(root, oracle, null)) return 'not_found';
   const extracted = extractBlocks(root, oracle);
