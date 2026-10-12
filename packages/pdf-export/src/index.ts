@@ -25,3 +25,16 @@ export type { FontSet } from './fonts/font-set.ts';
 export { loadBundledFonts } from './fonts/bundled.ts';
 export { BUNDLED_FONT_FILES, type BundledFontFile } from './fonts/manifest.ts';
 export { findChrome, SUPPORTED_BROWSERS } from './render/chrome.ts';
+// D28 照片（P1-T083）：重新編碼、去中繼資料、縮圖
+export {
+  createPhotoProcessor,
+  PHOTO_JPEG_QUALITY,
+  PHOTO_THUMBNAIL_EDGE_PX,
+  type PhotoProcessOptions,
+  type PhotoProcessor,
+  type PhotoProcessorDeps,
+  type ProcessedPhoto,
+} from './photo/process.ts';
+export { PhotoProcessError, type PhotoProcessErrorCode } from './photo/errors.ts';
+export { inspectJpeg, metadataProblems, stripJpegMetadata, type JpegInfo } from './photo/jpeg.ts';
+export type { PhotoRenderer, PhotoRendering, RenderRequest } from './photo/render.ts';

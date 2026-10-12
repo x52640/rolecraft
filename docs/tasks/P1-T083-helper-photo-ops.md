@@ -1,7 +1,7 @@
 ---
 id: P1-T083
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T082", "P1-T079"]
 specs: ["resume-output.md", "bridge.md"]
 track: helper
@@ -82,9 +82,18 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等相依完成後改 ready
-- Blocker：無（相依已於 2026-10-12 收官）
+- 最後完成：2026-10-12 工作者實作完成（單一 commit，未 push）
+- 已通過驗證：`npm run verify` 綠（Vitest 4050 通過、15 略過）；`RUN_CHROME=1` 真實 Chrome 重繪測試 2 案例本機通過
+- 下一步：協調者收官；高風險，收官前跑對抗驗證（E3）與 codex review；擁有者／協調者用真實選取器選一張照片（手動驗證）
+- Blocker：無
 
 ## 完成結果
+
+- `packages/sources/src/picker/photo-picker.ts`：`createMacPhotoPicker`、`PHOTO_SCRIPT`（寫死 `of type {"public.jpeg", "public.png"}`）、`readPickedPhoto`（副檔名 .jpg／.jpeg／.png＋檔頭、10 MB 上限 `PHOTO_SOURCE_MAX_BYTES`），只回內容、不回檔名或路徑；`PickerFailure` 加 `not_image`。共用讀檔抽到 `read-picked.ts`（`readPickedFile`、`parseSingleFileOutput`），`pdf-picker.ts` 改用、行為不變
+- `packages/pdf-export/src/photo/`：`source.ts`（`inspectPhotoSource`：看檔頭認 JPEG／PNG、讀尺寸，像素上限 `PHOTO_SOURCE_MAX_PIXELS`＝8,000 萬防解壓炸彈）；`render.ts`（`createChromePhotoRenderer`：puppeteer-core 開本機 Chrome，只允許 data:，canvas 白底重繪成 JPEG 品質 0.9、最長邊 1,200，另出 320 px 縮圖；中止時關瀏覽器）；`jpeg.ts`（`inspectJpeg`、`stripJpegMetadata`、`metadataProblems`：純函式段落解析，只留 SOI／DQT／SOFn／DHT／DRI／SOS／EOI 與最小 JFIF，丟掉全部 APPn、COM、EOI 後資料，不認得的段落拒絕）；`process.ts`（`createPhotoProcessor`：`process`／`thumbnail`，Chrome 輸出後一律再清除一次並驗證「沒有中繼資料、尺寸相符、最長邊 ≤ 1,200」，不符就拒絕；`withDeadline` 逾時中止）；`errors.ts`（`PhotoProcessError`）。未新增 npm 相依
+- `apps/helper/src/handlers/photo/photo-service.ts`：`createPhotoService`。`pick`：busy 旗標 → 選取器 → 處理（時限＝min(45 秒, 選取器客戶端逾時減 10 秒餘裕的剩餘時間)）→ 處理完再檢查期限，超過就放棄 → `replacePhoto`（P1-T082，同一交易刪舊加新、套 D19）；`get`：縮圖記憶體快取，重啟後存下的照片 ≤ 256 KiB 直接當縮圖，否則用 Chrome 重產（20 秒）；`remove`：`removePhoto`（D19）。`service.ts` 的 `PhotoPickOutcome` 加 `failed`，`pick.ts` 把它轉成 `invalid_request`（非 JPEG／PNG、超過 10 MB、解不開）或 `internal_error`（逾時、找不到 Chrome、處理失敗），一律沒有寫入
+- `apps/helper/src/main.ts`：`NativePickers.photo`、`nativePickers` 接 `createMacPhotoPicker`；`createServices` 第 5 參數 `photoProcessor`（只供測試替換，預設 `createPhotoProcessor()`）；有資料區才接照片服務，沒有照片選取器只少 `photo.pick`
+- 新測試：`pdf-export/src/photo/jpeg.test.ts`（7）、`process.test.ts`（9，假重繪器故意輸出帶 EXIF／GPS／XMP／ICC／IPTC／COM 的 JPEG）、`process.chrome.test.ts`（2，`RUN_CHROME=1`：合成 PNG 帶 tEXt／eXIf、真 JPEG 塞回 EXIF／GPS）、`sources/src/picker/photo-picker.test.ts`（6）、`helper/src/handlers/photo/photo-service.test.ts`（11，從資料庫讀回存下的照片驗證沒有中繼資料與 GPS／裝置字樣；取消、busy、拒絕、逾時後晚到不寫入、超過期限不寫入、更換、刪除、重啟重產縮圖、經 dispatch 的 photo.get 回應 < 1 MiB）、`main.test.ts` 加 1 案例。verify 不開真實選取器、不開 Chrome
+- 保守選擇：(1) 不只信 Chrome：重繪後自己再清除＋驗證，任何殘留就拒絕；(2) 連帶內嵌縮圖的 JFIF 與 ICC（APP2）也丟掉（色彩以 sRGB 為準）；(3) 原始照片像素上限 8,000 萬；(4) 失敗訊息是固定文字，不含路徑或內容；(5) 處理完已過期限也不寫入（客戶端可能已放棄）
+- 殘餘：(1) busy 只在照片選取器之間互斥，跟 `import.pick_pdf`、`sources.pick_folders` 的選取視窗不共用旗標（各自既有實作如此，改要動 write_paths 外）；(2) 縮圖不存資料庫（P1-T082 未存），重啟後第一次 `photo.get` 對大於 256 KiB 的照片會開一次 Chrome（20 秒上限，小於一般逾時 30 秒）；(3) `RUN_CHROME=1` 只在本機跑過一次，verify 不跑；(4) 真實選取器手動驗證待做
+- 規格落差：resume-output 說「解碼與重新編碼必須在選取器的處理餘裕內完成」，但客戶端逾時從送出算起、對話框本身最多 5 分鐘，helper 不知道送出時間；以「收到請求起算選取器逾時減 10 秒」當期限，處理上限 45 秒（< 60 秒餘裕）

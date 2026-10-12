@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
+import { createPhotoProcessor, metadataProblems } from '@rolecraft/pdf-export';
 import { createMacFolderPicker, createMacPdfPicker, type ExecFileRunner } from '@rolecraft/sources';
 import { createLocalFileStore, createRepositories, openDatabase } from '@rolecraft/storage';
 import { afterAll, describe, expect, it, vi } from 'vitest';
@@ -29,6 +30,7 @@ import {
   type ClaudeProbe,
   createHelperClaudeService,
 } from './handlers/providers/claude-probe.ts';
+import { dirtyJpeg, leakyRenderer } from './handlers/photo/__fixtures__/photo.ts';
 import type { HelperServices } from './handlers/services.ts';
 import { createServices as createRealServices, nativePickers, type NativePickers } from './main.ts';
 
@@ -53,16 +55,26 @@ const FAKE_PROBE: ClaudeProbe = {
   check: fakeCheck,
   verifyModel: fakeVerifyModel,
 };
+/** 照片重繪一律用假的（不開 Chrome，P1-T083）。 */
+const FAKE_PHOTO_PROCESSOR = createPhotoProcessor({
+  renderer: leakyRenderer({ width: 2400, height: 3200 }),
+});
 const createServices = (
   storage?: Parameters<typeof createRealServices>[0],
   pickers?: NativePickers,
   base?: HelperServices,
 ) =>
-  createRealServices(storage, pickers, base, {
-    claudeProbe: FAKE_PROBE,
-    // 有資料區時用 persistedProvidersOptions 接上的 Claude 服務；沒有時照正式入口建一個（不啟動程式）
-    ...(storage ? {} : { service: createHelperClaudeService() }),
-  });
+  createRealServices(
+    storage,
+    pickers,
+    base,
+    {
+      claudeProbe: FAKE_PROBE,
+      // 有資料區時用 persistedProvidersOptions 接上的 Claude 服務；沒有時照正式入口建一個（不啟動程式）
+      ...(storage ? {} : { service: createHelperClaudeService() }),
+    },
+    FAKE_PHOTO_PROCESSOR,
+  );
 
 const MAIN = path.join(import.meta.dirname, 'main.ts');
 
@@ -177,6 +189,42 @@ describe('服務組裝（createServices，P1-T043）', () => {
     const mac = nativePickers('darwin');
     expect(typeof mac.folder).toBe('function');
     expect(typeof mac.pdf).toBe('function');
+    expect(typeof mac.photo).toBe('function');
+  });
+
+  it('照片（P1-T083）：有 storage 才接；pick 存下去中繼資料的照片，get／remove 照常', async () => {
+    const photo = vi.fn(() => Promise.resolve({ bytes: dirtyJpeg(2400, 3200) }));
+    for (const op of ['photo.pick', 'photo.get', 'photo.remove']) {
+      expect(await send(createServices(null, { photo }), op)).toMatchObject({
+        ok: false,
+        error: { code: 'not_implemented' },
+      });
+    }
+    expect(photo).not.toHaveBeenCalled();
+    const { db, fileStore } = storage();
+    const services = createServices({ db, fileStore }, { photo });
+    const picked = await send(services, 'photo.pick');
+    expect(picked).toMatchObject({
+      ok: true,
+      selection: { status: 'selected', photo: { width: 900, height: 1200 } },
+    });
+    const saved = createRepositories(db).photos.get();
+    expect(metadataProblems(saved?.content ?? new Uint8Array())).toEqual([]);
+    expect(await send(services, 'photo.get')).toMatchObject({
+      ok: true,
+      current: { photo: saved?.photo },
+    });
+    expect(await send(services, 'photo.remove')).toEqual({ ok: true });
+    expect(await send(services, 'photo.get')).toEqual({ ok: true, current: null });
+    // 沒有照片選取器：只有 pick 不接
+    expect(await send(createServices(storage(), {}), 'photo.pick')).toMatchObject({
+      ok: false,
+      error: { code: 'not_implemented' },
+    });
+    expect(await send(createServices(storage(), {}), 'photo.get')).toEqual({
+      ok: true,
+      current: null,
+    });
   });
 
   it('沒有 storage：sources 接選取器；resumeImport、applications 不接', async () => {

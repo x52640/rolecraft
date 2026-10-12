@@ -32,6 +32,7 @@ export type PickerFailure =
   | 'bad_output' // 輸出格式不符預期（例如路徑含換行），整批不採用
   | 'not_file' // 選到的不是一般檔案（或是符號連結）
   | 'not_pdf' // 副檔名或檔頭不是 PDF
+  | 'not_image' // 副檔名或檔頭不是 JPEG／PNG（照片選取器，D28）
   | 'too_large'; // 超過大小上限
 
 /** 選取器失敗；訊息是固定文字，不含路徑或輸出內容。 */

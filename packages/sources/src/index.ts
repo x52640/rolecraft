@@ -14,7 +14,9 @@ export { createNodeFolderAccess, type NodeFolderAccessOptions } from './node-fol
 export {
   createMacFolderPicker,
   createMacPdfPicker,
+  createMacPhotoPicker,
   DEFAULT_MAX_PDF_BYTES,
+  type PickedPhotoFile,
   PickerError,
   type ExecFileRunner,
   type PickedPdfFile,

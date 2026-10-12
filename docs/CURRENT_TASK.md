@@ -8,11 +8,12 @@
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本（`docs/tasks/P1-T017-spike-104-job.md`）
 - P1-T075 extension：履歷頁區塊抽取與擷取共用流程（`docs/tasks/P1-T075-extension-resume-blocks.md`）
 - P1-T078 pipeline：網頁區塊來源的去個資、提示與照抄檢查（`docs/tasks/P1-T078-pipeline-web-resume-parse.md`）
+- P1-T083 helper：照片選取與處理、photo.* 操作（`docs/tasks/P1-T083-helper-photo-ops.md`）
 - P1-T084 匯出 PDF 加照片（`docs/tasks/P1-T084-export-photo.md`）
 
 ## ready
 
-- P1-T083 helper：照片選取與處理、photo.* 操作
+- 無
 <!-- index:end -->
 
 ## 下一步（2026-10-11 codex 補審後）

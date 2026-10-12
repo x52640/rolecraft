@@ -20,3 +20,10 @@ export {
   type PdfPickerDeps,
   type PickedPdfFile,
 } from './pdf-picker.ts';
+export {
+  createMacPhotoPicker,
+  PHOTO_SCRIPT,
+  readPickedPhoto,
+  type PhotoPickerDeps,
+  type PickedPhotoFile,
+} from './photo-picker.ts';

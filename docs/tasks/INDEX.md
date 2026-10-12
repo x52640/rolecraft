@@ -89,7 +89,7 @@
 | [P1-T080](P1-T080-helper-web-ai-parse.md) | helper：網頁來源的 AI 整理接線 | blocked | 1 | helper | P1-T078、P1-T079 |
 | [P1-T081](P1-T081-editor-web-import-page.md) | editor：匯入頁接網頁擷取與手動輸入 | done | 1 | editor | P1-T074 |
 | [P1-T082](P1-T082-storage-photo-material.md) | storage：照片保存與照片素材的 D19 刪除 | done | 1 | storage | P1-T074 |
-| [P1-T083](P1-T083-helper-photo-ops.md) | helper：照片選取與處理、photo.* 操作 | ready | 1 | helper | P1-T082、P1-T079 |
+| [P1-T083](P1-T083-helper-photo-ops.md) | helper：照片選取與處理、photo.* 操作 | in_progress | 1 | helper | P1-T082、P1-T079 |
 | [P1-T084](P1-T084-export-photo.md) | 匯出 PDF 加照片 | in_progress | 1 | pdf-export | P1-T082 |
 | [P1-T085](P1-T085-editor-profile-copy-photo.md) | editor：履歷頁的個人資料複製與照片管理 | done | 1 | editor | P1-T074 |
 | [P1-T086](P1-T086-editor-section-copy.md) | editor：客製履歷段落「複製」按鈕 | done | 1 | editor | P1-T025、P1-T064 |

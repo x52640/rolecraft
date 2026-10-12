@@ -3,9 +3,15 @@
 // 方法皆可省略：沒接上的方法，handler 回 not_implemented，不偽造成功。
 import type { PhotoView } from '@rolecraft/contracts';
 
-/** photo.pick 的結果；busy＝已有一個選取視窗開著（同時只開一個）。 */
+/**
+ * photo.pick 的結果；busy＝已有一個選取視窗開著（同時只開一個）。
+ * failed＝選到的檔案不能用或處理失敗／逾時（一律沒有寫入）；訊息是固定文字。
+ */
 export type PhotoPickOutcome =
-  { status: 'selected'; view: PhotoView } | { status: 'cancelled' } | { status: 'busy' };
+  | { status: 'selected'; view: PhotoView }
+  | { status: 'cancelled' }
+  | { status: 'busy' }
+  | { status: 'failed'; code: 'invalid_request' | 'internal_error'; message: string };
 
 export interface PhotoService {
   /** 開選取器、重新編碼去中繼資料後設為目前照片（已有照片時同一交易更換，套 D19）。 */

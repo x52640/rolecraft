@@ -4,7 +4,12 @@
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
-import { createMacFolderPicker, createMacPdfPicker } from '@rolecraft/sources';
+import { createPhotoProcessor, type PhotoProcessor } from '@rolecraft/pdf-export';
+import {
+  createMacFolderPicker,
+  createMacPdfPicker,
+  createMacPhotoPicker,
+} from '@rolecraft/sources';
 import {
   createApplicationRecordRepository,
   createExportVersionRepository,
@@ -23,6 +28,7 @@ import type { PdfFilePicker } from './handlers/import/import-service.ts';
 import { createIntroWithClaude } from './handlers/intro/assemble.ts';
 import { createJobsService } from './handlers/jobs/storage-service.ts';
 import { createMessagesService } from './handlers/messages/assemble.ts';
+import { createPhotoService, type PhotoFilePicker } from './handlers/photo/photo-service.ts';
 import { createProfileService } from './handlers/profile/profile-service.ts';
 import { persistedProvidersOptions } from './handlers/providers/persistence.ts';
 import {
@@ -46,25 +52,32 @@ function isRuntime(storage: HelperStorage): storage is HelperRuntime {
 export interface NativePickers {
   readonly folder?: FolderPicker;
   readonly pdf?: PdfFilePicker;
+  /** 照片（D28）：只限 JPEG／PNG、10 MB 以下 */
+  readonly photo?: PhotoFilePicker;
 }
 
 /** macOS 原生選取器（實作在 @rolecraft/sources）；其他平台不接（D11），對應操作回「尚未支援」。 */
 export function nativePickers(platform: NodeJS.Platform = process.platform): NativePickers {
   if (platform !== 'darwin') return {};
-  return { folder: createMacFolderPicker(), pdf: createMacPdfPicker() };
+  return {
+    folder: createMacFolderPicker(),
+    pdf: createMacPdfPicker(),
+    photo: createMacPhotoPicker(),
+  };
 }
 
 /**
  * 服務組裝：各操作的服務由對應 Task 接上；沒接上的 handler 回「尚未支援」。
  * 沒有本機儲存（尚未設定資料區）時，依賴儲存的服務一律不接。
  * pickers 只供測試替換（不開真的對話框）；providerOptions 只供測試替換 Claude 檢查（假 probe／runDeps，
- * 不執行真實 CLI，P1-T070）。正式入口不傳。
+ * 不執行真實 CLI，P1-T070）；photoProcessor 只供測試替換照片重繪（不開 Chrome）。正式入口不傳。
  */
 export function createServices(
   storage: HelperStorage | null = null,
   pickers: NativePickers = nativePickers(),
   base: HelperServices = {},
   providerOptions: Partial<ProvidersServiceOptions> = {},
+  photoProcessor: PhotoProcessor = createPhotoProcessor(),
 ): HelperServices {
   const repositories = storage && createRepositories(storage.db);
   const { folder, pdf } = pickers;
@@ -85,6 +98,15 @@ export function createServices(
     // D28：網頁擷取、手動輸入、profile.get 有資料區就可用；PDF 選取器只決定有沒有 import.pick_pdf
     ...(storage && { resumeImport: createResumeImportWithClaude(storage.db, pdf, providers) }),
     ...(repositories && { profile: createProfileService(repositories.profiles) }),
+    // 照片（D28，P1-T083）：有資料區就有 get／remove；選取器只決定有沒有 photo.pick
+    ...(storage && {
+      photo: createPhotoService({
+        db: storage.db,
+        fileStore: storage.fileStore,
+        processor: photoProcessor,
+        ...(pickers.photo && { picker: pickers.photo }),
+      }),
+    }),
     ...(storage && {
       applications: createApplicationsService({
         applications: createApplicationRecordRepository(storage.db, storage.fileStore),
