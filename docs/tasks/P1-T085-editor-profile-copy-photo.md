@@ -1,7 +1,7 @@
 ---
 id: P1-T085
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T074"]
 specs: ["resume-output.md", "bridge.md"]
 track: editor
@@ -78,9 +78,17 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等 P1-T074 收官後改 ready
-- Blocker：無（相依 P1-T074 已於 2026-10-12 收官）
+- 最後完成：區塊實作＋測試（worker，2026-10-12）
+- 已通過驗證：`npm run verify` 綠（Vitest 3830 通過、13 略過）
+- 下一步：協調者收官（範圍稽核、codex review）
+- Blocker：無
 
 ## 完成結果
+
+- 新區塊 `resumes/profile/ProfilePhotoPanel.tsx`（`ProfilePhotoPanel`），`ResumesPage.tsx` 只加 import 與掛載一行（頁尾，與職缺／版本無關，一律顯示）
+- 請求鎖 `useBlockLock`（begin／restart／current／end，比照 `useIntro`）：整個區塊共用，進行中全部按鈕停用；token 不符或已卸載的回應作廢
+- 個人資料 `useProfileCopy`＋`ProfileCopyList`＋`profile-labels.ts`（`profileGroups`、`findItem`）：personalInfo 各欄、每段經歷的公司／職稱／任職期間／描述、技能各一顆「複製」；按下重新 `profile.get`，讀回的「整份」Profile 與畫面完全一致才寫入該欄；不一致→更新畫面＋請再按一次；讀回 null／multiple_profiles／not_implemented→畫面改成對應原因、不複製；逾時等一般失敗→畫面不動、不複製
+- 照片 `usePhoto`＋`PhotoManager`：縮圖（data URI）＋尺寸；更換／刪除先顯示 D19 說明、確認後才送（更換確認後才開選取器）；`photo.pick` 非 selected（取消、busy、失敗、逾時）與 `photo.remove` 失敗後一律重讀 `photo.get` 顯示實際狀態；`photo.get` 為 not_implemented 時顯示「服務尚未接上」提示、只留「重新讀取照片」
+- 測試：`ProfileCopy.test.ts`（8：一致才複製且內容＝讀回值、不一致更新畫面再按才複製、整份比對、讀回 null、逾時、無／多份／未實作三種原因、鎖與卸載作廢；StrictMode 下跑）、`PhotoManager.test.ts`（10：加入、加入前發現已有照片、更換確認與取消、選取視窗取消不變動、刪除確認、逾時以 photo.get 為準、刪除失敗、未實作提示兩種、狀態不明可重讀）；測試替身 `profile.test-helpers.ts`
+- 保守選擇：(1) 比對整份 Profile 而非單欄（任何欄位變了都先更新畫面）；(2) 「加入照片」送出前先重讀 `photo.get`，本機已有照片就不開選取器、改走更換確認，避免未經 D19 確認就換掉舊照片；(3) 取消與 busy 也重讀 `photo.get`；(4) 技能合成一段以「、」分隔複製（規格沒說逐項或整段）；任職期間複製為「起 – 迄／至今」；(5) 空白欄位不能複製；(6) 照片狀態不明（逾時、連不上）時不提供加入／更換／刪除，只能重新讀取
+- 殘餘：P1-T086 的 `copy/copy-context.ts` 全域 store 未動（範圍外；本 Task 已能改 `ResumesPage.tsx`，之後可改成由頁面傳 props）；personalInfo 欄位順序依 helper 回傳的鍵順序；縮圖 data URI 是否受擴充功能頁 CSP 影響未在真實 Chrome 實測（MV3 預設 CSP 不限 img-src，待 P1-T083 後端到端確認）

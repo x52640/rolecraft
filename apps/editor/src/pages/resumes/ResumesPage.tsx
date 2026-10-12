@@ -1,3 +1,4 @@
+import { ProfilePhotoPanel } from './profile/ProfilePhotoPanel.tsx';
 import { SectionCard } from './SectionCard.tsx';
 import { SectionEditor } from './SectionEditor.tsx';
 import type { ResumePollOptions } from './useGenerateResume.ts';
@@ -156,6 +157,7 @@ export function ResumesPage({ poll }: { readonly poll?: ResumePollOptions }) {
           <Sections key={editor.view.version.id} editor={editor} view={editor.view} />
         </>
       ) : null}
+      <ProfilePhotoPanel />
     </section>
   );
 }
