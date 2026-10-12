@@ -71,8 +71,9 @@ function unitShape(el: Element, ctx: Ctx): Shape | null {
   if (heading) return { kind: 'heading', level: Number(heading[1]), label: null };
   if (el.localName === 'li')
     return { kind: 'list_item', level: listLevel(el, ctx.root), label: null };
-  const label = el.localName === 'dd' ? ctx.pairs.ddLabels.get(el) : undefined;
-  if (label !== undefined) return { kind: 'label_value', level: null, label };
+  if (el.localName === 'dd' && ctx.pairs.ddLabels.has(el)) {
+    return labeledShape(ctx.pairs.ddLabels.get(el) ?? null);
+  }
   return null;
 }
 
@@ -89,9 +90,13 @@ function collect(el: Element, ctx: Ctx, mode: Mode): Item[] {
   return items;
 }
 
-function pairBlocks(label: string, control: Element, ctx: Ctx): ResumeBlock[] {
-  const value = controlValue(control, ctx.oracle) ?? '';
-  return toBlocks(value, { kind: 'label_value', level: null, label });
+/** 標籤扣掉介面元素後變空（null）時，值改當段落。 */
+function labeledShape(label: string | null): Shape {
+  return label === null ? PARAGRAPH : { kind: 'label_value', level: null, label };
+}
+
+function pairBlocks(label: string | null, control: Element, ctx: Ctx): ResumeBlock[] {
+  return toBlocks(controlValue(control, ctx.oracle) ?? '', labeledShape(label));
 }
 
 /** 表單控制項與 label：配成對的在 label（包住控制項時）或控制項的位置出一次。 */
@@ -100,7 +105,7 @@ function scanFormPart(el: Element, ctx: Ctx, out: Item[]): boolean {
   const pairedControl = ctx.pairs.labelControls.get(el);
   if (pairedControl) {
     if (el.contains(pairedControl)) {
-      const text = ctx.pairs.controlLabels.get(pairedControl)?.text ?? '';
+      const text = ctx.pairs.controlLabels.get(pairedControl)?.text ?? null;
       out.push({ blocks: pairBlocks(text, pairedControl, ctx) });
     }
     return true;
@@ -155,6 +160,12 @@ function nestedBlocks(items: Item[]): ResumeBlock[] {
   return items.flatMap((item) => ('blocks' in item ? item.blocks : []));
 }
 
+/** 不套介面元素過濾時的儲存格文字（只用來判斷原本是否配成標籤＋值）。 */
+function rawText(cell: Element, ctx: Ctx): string {
+  const pairs = { ...ctx.pairs, noisePairs: new Set<Element>() };
+  return joinLines(itemsText(collect(cell, { ...ctx, pairs, isNoise: null }, 'unit')));
+}
+
 /**
  * 表格列：儲存格以 Tab 連接（儲存格內的換行併成空白）；只有 th＋td 兩格的列是標籤＋值。
  * 儲存格內巢狀的清單、表格各自成區塊，排在這一列之後。
@@ -171,8 +182,10 @@ function rowBlocks(tr: Element, ctx: Ctx): ResumeBlock[] {
   const [first, second] = cells;
   if (cells.length === 2 && first?.localName === 'th' && second?.localName === 'td') {
     const label = joinLines(itemsText(scanned[0] ?? []));
-    if (label !== '') {
-      const shape: Shape = { kind: 'label_value', level: null, label };
+    // 標籤扣掉介面元素後才變空：仍當配對、值改當段落（不改成表格列，免得多出新的組合文字）
+    const raw = label !== '' || !ctx.isNoise ? label : rawText(first, ctx);
+    if (raw !== '') {
+      const shape = labeledShape(label === '' ? null : label);
       return nestedBlocks(scanned[0] ?? []).concat(flush(scanned[1] ?? [], shape));
     }
   }

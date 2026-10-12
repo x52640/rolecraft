@@ -96,4 +96,5 @@ RUN_CHROME=1 npx vitest run apps/extension/src/sites/104/resume
 - 真實 Chrome：過濾前 214 → 過濾後 188 區塊（丟 26：按鈕組合 14、推廣連結 8、前往查看 4；2 個標題移除提示）；其餘非標題區塊與過濾前依序相同；「更多」收合區個資過濾前後皆 0 筆、`nameText` 相同。
 - 測試：`resume/noise.test.ts`（合成 DOM 12 案例）；`104/resume/fixture.chrome.test.ts` 加過濾前對照組。
 - codex 1 項（已修）：配對的表單控制項繞過選擇器過濾（label 包著登記為雜訊的 input 仍輸出標籤＋值）。改為配對探索也套用雜訊判定（`dom.ts` `findPairs`）：控制項或它的 label 在雜訊元素內就整對不讀（值與 label 文字都不出）；在雜訊內的 dt 不當標籤、切斷配對；label／dt 的標籤文字不含其中的雜訊元素文字。`noise.test.ts` 加 4 案例（修正前重現失敗）。姓名元素文字不套過濾。
+- codex 複審 1 項（已修）：過濾讓 dt 標籤變空或 dd 被過濾時解除了配對，原本被配對抑制的 dt 內容（例如 dt 裡的控制項值）露出。改為配對結構一律照未過濾的結果決定（dt＋dd、label＋控制項、th＋td），過濾只從顯示的標籤扣掉介面元素文字；標籤扣完變空時值改當段落，原本被抑制的 dt／label 照樣抑制。`noise-pairs.test.ts` 加 4 案例（dt 變空、dd 被過濾、label 全是雜訊而包著另一控制項、th 全是雜訊；修正前皆失敗）；`noise.test-helpers.ts` 的通則：每個合成 DOM 同時跑未過濾版本，斷言過濾後每段文字／標籤都是過濾前某段的子序列、`nameText` 相同。
 - 殘餘：fixture 只有預設版型，其他版型或 104 改版的按鈕／連結字樣要再登記。

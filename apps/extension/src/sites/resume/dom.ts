@@ -83,12 +83,12 @@ function inNoise(el: Element, root: Element, isNoise: NoiseMatcher): boolean {
 
 /** 標籤＋值的對應：dt＋dd、label＋控制項（規則 2）。 */
 export interface Pairs {
-  /** dd → 它前面 dt 的文字 */
-  ddLabels: Map<Element, string>;
+  /** dd → 它前面 dt 的文字（扣掉介面元素後變空是 null：仍算配對，dd 改當段落） */
+  ddLabels: Map<Element, string | null>;
   /** 已當作標籤的 dt（不另成區塊） */
   consumedDts: Set<Element>;
-  /** 控制項 → 它的 label 文字與元素 */
-  controlLabels: Map<Element, { label: Element; text: string }>;
+  /** 控制項 → 它的 label 文字與元素（扣掉介面元素後變空是 null：值改當段落） */
+  controlLabels: Map<Element, { label: Element; text: string | null }>;
   /** 已當作標籤的 label → 它配到的控制項 */
   labelControls: Map<Element, Element>;
   /** 自己或任何 label 屬於介面元素的控制項，連同它的 label：整對不讀（值與標籤都不出） */
@@ -104,56 +104,64 @@ function dlItems(dl: Element): Element[] {
   return items;
 }
 
+interface PairCtx {
+  root: Element;
+  oracle: RenderOracle;
+  isNoise: NoiseMatcher;
+}
+
+/** 標籤文字扣掉介面元素（配對與否不看這個，只決定顯示的標籤）；變空回 null。 */
+function shownLabel(els: readonly Element[], ctx: PairCtx): string | null {
+  const parts = els
+    .filter((el) => !inNoise(el, ctx.root, ctx.isNoise))
+    .map((el) => flatText(el, ctx.oracle, ctx.isNoise));
+  const text = joinLines(parts.join('\n'));
+  return text === '' ? null : text;
+}
+
 /**
  * dt＋dd 配對。讀不到的 dt（隱藏等）不貢獻文字、而且切斷配對：後面的 dd 不繼承前一個標籤，
  * 改當一般段落（dd 本身看得到，照讀；不會把隱藏的標籤或錯的標籤套上去）。
+ * 配對與否只看未過濾的結果（過濾不得解除原本被配對抑制的 dt）；介面元素只從顯示的標籤扣掉。
  */
-function pairDl(dl: Element, root: Element, ctx: PairCtx, pairs: Pairs): void {
-  const { oracle, isNoise } = ctx;
+function pairDl(dl: Element, ctx: PairCtx, pairs: Pairs): void {
+  const { oracle, root } = ctx;
   let dts: Element[] = [];
   let label = '';
   let afterDd = false;
   for (const item of dlItems(dl)) {
     if (item.localName !== 'dt' && item.localName !== 'dd') continue;
-    // 介面元素裡的 dt／dd 當作讀不到：不貢獻標籤文字、切斷配對
-    const readable = isReadableChain(item, oracle, root) && !inNoise(item, root, isNoise);
+    const readable = isReadableChain(item, oracle, root);
     if (item.localName === 'dt') {
       if (afterDd || !readable) dts = [];
       afterDd = false;
       if (readable) dts.push(item);
-      label = readable ? joinLines(dts.map((dt) => flatText(dt, oracle, isNoise)).join('\n')) : '';
+      label = readable ? joinLines(dts.map((dt) => flatText(dt, oracle)).join('\n')) : '';
       continue;
     }
     afterDd = true;
     if (!readable || label === '') continue;
-    pairs.ddLabels.set(item, label);
+    pairs.ddLabels.set(item, shownLabel(dts, ctx));
     for (const dt of dts) pairs.consumedDts.add(dt);
   }
 }
 
-interface PairCtx {
-  oracle: RenderOracle;
-  isNoise: NoiseMatcher;
-}
-
-function pairControl(control: Element, root: Element, ctx: PairCtx, pairs: Pairs): void {
-  const { oracle, isNoise } = ctx;
-  const labels = Array.from((control as HTMLInputElement).labels ?? []);
-  if (
-    inNoise(control, root, isNoise) ||
-    labels.some((label) => root.contains(label) && inNoise(label, root, isNoise))
-  ) {
+/** label＋控制項配對（只看未過濾的結果）；控制項或任一 label 屬於介面元素就整對不讀。 */
+function pairControl(control: Element, ctx: PairCtx, pairs: Pairs): void {
+  const { oracle, root, isNoise } = ctx;
+  const labels = Array.from((control as HTMLInputElement).labels ?? []).filter((label) =>
+    root.contains(label),
+  );
+  if (inNoise(control, root, isNoise) || labels.some((label) => inNoise(label, root, isNoise))) {
     pairs.noisePairs.add(control);
-    for (const label of labels) if (root.contains(label)) pairs.noisePairs.add(label);
-    return;
+    for (const label of labels) pairs.noisePairs.add(label);
   }
   if (controlValue(control, oracle) === null || !isReadableChain(control, oracle, root)) return;
   for (const label of labels) {
-    if (pairs.labelControls.has(label) || !root.contains(label)) continue;
+    if (pairs.labelControls.has(label)) continue;
     if (!isReadableChain(label, oracle, root)) continue;
-    const text = joinLines(flatText(label, oracle, isNoise));
-    if (text === '') continue;
-    pairs.controlLabels.set(control, { label, text });
+    if (joinLines(flatText(label, oracle)) === '') continue;
+    pairs.controlLabels.set(control, { label, text: shownLabel([label], ctx) });
     pairs.labelControls.set(label, control);
     return;
   }
@@ -161,7 +169,8 @@ function pairControl(control: Element, root: Element, ctx: PairCtx, pairs: Pairs
 
 /**
  * 先找出根節點內的標籤＋值配對，抽取時據此決定區塊種類。
- * 介面元素（`isNoise`）不參與配對：控制項或它的 label 屬於介面元素就整對不讀。
+ * 配對結構與沒登記過濾時相同（過濾只能讓輸出變少）；控制項或它的 label 屬於介面元素就整對不讀，
+ * 標籤文字扣掉其中的介面元素。
  */
 export function findPairs(
   root: Element,
@@ -175,11 +184,11 @@ export function findPairs(
     labelControls: new Map(),
     noisePairs: new Set(),
   };
-  const ctx: PairCtx = { oracle, isNoise };
+  const ctx: PairCtx = { root, oracle, isNoise };
   const all = [root, ...Array.from(root.querySelectorAll('*'))];
-  for (const dl of all.filter((el) => el.localName === 'dl')) pairDl(dl, root, ctx, pairs);
+  for (const dl of all.filter((el) => el.localName === 'dl')) pairDl(dl, ctx, pairs);
   for (const control of all.filter(isControl)) {
-    pairControl(control, root, ctx, pairs);
+    pairControl(control, ctx, pairs);
   }
   return pairs;
 }

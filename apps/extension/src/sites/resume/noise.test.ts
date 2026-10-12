@@ -1,48 +1,12 @@
 // @vitest-environment jsdom
-import { SubmitResumeCaptureRequest } from '@rolecraft/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { buildResumeCapture } from './capture.ts';
 import { extractBlocks } from './extract.ts';
 import { filterNoiseBlocks, noiseElementMatcher } from './noise.ts';
+import { BASE, blocksOf, extractWithRules, h, p, RULES } from './noise.test-helpers.ts';
 import { simpleOracle } from './simple-oracle.ts';
-import type { ResumeBlock, ResumeSiteConfig, UiNoiseRules } from './types.ts';
 
-/** 合成 DOM、假資料；規則是測試自己登記的，不是任何網站的清單。 */
-const RULES: UiNoiseRules = {
-  selectors: ['button', '.promo'],
-  texts: ['編輯', '前往查看', '  看看  薪資 '],
-  headingHints: ['排在第一筆的會當作最高學歷', '提示  字樣'],
-};
-const BASE: ResumeSiteConfig = { platform: '104', rootSelector: '#resume', nameSelector: '.nm' };
-const deps = {
-  doc: document,
-  pageUrl: 'https://resume.example.com/view',
-  oracle: simpleOracle,
-  now: () => new Date('2026-10-13T00:00:00.000Z'),
-};
-
-const p = (text: string, continues = false): ResumeBlock => ({
-  kind: 'paragraph',
-  level: null,
-  label: null,
-  text,
-  continues,
-});
-const h = (level: number, text: string, continues = false): ResumeBlock => ({
-  kind: 'heading',
-  level,
-  label: null,
-  text,
-  continues,
-});
-
-function blocksOf(html: string, config: ResumeSiteConfig = { ...BASE, uiNoise: RULES }) {
-  document.body.innerHTML = html;
-  const request = buildResumeCapture(config, deps);
-  if (typeof request === 'string') return request;
-  return SubmitResumeCaptureRequest.parse(request).payload;
-}
+// blocksOf／extractWithRules 每次都以同一 DOM 跑未過濾版本，斷言過濾後只少不多（noise.test-helpers）。
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -115,15 +79,13 @@ describe('選擇器過濾', () => {
   it('根節點本身符合選擇器也不會整個被丟', () => {
     document.body.innerHTML = '<button id="r">甲</button>';
     const root = document.getElementById('r') as Element;
-    const isNoise = noiseElementMatcher(RULES);
-    expect(extractBlocks(root, simpleOracle, isNoise)).toEqual([p('甲')]);
+    expect(extractWithRules(root)).toEqual([p('甲')]);
   });
 
   it('表格儲存格符合選擇器：該格不讀', () => {
     document.body.innerHTML = '<table id="r"><tr><td>甲</td><td class="promo">乙</td></tr></table>';
     const root = document.getElementById('r') as Element;
-    const blocks = extractBlocks(root, simpleOracle, noiseElementMatcher(RULES));
-    expect(blocks.map((b) => b.text)).toEqual(['甲']);
+    expect(extractWithRules(root).map((b) => b.text)).toEqual(['甲']);
   });
 });
 
@@ -179,48 +141,5 @@ describe('個資範圍不擴大', () => {
     expect(blocksOf('<main id="resume"><button>編輯</button><p>前往查看</p></main>')).toBe(
       'not_found',
     );
-  });
-});
-
-describe('表單配對也套用介面元素過濾（codex）', () => {
-  const lv = (label: string, text: string): ResumeBlock => ({
-    kind: 'label_value',
-    level: null,
-    label,
-    text,
-    continues: false,
-  });
-  const after = (html: string, config?: ResumeSiteConfig) => {
-    const payload = blocksOf(`<main id="resume"><p>甲</p>${html}</main>`, config);
-    if (typeof payload === 'string') throw new Error(payload);
-    return payload.blocks.slice(1);
-  };
-
-  it('label 包著的控制項是介面元素：整對不讀（值與標籤都不出）', () => {
-    const html = '<label>Title<input class="promo" value="Filtered"></label>';
-    expect(after(html, BASE)).toEqual([lv('Title', 'Filtered')]);
-    expect(after(html)).toEqual([]);
-  });
-
-  it('for 配對：控制項或 label 任一是介面元素，整對不讀', () => {
-    expect(after('<label for="x">Title</label><input id="x" class="promo" value="V">')).toEqual([]);
-    expect(after('<label for="x" class="promo">Title</label><input id="x" value="V">')).toEqual([]);
-    expect(
-      after('<div class="promo"><label for="x">T</label></div><input id="x" value="V">'),
-    ).toEqual([]);
-  });
-
-  it('label 裡夾著介面元素：標籤文字不帶它的字', () => {
-    const html = '<label for="x">Title<button>編輯</button></label><input id="x" value="V">';
-    expect(after(html)).toEqual([lv('Title', 'V')]);
-  });
-
-  it('dt 是介面元素：不當標籤、切斷配對，dd 照常當段落', () => {
-    const html = '<dl><dt class="promo">廣告</dt><dd>值</dd></dl>';
-    expect(after(html, BASE)).toEqual([lv('廣告', '值')]);
-    expect(after(html)).toEqual([p('值')]);
-    expect(after('<dl><dt>年資<button>編輯</button></dt><dd>3 年</dd></dl>')).toEqual([
-      lv('年資', '3 年'),
-    ]);
   });
 });
