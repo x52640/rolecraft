@@ -22,7 +22,7 @@
 
 ### 操作
 
-**誰可以呼叫**：content script 只能呼叫 `submit_job_capture`、`submit_message_capture`，且只在已註冊職缺頁主框架、只能送該站、自動擷取（清單唯一定義在 contracts `CONTENT_SCRIPT_OPERATIONS`，service worker 的 sender 檢查擋）。**其餘操作一律只限擴充功能頁**（編輯器）。
+**誰可以呼叫**：content script 只能呼叫 `submit_job_capture`、`submit_message_capture`，且只在已註冊職缺頁主框架、只能送該站、自動擷取；〔D28，P1-T076〕以及 `submit_resume_capture`，只在該站已註冊履歷頁主框架、平台相符、`url` 等於發送頁的 origin＋路徑（操作×頁型，兩種頁型規則互不放行；`web-resume-capture.md`）。清單唯一定義在 contracts `CONTENT_SCRIPT_OPERATIONS`，service worker 的 sender 檢查擋。**其餘操作一律只限擴充功能頁**（編輯器）。
 
 **共同規則（P1-T041）**：
 
@@ -40,6 +40,7 @@
 | --- | --- | --- |
 | `submit_job_capture` | 編輯器頁；content script（見上） | 送入職缺頁擷取內容，回職缺快照 id。編輯器手動貼上職缺也用它（擷取方式＝手動貼上） |
 | `submit_message_capture` | 同上 | 送入使用者選定的訊息，回訊息草稿 id。編輯器手動貼上訊息也用它 |
+| `submit_resume_capture` | content script（只在已註冊履歷頁，見上） | 〔D28，P1-T074 契約、P1-T079 實作〕送入履歷頁擷取的區塊清單（`web-resume-capture.md`），helper 建立網頁來源的匯入工作階段、不呼叫模型；成功只回 `{ok: true}` |
 | `request_draft` | 編輯器頁 | 要求產生回覆草稿，回工作 id（不送出，D7） |
 
 編輯器頁專用（P1-T041；括號內為實作 Task）：
@@ -52,9 +53,15 @@
 | `import.pick_pdf` | helper 開系統檔案選取器（只限 PDF）並解析，回匯入 id 與檔名；取消回 cancelled（P1-T020） |
 | `import.get` | 解析結果：原文（依閱讀順序的行）與欄位草稿；失敗只回原因，不當成功 |
 | `import.save_corrections` | 暫存逐欄校正；不算確認 |
-| `import.confirm` | 以使用者確認當下的內容寫入 Profile 並標為已確認；解析失敗時可確認手動輸入內容（D18） |
-| `import.ai_parse` | 用使用者選定的 Claude 模型整理已解析的文字（P1-T069，規則見 resume-import「AI 整理欄位」）：在背景執行、立即回狀態；同一筆匯入已有執行中的就不重送。姓名與聯絡資料在本機抽出、不送模型。找不到匯入、解析失敗、移除後沒有文字、沒有選定且可用的模型、超過輸入預算回 `invalid_request`（固定訊息），不呼叫模型 |
+| `import.confirm` | 以使用者確認當下的內容寫入 Profile 並標為已確認；解析失敗時可確認手動輸入內容（D18）。〔D28／Q8，P1-T079〕資料區已有一份 Profile 時更新那一份（保留 id），沒有才新增，已有多份時不寫入（resume-import「匯入工作階段」） |
+| `import.latest_capture` | 〔D28，P1-T079〕最近一次網頁擷取的 importId、平台、擷取時間、是否截斷；沒有回 null。查詢不觸發 AI 整理 |
+| `import.start_manual` | 〔D28，P1-T079〕建立沒有原文的匯入工作階段，供手動輸入後確認 |
+| `import.ai_parse` | 用使用者選定的 Claude 模型整理已解析的文字（P1-T069，規則見 resume-import「AI 整理欄位」）：在背景執行、立即回狀態；同一筆匯入已有執行中的就不重送。姓名與聯絡資料在本機抽出、不送模型。〔D28，P1-T080〕網頁來源規則見 resume-import「網頁來源的 AI 整理」；相加選填使用者確認的姓名（可多個寫法，只用於本機遮蔽與預填），本次頁面姓名沒辨識出來又沒帶姓名時不呼叫模型。找不到匯入、解析失敗、移除後沒有文字、沒有選定且可用的模型、超過輸入預算回 `invalid_request`（固定訊息），不呼叫模型 |
 | `import.ai_status` | 最近一次 AI 整理：執行中／成功（逐欄照抄檢查過的草稿：本機抽出的個人資料、學歷、經歷、技能、其他段落、被丟棄的欄位與原因）／失敗（原因）；只在 helper 記憶體，沒有整理過為 null |
+| `profile.get` | 〔D28，P1-T079〕唯讀：資料區唯一那份已確認的 Profile（沒有回 null；多份時回固定原因）。供複製按鈕重新讀取比對（resume-output「內容回填到求職網站」） |
+| `photo.pick` | 〔D28，P1-T083〕helper 開系統選取器（只限 JPEG／PNG、10 MB 以下），重新編碼、去中繼資料後即設為目前照片；已有照片時是更換（同一交易刪舊加新，套 D19）。回照片資訊（格式、尺寸、雜湊）與縮圖；取消回 cancelled。選取器操作 |
+| `photo.get` | 〔D28，P1-T083〕目前照片資訊＋縮圖（回應低於 1 MiB）；沒有回 null |
+| `photo.remove` | 〔D28，P1-T083〕刪除目前照片，套 D19（含這張照片、未投遞的匯出版本整份刪除，已投遞的保留） |
 | `sources.pick_folders` | helper 開系統資料夾選取器（可連續新增），回資料夾 id 與名稱（P1-T021） |
 | `sources.list_folders` | 已加入的資料夾與待確認／已授權數量 |
 | `sources.preview` | 重新列舉一個資料夾（只列名稱、大小、類型，不讀內容），項目以 id／上層 id 組成樹；新候選為「待確認」（R4 增量更新） |
@@ -112,7 +119,7 @@
   - id 缺漏或不合法（非字串、空、超長、含其他字元）：無法歸屬，helper 等在途請求回完，送一則 id 為 `null` 的 `invalid_request` 後斷線。
   - id 在本連線出現過（不論是否已回覆）：同上斷線；原請求照常只回一次。
   - id 合法但信封多帶或缺欄位：以該 id 回 `invalid_request`，連線繼續。
-- 客戶端收到未知 id、id 為 `null` 或信封不合法：協定已不可信，斷線，在途請求回 `internal_error`。已逾時請求的晚到回覆直接丟棄；逾時請求在 helper 回覆前仍占名額，名額全被占住時斷線重來。選取器操作（`import.pick_pdf`、`sources.pick_folders`，P1-T045）排隊時用一般逾時，真正送出後改用較長的選取器逾時（原生對話框上限＋解析餘裕，常數在 contracts）；排隊中的請求逾時仍未送出、且名額裡有已逾時請求時，也視為 helper 卡死而斷線重來。
+- 客戶端收到未知 id、id 為 `null` 或信封不合法：協定已不可信，斷線，在途請求回 `internal_error`。已逾時請求的晚到回覆直接丟棄；逾時請求在 helper 回覆前仍占名額，名額全被占住時斷線重來。選取器操作（`import.pick_pdf`、`sources.pick_folders`，P1-T045；〔D28〕`photo.pick`）排隊時用一般逾時，真正送出後改用較長的選取器逾時（原生對話框上限＋解析餘裕，常數在 contracts）；排隊中的請求逾時仍未送出、且名額裡有已逾時請求時，也視為 helper 卡死而斷線重來。
 - 分塊（P1-T041）：host→瀏覽器單則 1 MB 上限仍在，信封形狀不變（一個請求 id 只回一則）。PDF 等大內容不放進單一回應，改由呼叫端逐塊請求：每塊是一則獨立請求（各自的請求 id），請求帶內容 id 與塊序號（從 0 起），回應帶第幾塊、共幾塊、整份位元組數、整份 SHA-256 與該塊 base64。每塊原始上限 512 KiB（base64 後連信封仍低於 1 MB），單一內容最多 128 塊。只用於不可變內容（例如匯出版本），所以不需要 helper 端狀態；呼叫端拼完後必須比對 SHA-256，不符就整份丟棄。塊序號超出範圍回 `invalid_request`。其他回應超過上限時 helper 仍以同一 id 回 `internal_error`。
 
 ### 錯誤碼

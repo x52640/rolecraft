@@ -9,7 +9,8 @@
 
 ## ready
 
-- 無
+- P1-T074 contracts：網頁履歷匯入、照片、個人資料讀取的橋接契約
+- P1-T086 editor：客製履歷段落「複製」按鈕
 <!-- index:end -->
 
 ## 下一步（2026-10-11 codex 補審後）
@@ -24,6 +25,8 @@
 6. 只有擁有者說「推」才 push；本機 `refs/original` 待擁有者同意後清除。
 
 ## 交接（2026-10-12 擁有者要求清空對話後重開）
+
+- 2026-10-12 擁有者說「開工」：web-resume-import 已轉正式規格（plan.md D28；`docs/specs/web-resume-capture.md`、`resume-import.md`、`resume-output.md`、`bridge.md`）並拆成 P1-T074～P1-T087；先跑 T074（契約）與 T086（段落複製），T077 等 P1-T017 履歷頁樣本。
 
 - web-resume-import 規格已收斂（2026-10-12，擁有者裁決已寫入，final2 no_blockers；觸發改為在履歷頁點外掛圖示擷取）。等擁有者說「開工」才拆 Task；實作前需 P1-T017 各站履歷頁樣本（Q2）。
 - 方向變更：匯入改走「擴充功能讀求職網站履歷頁 HTML」，PDF 只負責輸出（加照片、匯出）。規格 `docs/spec-discussions/web-resume-import/spec.md`。

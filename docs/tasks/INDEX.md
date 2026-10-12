@@ -80,6 +80,20 @@
 | [P1-T071](P1-T071-intro-failed-draft-visible.md) | 自介沒通過檢查時看不到草稿 | done | 1 | pipeline | P1-T064 |
 | [P1-T072](P1-T072-resume-experience-tailoring.md) | 客製履歷沒有改寫工作經歷 | done | 1 | pipeline | P1-T025 |
 | [P1-T073](P1-T073-claims-page-usability.md) | 事實項頁實用性 | done | 1 | editor | P1-T063 |
+| [P1-T074](P1-T074-web-import-contracts.md) | contracts：網頁履歷匯入、照片、個人資料讀取的橋接契約 | ready | 1 | contracts | P1-T041、P1-T069 |
+| [P1-T075](P1-T075-extension-resume-blocks.md) | extension：履歷頁區塊抽取與擷取共用流程 | blocked | 1 | extension | P1-T074 |
+| [P1-T076](P1-T076-extension-resume-trigger.md) | extension：點圖示／快捷鍵依頁型觸發與發送者驗證 | blocked | 1 | extension | P1-T074 |
+| [P1-T077](P1-T077-extension-104-resume-page.md) | extension：104 履歷頁登記與 fixture 比對 | blocked | 1 | extension | P1-T017、P1-T075、P1-T076 |
+| [P1-T078](P1-T078-pipeline-web-resume-parse.md) | pipeline：網頁區塊來源的去個資、提示與照抄檢查 | blocked | 1 | pipeline | P1-T074 |
+| [P1-T079](P1-T079-helper-import-session-web.md) | helper：網頁擷取與手動輸入的匯入工作階段、確認更新唯一 Profile、profile.get | blocked | 1 | helper | P1-T074 |
+| [P1-T080](P1-T080-helper-web-ai-parse.md) | helper：網頁來源的 AI 整理接線 | blocked | 1 | helper | P1-T078、P1-T079 |
+| [P1-T081](P1-T081-editor-web-import-page.md) | editor：匯入頁接網頁擷取與手動輸入 | blocked | 1 | editor | P1-T074 |
+| [P1-T082](P1-T082-storage-photo-material.md) | storage：照片保存與照片素材的 D19 刪除 | blocked | 1 | storage | P1-T074 |
+| [P1-T083](P1-T083-helper-photo-ops.md) | helper：照片選取與處理、photo.* 操作 | blocked | 1 | helper | P1-T082、P1-T079 |
+| [P1-T084](P1-T084-export-photo.md) | 匯出 PDF 加照片 | blocked | 1 | pdf-export | P1-T082 |
+| [P1-T085](P1-T085-editor-profile-copy-photo.md) | editor：履歷頁的個人資料複製與照片管理 | blocked | 1 | editor | P1-T074 |
+| [P1-T086](P1-T086-editor-section-copy.md) | editor：客製履歷段落「複製」按鈕 | ready | 1 | editor | P1-T025、P1-T064 |
+| [P1-T087](P1-T087-editor-hide-pdf-import.md) | editor：拿掉 PDF 匯入入口（Q10） | blocked | 1 | editor | P1-T077、P1-T080、P1-T081 |
 
 ## 依賴清單
 
@@ -104,7 +118,7 @@
 - P1-T014：P1-T013、P1-T006 → P1-T018、P1-T019、P1-T020、P1-T021、P1-T030、P1-T034
 - P1-T015：P1-T013、P1-T001 → P1-T016、P1-T017、P1-T034
 - P1-T016：P1-T015 → P1-T019、P1-T020、P1-T021、P1-T023、P1-T029、P1-T030、P1-T034
-- P1-T017：P1-T015 → P1-T018
+- P1-T017：P1-T015 → P1-T018、P1-T077
 - P1-T018：P1-T017、P1-T014 → P1-T031
 - P1-T019：P1-T016、P1-T014、P1-T041 → P1-T024
 - P1-T020：P1-T009、P1-T016、P1-T014、P1-T041 → P1-T032、P1-T043、P1-T067
@@ -112,7 +126,7 @@
 - P1-T022：P1-T002、P1-T003、P1-T004、P1-T005、P1-T012、P1-T008 → P1-T023、P1-T024
 - P1-T023：P1-T022、P1-T016 → P1-T025、P1-T032
 - P1-T024：P1-T022、P1-T019 → P1-T025、P1-T029
-- P1-T025：P1-T024、P1-T023 → P1-T032、P1-T072
+- P1-T025：P1-T024、P1-T023 → P1-T032、P1-T072、P1-T086
 - P1-T026：P0-T001 → P1-T027
 - P1-T027：P1-T026、P1-T007 → P1-T028、P1-T040
 - P1-T028：P1-T027、P1-T041 → P1-T032、P1-T043
@@ -128,7 +142,7 @@
 - P1-T038：— → —
 - P1-T039：P1-T012、P1-T037 → —
 - P1-T040：P1-T041、P1-T027、P1-T007 → P1-T043
-- P1-T041：P1-T034 → P1-T019、P1-T020、P1-T021、P1-T028、P1-T030、P1-T040
+- P1-T041：P1-T034 → P1-T019、P1-T020、P1-T021、P1-T028、P1-T030、P1-T040、P1-T074
 - P1-T042：— → —
 - P1-T043：P1-T020、P1-T021、P1-T028、P1-T040 → —
 - P1-T044：— → —
@@ -151,13 +165,27 @@
 - P1-T061：P1-T060 → P1-T063
 - P1-T062：P1-T058 → P1-T064、P1-T070
 - P1-T063：P1-T061 → P1-T073
-- P1-T064：P1-T060、P1-T062 → P1-T069、P1-T071
+- P1-T064：P1-T060、P1-T062 → P1-T069、P1-T071、P1-T086
 - P1-T065：P1-T009 → P1-T066
 - P1-T066：P1-T065 → P1-T069
 - P1-T067：P1-T020 → —
 - P1-T068：P1-T059 → —
-- P1-T069：P1-T066、P1-T064 → —
+- P1-T069：P1-T066、P1-T064 → P1-T074
 - P1-T070：P1-T062 → —
 - P1-T071：P1-T064 → —
 - P1-T072：P1-T025 → —
 - P1-T073：P1-T063 → —
+- P1-T074：P1-T041、P1-T069 → P1-T075、P1-T076、P1-T078、P1-T079、P1-T081、P1-T082、P1-T085
+- P1-T075：P1-T074 → P1-T077
+- P1-T076：P1-T074 → P1-T077
+- P1-T077：P1-T017、P1-T075、P1-T076 → P1-T087
+- P1-T078：P1-T074 → P1-T080
+- P1-T079：P1-T074 → P1-T080、P1-T083
+- P1-T080：P1-T078、P1-T079 → P1-T087
+- P1-T081：P1-T074 → P1-T087
+- P1-T082：P1-T074 → P1-T083、P1-T084
+- P1-T083：P1-T082、P1-T079 → —
+- P1-T084：P1-T082 → —
+- P1-T085：P1-T074 → —
+- P1-T086：P1-T025、P1-T064 → —
+- P1-T087：P1-T077、P1-T080、P1-T081 → —
