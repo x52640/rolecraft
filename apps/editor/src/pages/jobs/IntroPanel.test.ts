@@ -654,6 +654,23 @@ describe('未通過草稿（P1-T071）', () => {
     expect(screen.getByText(/先儲存或重新載入，才能儲存草稿/)).toBeTruthy();
   });
 
+  it('已存自介有未儲存修改時，請 AI 修正停用並說明，不送出也不蓋掉修改', async () => {
+    const { fake } = setupDraft((f, d) => {
+      f.intro = saved();
+      f.introCheck = passingCheck(TEXT);
+      d.draft = DRAFT;
+    });
+    await draftBox();
+    const official = await screen.findByLabelText<HTMLTextAreaElement>('投遞自介（可編輯）');
+    await waitFor(() => expect(button('請 AI 修正')).toHaveProperty('disabled', false));
+    fireEvent.change(official, { target: { value: `${TEXT}改` } });
+    expect(button('請 AI 修正')).toHaveProperty('disabled', true);
+    expect(screen.getByText(/才能儲存草稿或請 AI\s*修正/)).toBeTruthy();
+    fireEvent.click(button('請 AI 修正'));
+    expect(ops(fake, 'intro.generate')).toHaveLength(0);
+    expect(official.value).toBe(`${TEXT}改`);
+  });
+
   it('StrictMode 下初次讀取跑兩次：草稿只顯示一份、可以編輯', async () => {
     const fake = fakeBridge([sampleSnapshot({ confirmedAt: '2026-10-11T01:02:03.000Z' })]);
     render(

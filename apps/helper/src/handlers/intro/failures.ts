@@ -17,6 +17,8 @@ const MESSAGES: Record<IntroFailureReason, string> = {
   no_draft:
     '找不到未通過的草稿（可能已被新的產生取代，或本機輔助程式重新啟動過）：請重新讀取或重新產生',
   draft_stale: '草稿產生後職缺快照被修改或取消確認：請重新產生投遞自介',
+  draft_intro_changed:
+    '草稿產生後已存的自介被改過，「請 AI 修正」的結果會蓋掉那份修改，所以沒有呼叫 AI（沒有用到額度）：請重新產生投遞自介，或直接修改已存的自介',
   draft_failed: '草稿仍沒有通過檢查，還不是正式自介；你的修改已保留在草稿上，問題標在草稿下方',
   snapshot_changed: '草稿產生後職缺快照被修改或取消確認，沒有存成正式自介：請重新產生投遞自介',
   intro_changed:

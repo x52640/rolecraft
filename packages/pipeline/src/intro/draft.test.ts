@@ -11,7 +11,7 @@ import {
   profile,
   snapshot,
 } from '../generation/fixtures.test-helpers.ts';
-import { checkIntro, introProblemFragments } from './check.ts';
+import { checkIntro, introProblemFragments, withoutJobNames } from './check.ts';
 import { prepareIntro, type PreparedIntro } from './prepare.ts';
 import { runIntro } from './run.ts';
 import type { IntroFeedback } from './types.ts';
@@ -151,6 +151,17 @@ describe('公司名稱、職稱裡的數字（P1-T071）', () => {
     expect(checkIntro('應徵104資訊科技，載入時間縮短 3%。', cite, ctx(NAMES))).toBe(
       'number_not_grounded',
     );
+  });
+
+  it('名稱要有邊界：前後緊鄰英數字的不算名稱，只豁免名稱本身', () => {
+    expect(withoutJobNames('應徵3M，3MB、X3M 與 13M；3M。', ['3M'])).toBe(
+      '應徵 ,3MB、X3M 與 13M; 。',
+    );
+    const names = ['3M', '前端工程師'];
+    expect(checkIntro('應徵3M的前端工程師，載入時間縮短 40%。', cite, ctx(names))).toBeNull();
+    for (const text of ['應徵3M，傳輸 3MB，載入時間縮短 40%。', '應徵X3M，載入時間縮短 40%。']) {
+      expect(checkIntro(text, cite, ctx(names))).toBe('number_not_grounded');
+    }
   });
 
   it('全形數字的名稱也照正規化後比對', () => {

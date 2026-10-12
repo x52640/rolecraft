@@ -17,6 +17,7 @@ import type {
  * - over_budget：提示超過輸入預算（R8）
  * - no_draft：「請 AI 修正」或儲存草稿時沒有未通過的草稿（P1-T071）
  * - draft_stale：草稿產生後職缺快照被修改或取消確認，不能再用它修正
+ * - draft_intro_changed：草稿產生後已存自介被改過，修正結果寫不進去（不蓋掉那份修改），所以不呼叫模型
  */
 export type IntroRefusal =
   | 'not_found'
@@ -25,7 +26,8 @@ export type IntroRefusal =
   | 'no_service'
   | 'over_budget'
   | 'no_draft'
-  | 'draft_stale';
+  | 'draft_stale'
+  | 'draft_intro_changed';
 
 export type GenerateIntroResult =
   | { readonly ok: true; readonly generation: IntroGenerationView }

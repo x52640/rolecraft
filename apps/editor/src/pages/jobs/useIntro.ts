@@ -29,7 +29,7 @@ type Loaded = Extract<BridgeResponseOf<'intro.get'>, { ok: true }>;
  * - 單一編輯版本號：編輯框內容每次改變（使用者輸入、套用 helper 的內容、儲存成功）都加一；
  *   請求送出時記下版本號，回來時版本號已變就作廢，不套用、不複製。
  * 未通過檢查的草稿（P1-T071）另有自己的編輯框（draftText），同樣受上述鎖定與版本號保護；草稿不能複製，
- * 儲存通過檢查才成為正式自介，「請 AI 修正」＝帶 fix 的產生。
+ * 儲存通過檢查才成為正式自介，「請 AI 修正」＝帶 fix 的產生（已存自介有未存修改時不送）。
  * 沒有任何送出（D7）：自介只存在本機，由使用者複製後自行貼到求職網站。
  */
 export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
@@ -291,7 +291,7 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     failure,
     notice,
     generate: () => generate(),
-    fix: () => generate(true),
+    fix: () => (box.dirty ? Promise.resolve() : generate(true)),
     save: () => save(),
     saveDraft: () => save('draft'),
     copy,

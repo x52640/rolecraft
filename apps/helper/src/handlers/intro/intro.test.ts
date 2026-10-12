@@ -425,6 +425,22 @@ describe('未通過草稿（P1-T071）', () => {
     });
   });
 
+  it('草稿產生後已存自介被改過：請 AI 修正先比對，不呼叫模型並說明原因，草稿與自介都不動', async () => {
+    const env = open(scripted(GOOD, BAD, GOOD));
+    await generated(env);
+    await generated(env); // 重新產生沒通過 → 草稿；已存自介仍是第一份
+    await env.send(update('我自己改寫的版本，載入時間縮短 40%。'));
+    expect(await env.send(fix)).toMatchObject({
+      ...INVALID,
+      error: { message: expect.stringContaining('沒有呼叫 AI') as unknown },
+    });
+    expect(env.engine.prompts).toHaveLength(2);
+    expect(await env.send(get)).toMatchObject({
+      intro: { text: '我自己改寫的版本，載入時間縮短 40%。' },
+      draft: { problem: 'number_not_grounded' },
+    });
+  });
+
   it('草稿產生後快照被修改並重新確認：不能修正、也不能存成自介', async () => {
     const env = open(() => BAD);
     await generated(env);

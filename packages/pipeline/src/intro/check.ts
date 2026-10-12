@@ -47,13 +47,21 @@ export interface IntroCheckContext {
   readonly jobNames?: readonly string[];
 }
 
-/** 把自介中出現的公司名稱、職稱整段換成空白（正規化後比對，長的先換）；只用於數字檢查。 */
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * 把自介中出現的公司名稱、職稱整段換成空白（正規化後比對，長的先換）；只用於數字檢查。
+ * 要有邊界：前後緊鄰英數字的不算名稱（名稱「3M」不會豁免「13M」「3MB」裡的 3M），只豁免名稱本身。
+ */
 export function withoutJobNames(text: string, names: readonly string[] = []): string {
   const normalized = names
     .map((name) => normalizeForGrounding(name).trim())
     .filter((name) => name.length > 0)
     .sort((a, b) => b.length - a.length);
-  return normalized.reduce((out, name) => out.split(name).join(' '), normalizeForGrounding(text));
+  return normalized.reduce((out, name) => {
+    const bounded = new RegExp(`(?<![A-Za-z0-9])${escapeRegExp(name)}(?![A-Za-z0-9])`, 'gu');
+    return out.replace(bounded, ' ');
+  }, normalizeForGrounding(text));
 }
 
 export type IntroLabelResolution =

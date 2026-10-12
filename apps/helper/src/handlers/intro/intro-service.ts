@@ -146,6 +146,10 @@ export function createIntroService(deps: IntroServiceDeps): Required<IntroServic
     const selection = await engine.select();
     if (selection === null) return { ok: false, reason: 'no_service' };
     if (fix && drafts.get(jobSnapshotId) !== held) return { ok: false, reason: 'no_draft' };
+    // 修正結果只能寫在草稿產生前那份已存自介上：之後被改過就注定寫不進去，不呼叫模型、不耗額度
+    if (held && !sameIntro(repos.applicationIntros.get(jobSnapshotId), held.before)) {
+      return { ok: false, reason: 'draft_intro_changed' };
+    }
     const inputs = { jobSnapshot, profile: profile(), claims };
     const { draft } = held ?? {};
     const feedback = draft

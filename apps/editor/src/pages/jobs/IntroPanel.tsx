@@ -142,13 +142,18 @@ export function IntroPanel({
             </button>
             <button
               type="button"
-              disabled={locked || draftBox.dirty || !confirmed}
+              disabled={locked || draftBox.dirty || box.dirty || !confirmed}
               onClick={() => void state.fix()}
             >
               請 AI 修正
             </button>
           </div>
-          {box.dirty ? <p>已存的自介有尚未儲存的修改：先儲存或重新載入，才能儲存草稿。</p> : null}
+          {box.dirty ? (
+            <p>
+              已存的自介有尚未儲存的修改：先儲存或重新載入，才能儲存草稿或請 AI
+              修正（修正結果會取代已存的自介）。
+            </p>
+          ) : null}
           {draftBox.dirty ? <p>草稿有尚未儲存的修改：先儲存草稿，才能請 AI 修正。</p> : null}
         </section>
       ) : null}
