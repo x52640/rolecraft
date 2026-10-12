@@ -1,30 +1,26 @@
-import type { ApplicationIntro, IntroCheckView, IntroGenerationView } from '@rolecraft/contracts';
+import type {
+  ApplicationIntro,
+  BridgeResponseOf,
+  IntroCheckView,
+  IntroDraft,
+} from '@rolecraft/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
-import { INTRO_PROBLEM_LABELS, generationFailureText, introFailureText } from './intro-labels.ts';
+import {
+  INTERRUPTED_TEXT,
+  INTRO_PROBLEM_LABELS,
+  generationFailureOf,
+  introFailureText,
+  type IntroBusy,
+  type IntroPollOptions,
+} from './intro-labels.ts';
 
-export interface IntroPollOptions {
-  /** 輪詢間隔（毫秒） */
-  readonly intervalMs: number;
-  /** 最多輪詢幾次；用完仍在產生就停止並提示 */
-  readonly maxPolls: number;
-}
+/** 一個編輯框：內容與是否有未儲存的修改。 */
+type Box = { readonly text: string; readonly dirty: boolean };
+const clean = (text = ''): Box => ({ text, dirty: false });
 
-export const DEFAULT_INTRO_POLL: IntroPollOptions = { intervalMs: 3000, maxPolls: 60 };
-
-/** 產生中途 helper 重開（狀態只在記憶體），輪詢拿到 null。 */
-export const INTERRUPTED_TEXT =
-  '產生中斷：本機輔助程式可能重新啟動，沒有拿到結果。請再按一次產生。';
-
-/** 進行中的 helper 請求；一次只允許一個，進行中鎖住編輯框與所有按鈕。 */
-export type IntroBusy = 'loading' | 'generating' | 'saving' | 'copying' | 'reloading';
-
-interface Loaded {
-  readonly intro: ApplicationIntro | null;
-  readonly check: IntroCheckView | null;
-  readonly generation: IntroGenerationView | null;
-}
+type Loaded = Extract<BridgeResponseOf<'intro.get'>, { ok: true }>;
 
 /**
  * 單一職缺快照的投遞自介：讀取、要求產生（輪詢最近一次產生狀態）、編輯、儲存（helper 重跑檢查）、
@@ -32,14 +28,17 @@ interface Loaded {
  * - 任何對 helper 的請求進行中（busy 不為 null），編輯框與按鈕一律鎖住，一次只允許一個請求。
  * - 單一編輯版本號：編輯框內容每次改變（使用者輸入、套用 helper 的內容、儲存成功）都加一；
  *   請求送出時記下版本號，回來時版本號已變就作廢，不套用、不複製。
+ * 未通過檢查的草稿（P1-T071）另有自己的編輯框（draftText），同樣受上述鎖定與版本號保護；草稿不能複製，
+ * 儲存通過檢查才成為正式自介，「請 AI 修正」＝帶 fix 的產生。
  * 沒有任何送出（D7）：自介只存在本機，由使用者複製後自行貼到求職網站。
  */
 export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
   const bridge = useBridge();
   const [intro, setIntro] = useState<ApplicationIntro | null>(null);
   const [check, setCheck] = useState<IntroCheckView | null>(null);
-  const [text, setText] = useState('');
-  const [dirty, setDirty] = useState(false);
+  const [box, setBox] = useState(clean());
+  const [draft, setDraft] = useState<IntroDraft | null>(null);
+  const [draftBox, setDraftBox] = useState(clean());
   const [busy, setBusyState] = useState<IntroBusy | null>('loading');
   const [version, setVersionState] = useState(0);
   const [failure, setFailure] = useState<string | null>(null);
@@ -55,10 +54,7 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     busyRef.current = next;
     setBusyState(next);
   };
-  const bump = () => {
-    versionRef.current += 1;
-    setVersionState(versionRef.current);
-  };
+  const bump = () => setVersionState(++versionRef.current);
   /** 開始一個請求，回傳它的 token；已有請求進行中就不開始（回 null）。 */
   const begin = (kind: IntroBusy): number | null => {
     if (busyRef.current !== null) return null;
@@ -92,19 +88,22 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     return response;
   }, [bridge, jobSnapshotId]);
 
-  /** 套用 helper 的已儲存內容到編輯框（新版本）。 */
-  const applyLoaded = (loaded: Loaded) => {
-    setIntro(loaded.intro);
-    setCheck(loaded.check);
-    setText(loaded.intro?.text ?? '');
-    setDirty(false);
-    bump();
+  /** 套用 helper 的已存自介到編輯框（呼叫端負責 bump）。 */
+  const applyIntro = (next: ApplicationIntro | null, nextCheck: IntroCheckView | null) => {
+    setIntro(next);
+    setCheck(nextCheck);
+    setBox(clean(next?.text));
   };
-
-  const showFailure = (generation: IntroGenerationView | null) => {
-    if (generation?.state === 'failed' && generation.failure) {
-      setFailure(generationFailureText(generation.failure, generation.problem));
-    }
+  /** 套用 helper 的未通過草稿到草稿編輯框（呼叫端負責 bump）。 */
+  const applyDraft = (next: IntroDraft | null) => {
+    setDraft(next);
+    setDraftBox(clean(next?.text));
+  };
+  /** 套用 helper 的已儲存內容（自介與草稿）到編輯框（新版本）。 */
+  const applyLoaded = (loaded: Loaded) => {
+    applyIntro(loaded.intro, loaded.check);
+    applyDraft(loaded.draft ?? null);
+    bump();
   };
 
   const waitForResult = (remaining: number, sentAt: number, token: number) => {
@@ -125,7 +124,10 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
             applyLoaded(loaded);
             setNotice('已產生投遞自介。請檢查、對照引用後再複製。');
           } else {
-            showFailure(generation ?? null);
+            setFailure((prev) => generationFailureOf(generation) ?? prev);
+            // 檢查不通過的輸出成為新的草稿；其他失敗沿用 helper 上的草稿（修正可再按）
+            applyDraft(loaded.draft ?? null);
+            bump();
           }
         }
         end(token);
@@ -150,7 +152,7 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
         return;
       }
       // 離開期間已結束的失敗也要顯示原因
-      showFailure(loaded.generation);
+      setFailure((prev) => generationFailureOf(loaded.generation) ?? prev);
       end(token);
     });
     return () => {
@@ -161,11 +163,13 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     // 只在切換職缺（fetchIntro 改變）時讀取一次
   }, [fetchIntro]);
 
-  async function generate() {
+  /** fix：「請 AI 修正」目前的草稿（使用者按下才送，不自動重試）。 */
+  async function generate(fix = false) {
     const token = begin('generating');
     if (token === null) return;
     const sentAt = versionRef.current;
-    const response = await bridge.send({ op: 'intro.generate', payload: { jobSnapshotId } });
+    const payload = fix ? { jobSnapshotId, fix } : { jobSnapshotId };
+    const response = await bridge.send({ op: 'intro.generate', payload });
     if (!current(token)) return;
     if (!response.ok) {
       setFailure(introFailureText(response));
@@ -175,20 +179,34 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     waitForResult(poll.maxPolls, sentAt, token);
   }
 
-  async function save() {
+  // 儲存（helper 重跑檢查）。draft＝儲存草稿上的修改（P1-T071），通過才成為正式自介；沒通過就重讀，
+  // helper 保留了這次的修改才套用（看得到新的問題），否則保留畫面上的修改。
+  async function save(target: 'intro' | 'draft' = 'intro') {
     const token = begin('saving');
     if (token === null) return;
     const sentAt = versionRef.current;
-    const response = await bridge.send({ op: 'intro.update', payload: { jobSnapshotId, text } });
+    const toDraft = target === 'draft';
+    const sent = toDraft ? draftBox.text : box.text;
+    const payload = { jobSnapshotId, text: sent, ...(toDraft ? { draft: true } : {}) };
+    const response = await bridge.send({ op: 'intro.update', payload });
     if (!current(token)) return;
     if (!response.ok) {
+      const loaded = toDraft ? await fetchIntro() : undefined;
+      if (!current(token)) return;
+      if (loaded?.draft?.text === sent && versionRef.current === sentAt) {
+        applyDraft(loaded.draft);
+        bump();
+      }
       setFailure(introFailureText(response));
     } else if (versionRef.current === sentAt) {
-      setIntro(response.intro);
-      setCheck(response.check);
-      setDirty(false);
+      applyIntro(response.intro, response.check);
+      if (toDraft) applyDraft(null);
       bump(); // 儲存成功也是新版本：先前的確認（例如重新載入的警告）失效
-      setNotice('已儲存（只存在本機，不會送出），並重新檢查。');
+      setNotice(
+        toDraft
+          ? '草稿通過檢查，已存成正式自介（只存在本機，不會送出）。請對照引用後再複製。'
+          : '已儲存（只存在本機，不會送出），並重新檢查。',
+      );
     }
     end(token);
   }
@@ -212,7 +230,7 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     const token = begin('copying');
     if (token === null) return;
     const sentAt = versionRef.current;
-    const shown = text;
+    const shown = box.text;
     try {
       const loaded = await fetchIntro();
       if (!current(token) || !loaded || versionRef.current !== sentAt) return;
@@ -221,13 +239,14 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
         setFailure('找不到已儲存的自介：請重新產生。');
         return;
       }
-      if (dirty) {
+      if (box.dirty) {
         setFailure('有尚未儲存的修改：儲存後會重新檢查，通過才能複製。');
         return;
       }
       if (fresh.text !== shown) {
-        // 已儲存的內容在別處變了（另一頁編輯、逾時後才產生完成）；沒有未存修改就同步成新內容
-        applyLoaded(loaded);
+        // 已儲存的內容在別處變了（另一頁編輯、逾時後才產生完成）；沒有未存修改就同步成新內容（草稿不動）
+        applyIntro(fresh, loaded.check);
+        bump();
         setNotice('已儲存的自介在別處有變更，已更新為最新內容：請確認後再按一次複製。');
         return;
       }
@@ -252,24 +271,29 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     }
   }
 
+  /** 使用者輸入；請求進行中鎖住編輯。 */
+  const edit = (set: (next: Box) => void) => (next: string) => {
+    if (busyRef.current !== null) return;
+    set({ text: next, dirty: true });
+    bump();
+  };
+
   return {
     intro,
     check,
-    text,
-    setText: (next: string) => {
-      if (busyRef.current !== null) return; // 請求進行中鎖住編輯
-      setText(next);
-      setDirty(true);
-      bump();
-    },
-    dirty,
+    box,
+    setText: edit(setBox),
+    draft,
+    draftBox,
+    setDraftText: edit(setDraftBox),
     busy,
-    generating: busy === 'generating',
     version,
     failure,
     notice,
-    generate,
-    save,
+    generate: () => generate(),
+    fix: () => generate(true),
+    save: () => save(),
+    saveDraft: () => save('draft'),
     copy,
     reload,
   };

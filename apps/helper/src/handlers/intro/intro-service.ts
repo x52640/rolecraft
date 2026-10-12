@@ -5,6 +5,8 @@
 // - 通過檢查才寫入；寫入前快照必須仍是當時那份確認、自介仍是當時那份（使用者期間改過就不覆蓋）。
 // - 讀取與儲存編輯時，依目前的事實項重跑檢查（check-view.ts）；R1 類不通過時編輯器停用複製，
 //   承諾字眼只提示（D25）。沒有任何送出功能（D7）。
+// - 檢查不通過的輸出保留成未通過草稿（drafts.ts，只在記憶體，P1-T071）：使用者可修改後儲存，或按「請 AI 修正」
+//   帶問題回饋重寫一次（fix；寫入前比對的是草稿產生前的已存自介）。重新產生（非修正）時先捨棄舊草稿。
 import {
   type ApplicationIntro,
   type IntroCheckView,
@@ -25,6 +27,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { GenerationEngine } from '../resume/generation.ts';
 import type { ClaimGate } from '../sources/claim-gate.ts';
 import { introCheckView } from './check-view.ts';
+import { holdDraft, sameIntro, saveDraft, type HeldDraft } from './drafts.ts';
 import type { GenerateIntroResult, IntroRefusal, IntroService } from './service.ts';
 
 export interface IntroServiceDeps {
@@ -53,15 +56,14 @@ function failedView(result: Extract<IntroRunResult, { ok: false }>): IntroGenera
   return { state: 'failed', failure: result.failure, problem: result.problem };
 }
 
-const sameIntro = (a: ApplicationIntro | null, b: ApplicationIntro | null) =>
-  JSON.stringify(a) === JSON.stringify(b);
-
 export function createIntroService(deps: IntroServiceDeps): Required<IntroService> {
   const { db, repos, engine } = deps;
   const makeId = deps.newId ?? storageId;
   const now = deps.now ?? Date.now;
+  const iso = () => new Date(now()).toISOString();
   const gate = deps.gate ?? null;
   const generations = new Map<string, IntroGenerationView>();
+  const drafts = new Map<string, HeldDraft>();
   const starting = new Map<string, Promise<GenerateIntroResult>>();
 
   async function currentClaims() {
@@ -76,8 +78,15 @@ export function createIntroService(deps: IntroServiceDeps): Required<IntroServic
     return profiles.length === 1 ? confirmedProfile(profiles[0]) : null;
   }
 
+  /** 已確認職缺快照的公司名稱與職稱（名稱裡的數字只在名稱內算有出處）；未確認不給。 */
+  function jobNames(jobSnapshotId: string): string[] {
+    const snapshot = repos.jobSnapshots.get(jobSnapshotId);
+    if (!snapshot || snapshot.confirmedAt === null) return [];
+    return [snapshot.fields.company, snapshot.fields.title];
+  }
+
   async function checkOf(intro: ApplicationIntro): Promise<IntroCheckView> {
-    return introCheckView(intro, await currentClaims(), profile());
+    return introCheckView(intro, await currentClaims(), profile(), jobNames(intro.jobSnapshotId));
   }
 
   /** 通過檢查的結果在同一交易寫入；快照或自介在產生期間變了就不寫。 */
@@ -100,28 +109,54 @@ export function createIntroService(deps: IntroServiceDeps): Required<IntroServic
         jobSnapshotId: id,
         text: result.text,
         citations: [...result.citations],
-        generatedAt: new Date(now()).toISOString(),
+        generatedAt: iso(),
         userEdited: false,
       });
       return SUCCEEDED;
     });
   }
 
-  async function begin(jobSnapshotId: string): Promise<GenerateIntroResult> {
+  /** 產生結束：成功寫入就捨棄草稿；檢查不通過把輸出留成新的草稿；其他失敗保留原草稿（修正可再按）。 */
+  function settleDrafts(
+    prepared: PreparedIntro,
+    before: ApplicationIntro | null,
+    result: IntroRunResult,
+    view: IntroGenerationView,
+  ) {
+    const id = prepared.jobSnapshotId;
+    if (view.state === 'succeeded') drafts.delete(id);
+    else if (!result.ok && result.draft) {
+      drafts.set(id, holdDraft(result.draft, before, prepared.snapshotConfirmedAt, iso()));
+    }
+  }
+
+  async function begin(jobSnapshotId: string, fix: boolean): Promise<GenerateIntroResult> {
     const current = generations.get(jobSnapshotId);
     if (current?.state === 'running') return { ok: true, generation: current };
     const jobSnapshot = repos.jobSnapshots.get(jobSnapshotId);
     if (!jobSnapshot) return { ok: false, reason: 'not_found' };
     if (jobSnapshot.confirmedAt === null) return { ok: false, reason: 'snapshot_not_confirmed' };
+    const held = fix ? drafts.get(jobSnapshotId) : undefined;
+    if (fix && !held) return { ok: false, reason: 'no_draft' };
+    if (held && held.snapshotConfirmedAt !== jobSnapshot.confirmedAt) {
+      return { ok: false, reason: 'draft_stale' };
+    }
     const claims = await currentClaims();
     if (usableClaims(claims).length === 0) return { ok: false, reason: 'no_usable_claims' };
     const selection = await engine.select();
     if (selection === null) return { ok: false, reason: 'no_service' };
+    if (fix && drafts.get(jobSnapshotId) !== held) return { ok: false, reason: 'no_draft' };
     const inputs = { jobSnapshot, profile: profile(), claims };
-    const prepared = prepareIntro(jobSnapshotId, inputs, selection.budget, makeId);
+    const { draft } = held ?? {};
+    const feedback = draft
+      ? { previous: draft.text, problem: draft.problem, fragments: draft.fragments }
+      : null;
+    const prepared = prepareIntro(jobSnapshotId, inputs, selection.budget, makeId, feedback);
     if (!prepared.ok) return { ok: false, reason: PREPARE_REFUSALS[prepared.reason] };
 
-    const before = repos.applicationIntros.get(jobSnapshotId);
+    // 修正：寫入前比對草稿產生前的已存自介（不蓋掉使用者之後的修改）；重新產生：捨棄舊草稿
+    const before = held ? held.before : repos.applicationIntros.get(jobSnapshotId);
+    if (!held) drafts.delete(jobSnapshotId);
     generations.set(jobSnapshotId, RUNNING);
     const settle = (view: IntroGenerationView) => {
       generations.set(jobSnapshotId, view);
@@ -137,17 +172,23 @@ export function createIntroService(deps: IntroServiceDeps): Required<IntroServic
         return Promise.resolve();
       },
     })
-      .then((result) => commit(prepared.prepared, before, result))
+      .then((result) => {
+        const view = commit(prepared.prepared, before, result);
+        settleDrafts(prepared.prepared, before, result, view);
+        return view;
+      })
       .then(settle, () => settle({ state: 'failed', failure: 'provider_error', problem: null }));
     return { ok: true, generation: RUNNING };
   }
 
   return {
-    generate(jobSnapshotId) {
+    generate(jobSnapshotId, options) {
       // 同時按兩次：共用同一次啟動，不會送兩次
       let pending = starting.get(jobSnapshotId);
       if (!pending) {
-        pending = begin(jobSnapshotId).finally(() => starting.delete(jobSnapshotId));
+        pending = begin(jobSnapshotId, options?.fix === true).finally(() =>
+          starting.delete(jobSnapshotId),
+        );
         starting.set(jobSnapshotId, pending);
       }
       return pending;
@@ -160,11 +201,22 @@ export function createIntroService(deps: IntroServiceDeps): Required<IntroServic
         intro,
         check: intro ? await checkOf(intro) : null,
         generation: generations.get(jobSnapshotId) ?? null,
+        draft: drafts.get(jobSnapshotId)?.draft ?? null,
       };
     },
 
-    async update(jobSnapshotId, text) {
+    async update(jobSnapshotId, text, options) {
       if (!repos.jobSnapshots.get(jobSnapshotId)) return { ok: false, reason: 'not_found' };
+      if (options?.draft) {
+        if (generations.get(jobSnapshotId)?.state === 'running') {
+          return { ok: false, reason: 'generation_running' };
+        }
+        const saveDeps = { db, repos, drafts, claims: currentClaims, profile, jobNames, now: iso };
+        const result = await saveDraft(saveDeps, jobSnapshotId, text);
+        // 草稿成為正式自介：先前「產生沒通過」的狀態已不適用
+        if (result.ok) generations.delete(jobSnapshotId);
+        return result;
+      }
       const current = repos.applicationIntros.get(jobSnapshotId);
       if (!current) return { ok: false, reason: 'no_intro' };
       const intro =

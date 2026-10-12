@@ -10,7 +10,7 @@ import { estimateTokens, fitsBudget, type InputBudget } from '@rolecraft/domain'
 
 import { usableClaims } from '../generation/prepare.ts';
 import { assembleIntroPrompt } from './prompt.ts';
-import type { IntroInputs } from './types.ts';
+import type { IntroFeedback, IntroInputs } from './types.ts';
 
 export type IntroPrepareFailure =
   | 'snapshot_missing' // 職缺快照不存在或格式不符
@@ -27,6 +27,8 @@ export interface PreparedIntro {
   readonly claims: readonly Claim[];
   /** 已確認的個人資料；沒有為 null */
   readonly profile: Profile | null;
+  /** 已確認職缺快照的公司名稱與職稱（名稱裡的數字只在名稱內算有出處） */
+  readonly jobNames: readonly string[];
 }
 
 export type PrepareIntroResult =
@@ -44,6 +46,8 @@ export function prepareIntro(
   inputs: IntroInputs,
   budget: InputBudget,
   newId: () => string,
+  /** 「請 AI 修正」（P1-T071）：上一版草稿與問題，一起放進提示、一起算預算 */
+  feedback: IntroFeedback | null = null,
 ): PrepareIntroResult {
   const snapshot = JobSnapshot.safeParse(inputs.jobSnapshot);
   if (!snapshot.success || snapshot.data.id !== jobSnapshotId) {
@@ -54,7 +58,10 @@ export function prepareIntro(
   const claims = usableClaims(inputs.claims);
   if (claims.length === 0) return { ok: false, reason: 'no_usable_claims' };
   const profile = confirmedProfile(inputs.profile);
-  const prompt = assembleIntroPrompt({ job: snapshot.data.fields, claims, profile }, newId);
+  const prompt = assembleIntroPrompt(
+    { job: snapshot.data.fields, claims, profile, feedback },
+    newId,
+  );
   const estimatedTokens = estimateTokens(prompt);
   if (!fitsBudget(estimatedTokens, budget)) return { ok: false, reason: 'over_budget' };
   return {
@@ -66,6 +73,7 @@ export function prepareIntro(
       estimatedTokens,
       claims,
       profile,
+      jobNames: [snapshot.data.fields.company, snapshot.data.fields.title],
     },
   };
 }

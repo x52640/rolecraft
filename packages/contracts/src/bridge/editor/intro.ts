@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 import { ApplicationIntro, IntroProblem } from '../../entities/application-intro.ts';
 import { ClaimType, CompletionStatus } from '../../entities/claim.ts';
-import { Id } from '../../entities/common.ts';
-import { StatedCompletion } from '../../entities/resume-version.ts';
+import { Id, Timestamp } from '../../entities/common.ts';
+import { ClaimCitation, StatedCompletion } from '../../entities/resume-version.ts';
 import { bridgeOp, OpaqueId } from '../common.ts';
 import { withFailure } from '../operations.ts';
 
@@ -85,18 +85,47 @@ export const IntroCheckView = z.strictObject({
 });
 export type IntroCheckView = z.infer<typeof IntroCheckView>;
 
+/** 未通過草稿標出的問題片段上限（筆數、每筆字元）。 */
+export const INTRO_DRAFT_FRAGMENTS = { max: 20, maxChars: 200 } as const;
+
+/**
+ * 沒通過檢查的模型輸出（P1-T071）：不是已存自介、不能複製；只存在 helper 記憶體（重開後消失）。
+ * 使用者可在草稿上修改並儲存（照常重跑檢查，通過才成為正式自介），或按「請 AI 修正」帶問題回饋重寫一次。
+ * fragments 是問題片段（例如沒有出處的數字），取自草稿文字本身，只是資料。
+ */
+export const IntroDraft = z.strictObject({
+  text: z.string(),
+  /** 模型列出且存在、不重複的引用（儲存草稿時用它重跑檢查） */
+  citations: z.array(ClaimCitation),
+  /** 未通過的原因（含承諾字眼：草稿源自模型，整份照模型內容的規則檢查） */
+  problem: IntroProblem,
+  fragments: z
+    .array(z.string().min(1).max(INTRO_DRAFT_FRAGMENTS.maxChars))
+    .max(INTRO_DRAFT_FRAGMENTS.max),
+  /** 這份草稿產生（或最近一次儲存）的時間 */
+  generatedAt: Timestamp,
+});
+export type IntroDraft = z.infer<typeof IntroDraft>;
+
 const JobRef = z.strictObject({ jobSnapshotId: OpaqueId });
 
 export const INTRO_SCHEMAS = {
   /**
    * 使用者按下才觸發：在背景產生投遞自介，立即回覆（執行中）。已有執行中的就回同一個狀態、不重送。
    * 快照未確認、沒有可用事實項、沒有選定且可用的模型、超過輸入預算回 invalid_request，不呼叫模型。
+   * fix 為 true＝「請 AI 修正」（P1-T071）：把目前未通過草稿與它的問題回饋給模型重寫一次；沒有草稿回 invalid_request。
    */
   'intro.generate': {
-    request: bridgeOp('intro.generate', JobRef),
+    request: bridgeOp(
+      'intro.generate',
+      z.strictObject({ jobSnapshotId: OpaqueId, fix: z.boolean().optional() }),
+    ),
     response: withFailure(z.strictObject({ ok: z.literal(true), generation: IntroGenerationView })),
   },
-  /** 最近一份自介、其檢查結果與最近一次產生狀態；沒有自介時 intro、check 為 null。 */
+  /**
+   * 最近一份自介、其檢查結果與最近一次產生狀態；沒有自介時 intro、check 為 null。
+   * draft：最近一次沒通過檢查的草稿（P1-T071；沒有時為 null，舊版 helper 不帶）。
+   */
   'intro.get': {
     request: bridgeOp('intro.get', JobRef),
     response: withFailure(
@@ -105,14 +134,23 @@ export const INTRO_SCHEMAS = {
         intro: ApplicationIntro.nullable(),
         check: IntroCheckView.nullable(),
         generation: IntroGenerationView.nullable(),
+        draft: IntroDraft.nullable().optional(),
       }),
     ),
   },
-  /** 儲存使用者編輯（只存檔、不送出），回傳重跑後的檢查結果。沒有自介時回 invalid_request。 */
+  /**
+   * 儲存使用者編輯（只存檔、不送出），回傳重跑後的檢查結果。沒有自介時回 invalid_request。
+   * draft 為 true：儲存未通過草稿上的修改（P1-T071），通過檢查（含承諾字眼）才成為正式自介並回傳；
+   * 沒通過回 invalid_request，修改保留在草稿上（重新讀取可看到新的問題）。
+   */
   'intro.update': {
     request: bridgeOp(
       'intro.update',
-      z.strictObject({ jobSnapshotId: OpaqueId, text: z.string().max(INTRO_EDIT_MAX_CHARS) }),
+      z.strictObject({
+        jobSnapshotId: OpaqueId,
+        text: z.string().max(INTRO_EDIT_MAX_CHARS),
+        draft: z.boolean().optional(),
+      }),
     ),
     response: withFailure(
       z.strictObject({ ok: z.literal(true), intro: ApplicationIntro, check: IntroCheckView }),

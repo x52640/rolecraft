@@ -103,7 +103,13 @@ async function generated(env: Env): Promise<unknown> {
 describe('intro.generate／intro.get', () => {
   it('合格自介：存檔、可取回、檢查通過；R6 紀錄照存', async () => {
     const env = open(() => GOOD);
-    expect(await env.send(get)).toEqual({ ok: true, intro: null, check: null, generation: null });
+    expect(await env.send(get)).toEqual({
+      ok: true,
+      intro: null,
+      check: null,
+      generation: null,
+      draft: null,
+    });
     expect(await generated(env)).toEqual({
       ok: true,
       intro: {
@@ -129,6 +135,7 @@ describe('intro.generate／intro.get', () => {
         ],
       },
       generation: { state: 'succeeded', failure: null, problem: null },
+      draft: null,
     });
     expect(env.repos.runCheckRecords.listByProvider('claude')).toHaveLength(1);
     expect(env.engine.prompts[0]).not.toContain('金流串接');
@@ -153,6 +160,8 @@ describe('intro.generate／intro.get', () => {
       intro: null,
       check: null,
       generation: { state: 'failed', failure: 'check_failed', problem },
+      // P1-T071：沒通過的輸出保留成草稿（不存檔、不能複製）
+      draft: expect.objectContaining({ problem }) as unknown,
     });
     expect(env.repos.applicationIntros.get(JOB)).toBeNull();
   });
@@ -300,5 +309,180 @@ describe('對抗驗證與擁有者裁定（D25）', () => {
         ],
       },
     });
+  });
+});
+
+describe('未通過草稿（P1-T071）', () => {
+  const BAD = json('載入時間縮短 40%，服務 12 萬名使用者。');
+  const saveDraft = (text: string) => ({
+    op: 'intro.update',
+    payload: { jobSnapshotId: JOB, text, draft: true },
+  });
+  const fix = { op: 'intro.generate', payload: { jobSnapshotId: JOB, fix: true } };
+
+  /** 第一次回 first，之後依序回 rest（用完重複最後一個）。 */
+  function scripted(...steps: FakeStep[]) {
+    let i = 0;
+    return () => steps[Math.min(i++, steps.length - 1)] as FakeStep;
+  }
+
+  async function fixed(env: Env): Promise<unknown> {
+    const done = env.settled();
+    expect(await env.send(fix)).toMatchObject({ ok: true, generation: { state: 'running' } });
+    await done;
+    return env.send(get);
+  }
+
+  it('沒通過：草稿可見（文字、問題、問題片段），不存成自介', async () => {
+    const env = open(() => BAD);
+    expect(await generated(env)).toMatchObject({
+      intro: null,
+      check: null,
+      generation: { state: 'failed', failure: 'check_failed', problem: 'number_not_grounded' },
+      draft: {
+        text: '載入時間縮短 40%，服務 12 萬名使用者。',
+        citations: [{ claimId: 'c-metric' }],
+        problem: 'number_not_grounded',
+        fragments: [expect.stringContaining('12') as unknown],
+      },
+    });
+    expect(env.repos.applicationIntros.get(JOB)).toBeNull();
+  });
+
+  it('在草稿上修改並儲存：通過才成為正式自介（經使用者編輯），草稿與失敗狀態清掉', async () => {
+    const env = open(() => BAD);
+    await generated(env);
+    expect(await env.send(saveDraft('載入時間縮短 40%，期待貢獻所長。'))).toMatchObject({
+      ok: true,
+      intro: { text: '載入時間縮短 40%，期待貢獻所長。', userEdited: true },
+      check: { problem: null },
+    });
+    expect(await env.send(get)).toMatchObject({ generation: null, draft: null });
+    expect(env.engine.prompts).toHaveLength(1);
+  });
+
+  it('儲存草稿仍沒通過：invalid_request，不存檔；修改與新的問題留在草稿上', async () => {
+    const env = open(() => BAD);
+    await generated(env);
+    expect(await env.send(saveDraft('載入時間縮短 40%，服務 99 人。'))).toMatchObject(INVALID);
+    expect(env.repos.applicationIntros.get(JOB)).toBeNull();
+    expect(await env.send(get)).toMatchObject({
+      draft: { text: '載入時間縮短 40%，服務 99 人。', problem: 'number_not_grounded' },
+    });
+  });
+
+  it('草稿源自模型：儲存時承諾字眼照樣擋（不是只提示）', async () => {
+    const env = open(() => BAD);
+    await generated(env);
+    expect(await env.send(saveDraft('載入時間縮短 40%，薪資面議。'))).toMatchObject(INVALID);
+    expect(await env.send(get)).toMatchObject({
+      intro: null,
+      draft: { problem: 'commits_salary' },
+    });
+  });
+
+  it('請 AI 修正：使用者按才送，把草稿與問題回饋給模型；修正後合格就存成自介', async () => {
+    const env = open(scripted(BAD, GOOD));
+    await generated(env);
+    expect(await fixed(env)).toMatchObject({
+      intro: { text: expect.stringContaining('40%') as unknown, userEdited: false },
+      generation: { state: 'succeeded' },
+      draft: null,
+    });
+    expect(env.engine.prompts).toHaveLength(2);
+    const prompt = env.engine.prompts[1] ?? '';
+    expect(prompt).toContain('<<<DATA PREVIOUS_DRAFT');
+    expect(prompt).toContain('服務 12 萬名使用者');
+    expect(prompt).toContain('<<<DATA PROBLEM_FRAGMENTS');
+    expect(prompt).toContain('上一版沒有通過檢查：有數字沒有出處');
+    expect(env.engine.prompts[0]).not.toContain('PREVIOUS_DRAFT');
+  });
+
+  it('請 AI 修正後仍沒通過：換成新的草稿；沒有草稿時回 invalid_request，不呼叫模型', async () => {
+    const empty = open(() => GOOD);
+    expect(await empty.send(fix)).toMatchObject(INVALID);
+    expect(empty.engine.prompts).toHaveLength(0);
+
+    const env = open(scripted(BAD, json('載入時間縮短 40%，服務 77 人。')));
+    await generated(env);
+    expect(await fixed(env)).toMatchObject({
+      intro: null,
+      draft: { text: '載入時間縮短 40%，服務 77 人。', problem: 'number_not_grounded' },
+    });
+  });
+
+  it('草稿產生後已存自介被使用者改過：儲存草稿不覆蓋', async () => {
+    const env = open(scripted(GOOD, BAD));
+    await generated(env);
+    await generated(env); // 重新產生沒通過 → 草稿；已存自介仍是第一份
+    await env.send(update('我自己改寫的版本，載入時間縮短 40%。'));
+    expect(await env.send(saveDraft('載入時間縮短 40%。'))).toMatchObject({
+      ...INVALID,
+      error: { message: expect.stringContaining('不蓋掉') as unknown },
+    });
+    expect(env.repos.applicationIntros.get(JOB)).toMatchObject({
+      text: '我自己改寫的版本，載入時間縮短 40%。',
+    });
+  });
+
+  it('草稿產生後快照被修改並重新確認：不能修正、也不能存成自介', async () => {
+    const env = open(() => BAD);
+    await generated(env);
+    env.repos.jobSnapshots.save(snapshot({ confirmedAt: '2026-10-12T09:00:00.000Z' }));
+    expect(await env.send(fix)).toMatchObject(INVALID);
+    expect(await env.send(saveDraft('載入時間縮短 40%。'))).toMatchObject(INVALID);
+    expect(env.repos.applicationIntros.get(JOB)).toBeNull();
+    expect(env.engine.prompts).toHaveLength(1);
+  });
+
+  it('重新產生（不是修正）先捨棄舊草稿；產生中不能儲存草稿', async () => {
+    let release: () => void = () => undefined;
+    const hold = new Promise<void>((resolve) => (release = resolve));
+    let calls = 0;
+    const env = open(async () => {
+      calls += 1;
+      if (calls === 2) await hold;
+      return calls === 1 ? BAD : GOOD;
+    });
+    await generated(env);
+    const done = env.settled();
+    await env.send(generate);
+    expect(await env.send(get)).toMatchObject({ draft: null });
+    expect(await env.send(saveDraft('載入時間縮短 40%。'))).toMatchObject(INVALID);
+    release();
+    await done;
+    expect(await env.send(get)).toMatchObject({ intro: { userEdited: false }, draft: null });
+  });
+});
+
+describe('公司名稱裡的數字（P1-T071）', () => {
+  const named = (env: Env, confirmedAt?: string | null) => {
+    const base = snapshot();
+    env.repos.jobSnapshots.save({
+      ...base,
+      fields: { ...base.fields, company: '104資訊科技' },
+      ...(confirmedAt === undefined ? {} : { confirmedAt }),
+    });
+  };
+
+  it('產生的自介寫到公司名稱（含數字）可以通過；名稱外的同一個數字不行', async () => {
+    const env = open(() => json('您好，應徵104資訊科技，曾讓載入時間縮短 40%。'));
+    named(env);
+    expect(await generated(env)).toMatchObject({
+      intro: { text: expect.stringContaining('104資訊科技') as unknown },
+      check: { problem: null },
+      generation: { state: 'succeeded' },
+    });
+    expect(await env.send(update('載入時間縮短 40%，服務 104 位使用者。'))).toMatchObject({
+      check: { problem: 'number_not_grounded' },
+    });
+  });
+
+  it('快照之後取消確認：名稱裡的數字不再算有出處', async () => {
+    const env = open(() => json('您好，應徵104資訊科技，曾讓載入時間縮短 40%。'));
+    named(env);
+    await generated(env);
+    named(env, null);
+    expect(await env.send(get)).toMatchObject({ check: { problem: 'number_not_grounded' } });
   });
 });

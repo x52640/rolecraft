@@ -8,9 +8,11 @@
  * 4. 不承諾面試時間、薪資、到職日，不寫聯絡方式（沿用 messages/commitments.ts）：D25 擁有者裁定只擋模型產生的
  *    內容（introCommitmentWarning，由 run.ts 套用）；使用者編輯後只提示，不算 checkIntro 的問題。
  * 5. 最後再過 domain 的 R1 匯出前檢查（當成一段生成段落、引用不可移除）。
+ * 沒通過時另可取出問題片段（沒有出處的網址、數字、倍數詞），標在未通過的草稿上（P1-T071）。
  * 職缺公司、職稱可以出現（自介對象本來就是它）。
  */
 import {
+  INTRO_DRAFT_FRAGMENTS,
   INTRO_MAX_CHARS,
   introLength,
   type Claim,
@@ -38,6 +40,20 @@ export interface IntroCheckContext {
   readonly claims: readonly Claim[];
   /** 已確認的個人資料；沒有或未確認傳 null（數字就只認引用的事實項） */
   readonly profile: Profile | null;
+  /**
+   * 已確認職缺快照的公司名稱與職稱（沒有或未確認就不給）：自介裡出現的這兩段文字整段不算數字，
+   * 名稱裡的數字（例如「104」）因此有出處；名稱以外的同一個數字仍要有出處。
+   */
+  readonly jobNames?: readonly string[];
+}
+
+/** 把自介中出現的公司名稱、職稱整段換成空白（正規化後比對，長的先換）；只用於數字檢查。 */
+export function withoutJobNames(text: string, names: readonly string[] = []): string {
+  const normalized = names
+    .map((name) => normalizeForGrounding(name).trim())
+    .filter((name) => name.length > 0)
+    .sort((a, b) => b.length - a.length);
+  return normalized.reduce((out, name) => out.split(name).join(' '), normalizeForGrounding(text));
 }
 
 export type IntroLabelResolution =
@@ -101,25 +117,39 @@ function citedClaims(
   return cited;
 }
 
-function groundingProblem(
+interface GroundingIssue {
+  readonly problem: IntroCheckProblem;
+  /** 沒有出處的片段（網址、數字、倍數詞；取自自介文字，P1-T071 標在草稿上） */
+  readonly fragments: readonly string[];
+}
+
+function groundingIssue(
   raw: string,
   cited: readonly Claim[],
-  profile: Profile | null,
-): IntroCheckProblem | null {
+  ctx: IntroCheckContext,
+): GroundingIssue | null {
+  const { profile } = ctx;
   const rawSources = cited.flatMap((c) => [c.text, c.basis.userConfirmation?.text ?? '']);
   const urls = new Set(rawSources.flatMap(fullUrls));
-  if (fullUrls(raw).some((url) => !urls.has(url))) return 'link_not_grounded';
+  const badUrls = fullUrls(raw).filter((url) => !urls.has(url));
+  if (badUrls.length > 0) return { problem: 'link_not_grounded', fragments: badUrls };
   const loose = new Set(rawSources.flatMap(extractLooseUrls));
-  if (extractLooseUrls(raw).some((url) => !loose.has(url))) return 'link_not_grounded';
+  const badLoose = extractLooseUrls(raw).filter((url) => !loose.has(url));
+  if (badLoose.length > 0) return { problem: 'link_not_grounded', fragments: badLoose };
   const text = normalizeForGrounding(raw);
   const sources = rawSources.map(normalizeForGrounding);
   const numberSources = [...sources, ...profileTexts(profile).map(normalizeForGrounding)];
   const keys = numberKeys(numberSources.join('\n'));
-  for (const token of extractNumbers(text)) {
-    if (token.key === null || !keys.has(token.key)) return 'number_not_grounded';
+  const numberText = withoutJobNames(raw, ctx.jobNames);
+  const badNumbers = extractNumbers(numberText).filter((t) => t.key === null || !keys.has(t.key));
+  if (badNumbers.length > 0) {
+    return { problem: 'number_not_grounded', fragments: badNumbers.map((t) => t.text) };
   }
   const multipliers = new Set(sources.flatMap(extractMultipliers));
-  if (extractMultipliers(text).some((m) => !multipliers.has(m))) return 'multiplier_not_grounded';
+  const badMultipliers = extractMultipliers(text).filter((m) => !multipliers.has(m));
+  if (badMultipliers.length > 0) {
+    return { problem: 'multiplier_not_grounded', fragments: badMultipliers };
+  }
   return null;
 }
 
@@ -138,7 +168,8 @@ function exportCheckPasses(
   const section = {
     id: 'intro',
     origin: 'generated' as const,
-    text,
+    // 公司名稱、職稱整段先拿掉：名稱裡的數字不算（R1 數字檢查與 groundingIssue 一致）
+    text: withoutJobNames(text, ctx.jobNames),
     citations: [...citations],
     sectionConfirmation: null,
     generatedCitations: [...citations],
@@ -166,7 +197,46 @@ export function checkIntro(
   if (introLength(text) > INTRO_MAX_CHARS) return 'too_long';
   const cited = citedClaims(citations, ctx.claims);
   if (typeof cited === 'string') return cited;
-  const grounding = groundingProblem(text, cited, ctx.profile);
-  if (grounding) return grounding;
+  const grounding = groundingIssue(text, cited, ctx);
+  if (grounding) return grounding.problem;
   return exportCheckPasses(text, citations, ctx) ? null : 'export_check_failed';
+}
+
+/** 模型內容的檢查（D25）：checkIntro 之外，承諾字眼與聯絡方式也整份不採用。未通過草稿儲存時也用它（P1-T071）。 */
+export function checkModelIntro(
+  text: string,
+  citations: readonly ClaimCitation[],
+  ctx: IntroCheckContext,
+): IntroProblem | null {
+  return checkIntro(text, citations, ctx) ?? introCommitmentWarning(text);
+}
+
+/** 問題片段（P1-T071）：只有問題是網址、數字、倍數詞沒有出處時有；去重、限制筆數與長度。 */
+export function introProblemFragments(
+  text: string,
+  citations: readonly ClaimCitation[],
+  ctx: IntroCheckContext,
+  problem: IntroProblem,
+): string[] {
+  const cited = citedClaims(citations, ctx.claims);
+  if (typeof cited === 'string') return [];
+  const issue = groundingIssue(text, cited, ctx);
+  if (issue?.problem !== problem) return [];
+  const { fragments } = issue;
+  const { max, maxChars } = INTRO_DRAFT_FRAGMENTS;
+  return [...new Set(fragments.map((f) => [...f].slice(0, maxChars).join('').trim()))]
+    .filter((f) => f.length > 0)
+    .slice(0, max);
+}
+
+/** 草稿用的引用：只留存在、不重複的本機編號（resolveIntroLabels 失敗時也要能保留草稿）。 */
+export function lenientIntroLabels(output: IntroOutput, claims: readonly Claim[]): ClaimCitation[] {
+  const byLabel = new Map(claims.map((claim, i) => [claimLabel(i), claim]));
+  const citations: ClaimCitation[] = [];
+  for (const { claim: label, statedCompletion } of output.citations) {
+    const claim = byLabel.get(label);
+    if (!claim || citations.some((c) => c.claimId === claim.id)) continue;
+    citations.push({ claimId: claim.id, ...(statedCompletion ? { statedCompletion } : {}) });
+  }
+  return citations;
 }

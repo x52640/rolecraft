@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // P1-T064 投遞自介（D25、D7）：產生、失敗原因、編輯後重跑檢查與複製停用、重新產生前確認覆寫。
-import type { ApplicationIntro } from '@rolecraft/contracts';
+import type { ApplicationIntro, BridgeRequest, IntroDraft } from '@rolecraft/contracts';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StrictMode, createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -12,7 +12,7 @@ import {
   sampleSnapshot,
   type FakeBridge,
 } from './fake-bridge.test-helpers.ts';
-import { INTERRUPTED_TEXT } from './useIntro.ts';
+import { INTERRUPTED_TEXT } from './intro-labels.ts';
 import { IntroPanel } from './IntroPanel.tsx';
 
 afterEach(cleanup);
@@ -470,5 +470,215 @@ describe('codex 第四輪：操作 token、取消舊輪詢、重檢更新中繼�
     fireEvent.click(button('重新產生投遞自介'));
     expect((await screen.findByRole('alert')).textContent).toContain('覆蓋你編輯過的自介');
     expect(ops(fake, 'intro.generate')).toHaveLength(0);
+  });
+});
+
+describe('未通過草稿（P1-T071）', () => {
+  const DRAFT_TEXT = '載入時間縮短 40%，服務 12 萬名使用者。';
+  const FIXED = '載入時間縮短 40%，期待貢獻所長。';
+  const DRAFT: IntroDraft = {
+    text: DRAFT_TEXT,
+    citations: [{ claimId: 'c-metric' }],
+    problem: 'number_not_grounded',
+    fragments: ['12'],
+    generatedAt: '2026-10-12T01:00:00.000Z',
+  };
+
+  interface Drafts {
+    draft: IntroDraft | null;
+    saves: string[];
+    /** 儲存草稿的回覆（模擬 helper）；預設通過並成為正式自介 */
+    saveReply: (text: string, fake: FakeBridge) => unknown;
+  }
+
+  const passSave = (text: string, fake: FakeBridge, drafts: Drafts) => {
+    fake.intro = saved({ text, userEdited: true });
+    fake.introCheck = passingCheck(text);
+    fake.generation = null;
+    drafts.draft = null;
+    return { ok: true, intro: fake.intro, check: fake.introCheck };
+  };
+
+  /** 在假 bridge 外包一層：intro.get 帶草稿、intro.update（draft）走 saveReply。 */
+  function setupDraft(prepare: (fake: FakeBridge, drafts: Drafts) => void = () => undefined) {
+    const drafts: Drafts = {
+      draft: null,
+      saves: [],
+      saveReply: (text, fake) => passSave(text, fake, drafts),
+    };
+    const fake = setup(true, (f) => {
+      prepare(f, drafts);
+      const inner = f.transport;
+      f.transport = {
+        send: async (request: BridgeRequest) => {
+          const req = request as { op: string; payload: { text?: string; draft?: boolean } };
+          if (req.op === 'intro.update' && req.payload.draft === true) {
+            f.requests.push(req);
+            drafts.saves.push(req.payload.text ?? '');
+            return drafts.saveReply(req.payload.text ?? '', f);
+          }
+          const response = (await inner.send(request)) as Record<string, unknown>;
+          return req.op === 'intro.get' && response.ok === true
+            ? { ...response, draft: drafts.draft }
+            : response;
+        },
+      };
+    });
+    return { fake, drafts };
+  }
+
+  const draftBox = () => screen.findByLabelText<HTMLTextAreaElement>('未通過的草稿（可編輯）');
+
+  it('產生沒通過：顯示草稿、問題與問題位置，標明不能複製（沒有複製按鈕）', async () => {
+    const { fake, drafts } = setupDraft();
+    fireEvent.click(await screen.findByRole('button', { name: '產生投遞自介' }));
+    await screen.findByText(/產生中/);
+    drafts.draft = DRAFT;
+    fake.generation = { state: 'failed', failure: 'check_failed', problem: 'number_not_grounded' };
+    expect((await draftBox()).value).toBe(DRAFT_TEXT);
+    expect(screen.getByRole('heading', { name: '未通過檢查的草稿（不能複製）' })).toBeTruthy();
+    expect(screen.getByTestId('intro-draft-problem').textContent).toContain('找不到');
+    expect(screen.getByTestId('intro-draft-fragments').textContent).toContain('「12」');
+    const marked = screen.getByTestId('intro-draft-marked');
+    expect(marked.querySelector('mark')?.textContent).toBe('12');
+    expect(marked.textContent).toBe(DRAFT_TEXT);
+    expect(screen.queryByRole('button', { name: /複製/ })).toBeNull();
+    expect(screen.queryByLabelText('投遞自介（可編輯）')).toBeNull();
+  });
+
+  it('在草稿上修改並儲存：helper 檢查通過就成為正式自介，可以複製', async () => {
+    const { fake, drafts } = setupDraft((_f, d) => (d.draft = DRAFT));
+    const box = await draftBox();
+    expect(button('儲存草稿並重新檢查')).toHaveProperty('disabled', true);
+    fireEvent.change(box, { target: { value: FIXED } });
+    fireEvent.click(button('儲存草稿並重新檢查'));
+    await screen.findByText(/草稿通過檢查，已存成正式自介/);
+    expect(drafts.saves).toEqual([FIXED]);
+    expect(ops(fake, 'intro.update')[0]?.payload).toMatchObject({ text: FIXED, draft: true });
+    const official = await screen.findByLabelText<HTMLTextAreaElement>('投遞自介（可編輯）');
+    expect(official.value).toBe(FIXED);
+    expect(screen.queryByLabelText('未通過的草稿（可編輯）')).toBeNull();
+    expect(button('複製自介')).toHaveProperty('disabled', false);
+  });
+
+  it('儲存草稿仍沒通過：顯示原因，草稿換成這次的修改與新的問題位置', async () => {
+    const { drafts } = setupDraft((_f, d) => {
+      d.draft = DRAFT;
+      d.saveReply = (text) => {
+        d.draft = { ...DRAFT, text, fragments: ['99'] };
+        return { ok: false, error: { code: 'invalid_request', message: '草稿仍沒有通過檢查' } };
+      };
+    });
+    fireEvent.change(await draftBox(), { target: { value: '載入時間縮短 40%，服務 99 人。' } });
+    fireEvent.click(button('儲存草稿並重新檢查'));
+    expect((await screen.findByRole('alert')).textContent).toContain('草稿仍沒有通過檢查');
+    await waitFor(() =>
+      expect(screen.getByTestId('intro-draft-marked').querySelector('mark')?.textContent).toBe(
+        '99',
+      ),
+    );
+    expect((await draftBox()).value).toBe('載入時間縮短 40%，服務 99 人。');
+    expect(button('儲存草稿並重新檢查')).toHaveProperty('disabled', true);
+    expect(drafts.saves).toHaveLength(1);
+  });
+
+  it('請 AI 修正：按了才送（帶 fix），有未儲存的草稿修改時停用；修正成功顯示正式自介', async () => {
+    const { fake } = setupDraft((_f, d) => (d.draft = DRAFT));
+    const box = await draftBox();
+    expect(ops(fake, 'intro.generate')).toHaveLength(0);
+    fireEvent.change(box, { target: { value: `${DRAFT_TEXT}改` } });
+    expect(button('請 AI 修正')).toHaveProperty('disabled', true);
+    fireEvent.change(box, { target: { value: DRAFT_TEXT } });
+    fireEvent.click(button('儲存草稿並重新檢查')); // 回到原文也算修改：存一次讓它乾淨
+    await screen.findByText(/已存成正式自介/);
+    expect(ops(fake, 'intro.generate')).toHaveLength(0);
+  });
+
+  it('請 AI 修正送出 fix，產生成功後草稿消失、顯示正式自介', async () => {
+    const { fake, drafts } = setupDraft((_f, d) => (d.draft = DRAFT));
+    await draftBox();
+    fireEvent.click(button('請 AI 修正'));
+    await screen.findByText(/產生中/);
+    expect(ops(fake, 'intro.generate')[0]?.payload).toEqual({ jobSnapshotId: 'job-1', fix: true });
+    fake.intro = saved({ text: FIXED });
+    fake.introCheck = passingCheck(FIXED);
+    drafts.draft = null;
+    fake.generation = { state: 'succeeded', failure: null, problem: null };
+    const official = await screen.findByLabelText<HTMLTextAreaElement>('投遞自介（可編輯）');
+    await waitFor(() => expect(official.value).toBe(FIXED));
+    expect(screen.queryByLabelText('未通過的草稿（可編輯）')).toBeNull();
+  });
+
+  it('草稿儲存期間鎖住：編輯框與所有按鈕停用，打字不會改內容', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    setupDraft((f, d) => {
+      d.draft = DRAFT;
+      d.saveReply = (text) =>
+        new Promise((resolve) => {
+          release = () => resolve(passSave(text, f, d));
+        });
+    });
+    const box = await draftBox();
+    fireEvent.change(box, { target: { value: FIXED } });
+    fireEvent.click(button('儲存草稿並重新檢查'));
+    await waitFor(() => expect(box).toHaveProperty('disabled', true));
+    fireEvent.change(box, { target: { value: '偷改' } });
+    expect(box.value).toBe(FIXED);
+    expect(button('請 AI 修正')).toHaveProperty('disabled', true);
+    expect(button('產生投遞自介')).toHaveProperty('disabled', true);
+    release(undefined);
+    await screen.findByText(/已存成正式自介/);
+  });
+
+  it('草稿有未儲存修改時重新產生：先要求確認', async () => {
+    const { fake } = setupDraft((_f, d) => (d.draft = DRAFT));
+    fireEvent.change(await draftBox(), { target: { value: FIXED } });
+    fireEvent.click(button('產生投遞自介'));
+    expect((await screen.findByRole('alert')).textContent).toContain('捨棄草稿上的修改');
+    expect(ops(fake, 'intro.generate')).toHaveLength(0);
+    fireEvent.click(button('產生投遞自介'));
+    await waitFor(() => expect(ops(fake, 'intro.generate')).toHaveLength(1));
+  });
+
+  it('已存自介有未儲存修改時，不能儲存草稿（避免蓋掉）', async () => {
+    setupDraft((f, d) => {
+      f.intro = saved();
+      f.introCheck = passingCheck(TEXT);
+      d.draft = DRAFT;
+    });
+    fireEvent.change(await screen.findByLabelText('投遞自介（可編輯）'), {
+      target: { value: `${TEXT}改` },
+    });
+    fireEvent.change(await draftBox(), { target: { value: FIXED } });
+    expect(button('儲存草稿並重新檢查')).toHaveProperty('disabled', true);
+    expect(screen.getByText(/先儲存或重新載入，才能儲存草稿/)).toBeTruthy();
+  });
+
+  it('StrictMode 下初次讀取跑兩次：草稿只顯示一份、可以編輯', async () => {
+    const fake = fakeBridge([sampleSnapshot({ confirmedAt: '2026-10-11T01:02:03.000Z' })]);
+    render(
+      createElement(
+        StrictMode,
+        null,
+        createElement(BridgeProvider, {
+          transport: {
+            send: async (request: BridgeRequest) => {
+              const response = (await fake.transport.send(request)) as Record<string, unknown>;
+              return request.op === 'intro.get' ? { ...response, draft: DRAFT } : response;
+            },
+          },
+          children: createElement(IntroPanel, {
+            jobSnapshotId: 'job-1',
+            confirmed: true,
+            poll: POLL,
+          }),
+        }),
+      ),
+    );
+    const box = await draftBox();
+    await waitFor(() => expect(box).toHaveProperty('disabled', false));
+    expect(screen.getAllByLabelText('未通過的草稿（可編輯）')).toHaveLength(1);
+    fireEvent.change(box, { target: { value: FIXED } });
+    expect(box.value).toBe(FIXED);
   });
 });

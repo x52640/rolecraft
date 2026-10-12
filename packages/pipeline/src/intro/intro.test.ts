@@ -132,7 +132,9 @@ describe('執行與檢查', () => {
     ['承諾到職日', json('載入時間縮短 40%，可立刻到職。'), 'commits_start_date'],
   ])('%s：不採用並回原因', async (_name, text, problem) => {
     const { result } = await run({ text });
-    expect(result).toEqual({ ok: false, failure: 'check_failed', problem });
+    // P1-T071：沒通過也回草稿（文字與問題），由呼叫端保留給使用者看
+    expect(result).toMatchObject({ ok: false, failure: 'check_failed', problem });
+    expect(!result.ok && result.draft?.problem).toBe(problem);
   });
 
   it('剛好 300 字可以；使用者確認完成的可寫成已完成；個人資料的年份算依據', async () => {
@@ -205,6 +207,6 @@ describe('對抗驗證修正', () => {
 
   it('模型只輸出零寬字元：不採用', async () => {
     const { result } = await run({ text: json('\u200B') });
-    expect(result).toEqual({ ok: false, failure: 'check_failed', problem: 'empty' });
+    expect(result).toMatchObject({ ok: false, failure: 'check_failed', problem: 'empty' });
   });
 });

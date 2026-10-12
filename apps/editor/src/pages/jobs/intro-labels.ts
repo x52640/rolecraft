@@ -3,13 +3,30 @@ import type {
   ClaimType,
   CompletionStatus,
   IntroGenerationFailure,
+  IntroGenerationView,
   IntroProblem,
   StatedCompletion,
 } from '@rolecraft/contracts';
 
 import { helperUnavailableText } from '../../bridge/helper-busy.ts';
 
-/** 投遞自介（P1-T064）顯示用文字（繁體中文）。 */
+/** 投遞自介（P1-T064）顯示用文字（繁體中文），以及 useIntro 的輪詢設定與請求種類。 */
+
+export interface IntroPollOptions {
+  /** 輪詢間隔（毫秒） */
+  readonly intervalMs: number;
+  /** 最多輪詢幾次；用完仍在產生就停止並提示 */
+  readonly maxPolls: number;
+}
+
+export const DEFAULT_INTRO_POLL: IntroPollOptions = { intervalMs: 3000, maxPolls: 60 };
+
+/** 進行中的 helper 請求；一次只允許一個，進行中鎖住編輯框與所有按鈕。 */
+export type IntroBusy = 'loading' | 'generating' | 'saving' | 'copying' | 'reloading';
+
+/** 產生中途 helper 重開（狀態只在記憶體），輪詢拿到 null。 */
+export const INTERRUPTED_TEXT =
+  '產生中斷：本機輔助程式可能重新啟動，沒有拿到結果。請再按一次產生。';
 
 export const INTRO_PROBLEM_LABELS: Record<IntroProblem, string> = {
   empty: '自介是空白的',
@@ -71,6 +88,12 @@ export function generationFailureText(
   const base = INTRO_FAILURE_LABELS[failure];
   const detail = problem ? `：${INTRO_PROBLEM_LABELS[problem]}` : '';
   return `${base}${detail}。可以改寫或重新產生。`;
+}
+
+/** 最近一次產生失敗的說明；不是失敗回 null。 */
+export function generationFailureOf(generation: IntroGenerationView | null | undefined) {
+  if (generation?.state !== 'failed' || !generation.failure) return null;
+  return generationFailureText(generation.failure, generation.problem);
 }
 
 /** 橋接失敗給人看的說明；訊息本身是 helper／service worker 的固定文字。 */

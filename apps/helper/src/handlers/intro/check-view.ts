@@ -31,11 +31,13 @@ export function introCheckView(
   intro: ApplicationIntro,
   all: readonly Claim[],
   profile: Profile | null,
+  /** 已確認職缺快照的公司名稱與職稱；快照未確認時不給 */
+  jobNames: readonly string[] = [],
 ): IntroCheckView {
   const usable = usableClaims(all);
   return {
     length: introLength(intro.text),
-    problem: checkIntro(intro.text, intro.citations, { claims: usable, profile }),
+    problem: checkIntro(intro.text, intro.citations, { claims: usable, profile, jobNames }),
     warning: introCommitmentWarning(intro.text),
     citations: citedView(intro, all, usable),
   };

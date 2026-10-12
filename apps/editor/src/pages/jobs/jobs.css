@@ -102,3 +102,28 @@
   padding: 0.25rem 0.5rem;
   border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
 }
+
+/* 未通過檢查的草稿（P1-T071）：和正式自介分開、標明不能複製。 */
+.job-intro-draft {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px dashed #c62828;
+  border-radius: 6px;
+}
+
+.job-intro-draft h4 {
+  margin: 0;
+  color: #c62828;
+}
+
+.job-intro-draft-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.job-intro-draft mark {
+  background: color-mix(in srgb, #c62828 20%, transparent);
+  color: inherit;
+  text-decoration: underline wavy #c62828;
+}
