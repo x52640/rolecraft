@@ -32,16 +32,22 @@ export function ProfilePhotoPanel() {
     // 只在掛載時讀取一次；之後由各按鈕重新讀取
   }, []);
 
+  /** 重新讀取（受區塊鎖保護；過期回應作廢）。 */
+  const reload =
+    <R,>(fetch: () => Promise<R>, apply: (res: R) => void) =>
+    () => {
+      const token = lock.begin('loading');
+      if (token === null) return;
+      void fetch().then((res) => {
+        if (!current(token)) return;
+        apply(res);
+        end(token);
+      });
+    };
   /** 照片狀態不明或服務未接上時重新讀取（只讀照片）。 */
-  const reloadPhoto = () => {
-    const token = lock.begin('loading');
-    if (token === null) return;
-    void fetchPhoto().then((res) => {
-      if (!current(token)) return;
-      applyPhoto(res);
-      end(token);
-    });
-  };
+  const reloadPhoto = reload(fetchPhoto, applyPhoto);
+  /** 個人資料讀取失敗、沒有或服務未接上時重新讀取（codex 審查：helper 恢復後不必離開再開頁）。 */
+  const reloadProfile = reload(fetchProfile, applyProfile);
 
   const locked = lock.busy !== null;
   const photoKey = photo.state.kind === 'ready' ? (photo.state.current?.photo.id ?? 'none') : '';
@@ -55,6 +61,7 @@ export function ProfilePhotoPanel() {
         state={profile.state}
         locked={locked}
         onCopy={(key) => void profile.copy(key)}
+        onReload={reloadProfile}
       />
       {profile.message !== null ? (
         <p aria-live="polite" className="resume-notice">

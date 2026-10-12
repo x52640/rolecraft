@@ -5,13 +5,25 @@ interface Props {
   readonly state: ProfileState;
   readonly locked: boolean;
   readonly onCopy: (key: string) => void;
+  readonly onReload: () => void;
 }
 
-/** 已確認個人資料的各欄與「複製」按鈕（P1-T085）；沒有或多份 Profile 時顯示原因。 */
-export function ProfileCopyList({ state, locked, onCopy }: Props) {
+/**
+ * 已確認個人資料的各欄與「複製」按鈕（P1-T085）；沒有、多份 Profile 或讀取失敗時顯示原因，
+ * 並可重新讀取（codex 審查：逾時、連不上後 helper 恢復不必離開再開頁）。
+ */
+export function ProfileCopyList({ state, locked, onCopy, onReload }: Props) {
   if (state.kind === 'loading') return <p>讀取個人資料中…</p>;
-  if (state.kind === 'none') return <p className="resume-hint">{PROFILE_TEXT.none}</p>;
-  if (state.kind === 'blocked') return <p className="resume-hint">{state.message}</p>;
+  if (state.kind === 'none' || state.kind === 'blocked') {
+    return (
+      <>
+        <p className="resume-hint">{state.kind === 'none' ? PROFILE_TEXT.none : state.message}</p>
+        <button type="button" disabled={locked} onClick={onReload}>
+          重新讀取個人資料
+        </button>
+      </>
+    );
+  }
   return (
     <>
       {profileGroups(state.profile).map((group) => (

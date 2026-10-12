@@ -76,9 +76,13 @@ npm run verify
 - [ ] 變更全在 write_paths 內
 - [ ] 中斷／接手紀錄與完成結果已回填
 
+## codex 審查待修
+
+- [x] `ProfileCopyList.tsx`：初次 `profile.get` 逾時或 helper_unavailable 時只顯示錯誤、沒有重試方式，helper 恢復後也無法再讀，要離開再開頁。加「重新讀取個人資料」按鈕（受同一把區塊鎖保護，鎖定與 token 作廢規則照舊）
+
 ## 中斷／接手紀錄
 
-- 最後完成：區塊實作＋測試（worker，2026-10-12）
+- 最後完成：codex 審查 1 項已修（個人資料讀取失敗可重試）
 - 已通過驗證：`npm run verify` 綠（Vitest 3830 通過、13 略過）
 - 下一步：協調者收官（範圍稽核、codex review）
 - Blocker：無
@@ -91,4 +95,5 @@ npm run verify
 - 照片 `usePhoto`＋`PhotoManager`：縮圖（data URI）＋尺寸；更換／刪除先顯示 D19 說明、確認後才送（更換確認後才開選取器）；`photo.pick` 非 selected（取消、busy、失敗、逾時）與 `photo.remove` 失敗後一律重讀 `photo.get` 顯示實際狀態；`photo.get` 為 not_implemented 時顯示「服務尚未接上」提示、只留「重新讀取照片」
 - 測試：`ProfileCopy.test.ts`（8：一致才複製且內容＝讀回值、不一致更新畫面再按才複製、整份比對、讀回 null、逾時、無／多份／未實作三種原因、鎖與卸載作廢；StrictMode 下跑）、`PhotoManager.test.ts`（10：加入、加入前發現已有照片、更換確認與取消、選取視窗取消不變動、刪除確認、逾時以 photo.get 為準、刪除失敗、未實作提示兩種、狀態不明可重讀）；測試替身 `profile.test-helpers.ts`
 - 保守選擇：(1) 比對整份 Profile 而非單欄（任何欄位變了都先更新畫面）；(2) 「加入照片」送出前先重讀 `photo.get`，本機已有照片就不開選取器、改走更換確認，避免未經 D19 確認就換掉舊照片；(3) 取消與 busy 也重讀 `photo.get`；(4) 技能合成一段以「、」分隔複製（規格沒說逐項或整段）；任職期間複製為「起 – 迄／至今」；(5) 空白欄位不能複製；(6) 照片狀態不明（逾時、連不上）時不提供加入／更換／刪除，只能重新讀取
+- codex 審查修正：`ProfileCopyList` 在沒有 Profile、多份、未實作、讀取失敗（逾時、連不上）時都顯示「重新讀取個人資料」，由 `ProfilePhotoPanel` 的 `reload`（與重新讀取照片共用）送出，受同一把區塊鎖、token 作廢規則不變；新增 3 個測試（逾時／連不上後恢復可讀可複製、重讀中鎖住區塊且卸載後作廢），修前重現失敗
 - 殘餘：P1-T086 的 `copy/copy-context.ts` 全域 store 未動（範圍外；本 Task 已能改 `ResumesPage.tsx`，之後可改成由頁面傳 props）；personalInfo 欄位順序依 helper 回傳的鍵順序；縮圖 data URI 是否受擴充功能頁 CSP 影響未在真實 Chrome 實測（MV3 預設 CSP 不限 img-src，待 P1-T083 後端到端確認）

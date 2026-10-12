@@ -147,3 +147,37 @@ describe('個人資料複製（P1-T085）', () => {
     expect(writeText).not.toHaveBeenCalled();
   });
 });
+
+const retryButton = () =>
+  screen.findByRole<HTMLButtonElement>('button', { name: '重新讀取個人資料' });
+
+describe('個人資料讀取失敗可重試（codex 審查）', () => {
+  it.each([
+    ['逾時', 'timeout'],
+    ['連不上', 'helper_unavailable'],
+  ])('%s：可重新讀取，helper 恢復後顯示內容並可複製', async (_name, code) => {
+    const helper = fakeHelper({ profileReplies: [fail(code)] });
+    renderPanel(helper);
+    const retry = await retryButton();
+    await waitFor(() => expect(retry.disabled).toBe(false));
+    helper.profileReplies = [{ ok: true, profile: sampleProfile() }];
+    fireEvent.click(retry);
+    await screen.findByText('甲公司');
+    fireEvent.click(copyButton('經歷 1的公司'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('甲公司'));
+  });
+
+  it('重新讀取進行中鎖住區塊；卸載後晚到的回應作廢', async () => {
+    const helper = fakeHelper({ profileReplies: [fail('timeout')] });
+    const view = renderPanel(helper);
+    const retry = await retryButton();
+    await waitFor(() => expect(retry.disabled).toBe(false));
+    helper.hold = 'profile.get';
+    fireEvent.click(retry);
+    await waitFor(() => expect(retry.disabled).toBe(true));
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: '加入照片' }).disabled).toBe(true);
+    view.unmount();
+    helper.release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+});
