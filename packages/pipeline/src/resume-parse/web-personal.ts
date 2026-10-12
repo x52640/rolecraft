@@ -50,6 +50,8 @@ export interface WebSplit {
    * 與上面的確認門檻分開（複審 2-1）。
    */
   readonly nameValues: readonly string[];
+  /** 姓 × 名的組合數超過上限（沒有組合、遮不全）：呼叫端一律拒絕送出（fail closed） */
+  readonly nameCombinationsOverLimit: boolean;
 }
 
 type Region = { label: string; level: number | null; remaining: number };
@@ -164,13 +166,15 @@ export function splitWebBlocks(blocks: readonly ImportWebBlock[]): WebSplit {
     }
     kept.push(block);
   }
+  const names = namesOf(chains);
   const nameValues = [...new Set(chains.filter((c) => c.name).map((c) => c.parts.join(' ')))];
   return {
     rows,
     kept,
     removed: secretsOf(chains),
-    labeledNames: namesOf(chains),
+    labeledNames: names.names,
     nameValues,
+    nameCombinationsOverLimit: names.overLimit,
   };
 }
 
@@ -192,19 +196,22 @@ function secretsOf(chains: readonly Chain[]): Secret[] {
 
 const atLeastTwo = (value: string) => [...normalizeForMatch(value)].length >= 2;
 
-/** 姓 × 名的組合上限（去重後）；超過就不組合，只用各自的值（複審 2-2，保守：可能因此 name_unconfirmed）。 */
+/**
+ * 姓 × 名的組合上限（去重後）。超過就不組合（避免字串爆量），組合後的姓名因此遮不到，
+ * prepareWebResumeParse 一律拒絕送出（name_parts_over_limit；複審 fail closed）。
+ */
 export const NAME_COMBINATIONS_MAX = 16;
 
-function namesOf(chains: readonly Chain[]): string[] {
+function namesOf(chains: readonly Chain[]): { names: string[]; overLimit: boolean } {
   const named = chains.filter((c) => c.name);
   const valuesOf = (part: ReturnType<typeof namePart>) => [
     ...new Set(named.filter((c) => namePart(c.label) === part).map((c) => c.parts.join(' '))),
   ];
   const family = valuesOf('family');
   const given = valuesOf('given');
-  const combined =
-    family.length * given.length > NAME_COMBINATIONS_MAX
-      ? []
-      : family.flatMap((f) => given.flatMap((g) => [f + g, `${f} ${g}`, `${g} ${f}`, g + f]));
-  return [...new Set([...valuesOf(null), ...combined])].filter(atLeastTwo);
+  const overLimit = family.length * given.length > NAME_COMBINATIONS_MAX;
+  const combined = overLimit
+    ? []
+    : family.flatMap((f) => given.flatMap((g) => [f + g, `${f} ${g}`, `${g} ${f}`, g + f]));
+  return { names: [...new Set([...valuesOf(null), ...combined])].filter(atLeastTwo), overLimit };
 }

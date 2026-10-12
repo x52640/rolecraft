@@ -42,6 +42,7 @@ expected_commit: "feat(P1-T078): pipeline：網頁區塊來源的去個資、提
 - 複審待修 2（2026-10-12，codex 複審修正 commit 8b78299，協調者寫入；fix commit 另提）：
   1. （個資，退步）名字欄位沒有對應姓氏欄位時，值被排除在 `knownNames` 外、失去別名拆分：「名字：雨晴／Rainy」＋姓名元素「林雨晴」＋段落「英文名 Rainy」→ 提示含 Rainy → 所有姓名部分的值（≥2 字的部分與依 ／ / ( 拆出的別名）一律加入遮蔽與別名抽取，與確認門檻分開；門檻照舊。
   2. （效能）姓／名組合是笛卡兒積且在去重前產生，近 2000 區塊的重複欄位可產生數百萬字串 → 組合前先去重，並限制組合數上限（超過時只用去重後的值、不組合）。
+- 複審待修 3（2026-10-12，codex 複審 7138c75，協調者寫入）：（個資）組合數超過上限時不組合，但另有完整姓名欄位／姓名元素／確認姓名時仍送出，略過的組合（「我是林晴」）沒遮 → 超過上限一律拒絕送出（fail closed）。
 
 ### 不包含
 
@@ -98,8 +99,8 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：2026-10-12 複審 2 第 2 輪修正（第四個 commit `fix(P1-T078): 複審 2 項（名字部分保留別名拆分、姓名組合去重）`，未 push）；之前：審查 6 項、複審 2 項
-- 已通過驗證：`npm run verify` 綠（Vitest 3865 通過、13 略過）；P1-T069 既有 resume-parse 測試全過、resume-import header-name 測試全過；104 fixture 粗略區塊模擬 0 項可疑
+- 最後完成：2026-10-12 複審 3 修正（第五個 commit `fix(P1-T078): 姓名組合超過上限時拒絕送出（複審）`，未 push）；之前：審查 6 項、複審 2 項、複審 2 第 2 輪
+- 已通過驗證：`npm run verify` 綠（Vitest 3867 通過、13 略過）；P1-T069 既有 resume-parse 測試全過、resume-import header-name 測試全過；104 fixture 粗略區塊模擬 0 項可疑
 - 下一步：協調者複審後收官（標 done）；helper 接線在 P1-T080
 - Blocker：無
 - write_paths 擴充理由（協調者 2026-10-12 指示）：審查 1 的英文別名結尾規則與 resume-import `headerNameAlias` 同一條，兩邊要同步，故加入 `packages/resume-import/src/draft/header-name.ts` 與其測試
@@ -131,4 +132,6 @@ npm run verify
 - 複審 2 第 2 輪修正（`web-name-paths.test.ts` 新增 3 項，共 29 項全過；修正前 2 項重現失敗）：
   1. `web-personal.ts` `WebSplit.nameValues`：所有姓名標籤的值（含只有姓或名的部分，去重）一律交給 `knownNames` 遮蔽與依 ／ / ( 拆別名；`labeledNames`（確認門檻：完整姓名或姓＋名合併、至少 2 字）照舊。
   2. `namesOf`：姓、名的值先去重再組合；去重後組合數（姓 × 名）超過 `NAME_COMBINATIONS_MAX`＝16 時不組合、只用各自的值（保守：此時若沒有完整姓名欄位、姓名元素或使用者確認，會回 name_unconfirmed，要使用者確認姓名）。1000 組不同姓／名欄位的 prepare 實測 16 ms、22 MB。
+- 複審 3 修正（`web-name-paths.test.ts` 新增 2 項，修正前 1 項重現失敗）：`splitWebBlocks` 回報 `nameCombinationsOverLimit`；`prepareWebResumeParse` 在姓 × 名（去重後）超過 `NAME_COMBINATIONS_MAX`＝16 時一律回 `name_parts_over_limit`，不論是否有完整姓名欄位、姓名元素或使用者確認（fail closed）。
+  - 保守選擇：新增 pipeline 內部的拒絕原因 `name_parts_over_limit`（不改 contracts）；沒用 `name_unconfirmed`，因為使用者確認姓名也解除不了，用它會讓匯入頁一直要求確認。P1-T080 接線時需把它對應到 `import.ai_parse` 的失敗（建議 invalid_request＋說明「姓／名欄位過多，請改用手動輸入」）。
 

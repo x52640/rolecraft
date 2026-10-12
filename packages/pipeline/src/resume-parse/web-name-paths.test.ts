@@ -128,3 +128,33 @@ describe('複審 2（2026-10-12）', () => {
     expect(big.labeledNames.length).toBeLessThan(5000);
   });
 });
+
+describe('姓名組合超過上限：一律拒絕送出（fail closed，複審 2026-10-12）', () => {
+  it('姓 5 種 × 名 4 種＋「姓名：王小明」→ 拒絕，「我是林晴」不會送出', () => {
+    const specs = [
+      ...['林', '王', '李', '陳', '張'].map((v) => lv('姓', v)),
+      ...['晴', '明', '華', '芳'].map((v) => lv('名', v)),
+      lv('姓名', '王小明'),
+      p('我是林晴，擅長門市營運。'),
+    ];
+    expect(prepare(specs)).toEqual({ ok: false, reason: 'name_parts_over_limit' });
+    expect(prepare(specs, ['王小明'])).toEqual({ ok: false, reason: 'name_parts_over_limit' });
+    const confirmed = prepareWebResumeParse(
+      inputsOf(specs, { confirmedNames: ['王小明'] }),
+      budget(1_000_000),
+      idSource(),
+    );
+    expect(confirmed).toEqual({ ok: false, reason: 'name_parts_over_limit' });
+  });
+
+  it('上限內照常組合遮蔽', () => {
+    const specs = [
+      ...['林', '王'].map((v) => lv('姓', v)),
+      ...['晴', '明'].map((v) => lv('名', v)),
+      p('我是林晴，擅長門市營運。'),
+    ];
+    const result = prepare(specs);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.prepared.prompt).not.toContain('林晴');
+  });
+});

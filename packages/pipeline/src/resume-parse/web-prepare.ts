@@ -1,5 +1,6 @@
 /**
  * 網頁來源 AI 整理的送出前準備（D28；resume-import「網頁來源的 AI 整理」）。任何一項不成立就不送出：
+ * - 姓 × 名欄位的組合數超過上限：一律不送（name_parts_over_limit）。
  * - 送出條件：本次頁面的姓名辨識出來（姓名元素文字，或姓名標籤的區塊值），或使用者在匯入頁確認了姓名；
  *   只有舊 Profile 的姓名不算（name_unconfirmed）。
  * - 本機先移除姓名與聯絡資料（web-personal.ts），其餘區塊遮蔽已知姓名（四個來源＋別名）、移除的值、
@@ -16,7 +17,12 @@ import { knownNames } from './web-names.ts';
 import { splitWebBlocks, type WebPersonalRow } from './web-personal.ts';
 import { assembleWebResumeParsePrompt } from './web-prompt.ts';
 
-export type WebResumeParsePrepareFailure = 'name_unconfirmed' | 'no_text' | 'over_budget';
+/**
+ * name_parts_over_limit：頁面上「姓」「名」欄位的值種類太多（組合數超過 NAME_COMBINATIONS_MAX），
+ * 組合後的姓名遮不全；不論其他姓名來源是否成立都不送（fail closed）。使用者確認姓名也不能解除，改走手動輸入。
+ */
+export type WebResumeParsePrepareFailure =
+  'name_unconfirmed' | 'name_parts_over_limit' | 'no_text' | 'over_budget';
 
 export interface PreparedWebResumeParse {
   readonly prompt: string;
@@ -47,6 +53,7 @@ export function prepareWebResumeParse(
   newId: () => string,
 ): PrepareWebResumeParseResult {
   const split = splitWebBlocks(inputs.blocks);
+  if (split.nameCombinationsOverLimit) return { ok: false, reason: 'name_parts_over_limit' };
   const pageNames = filled(inputs.pageNames);
   const confirmed = filled(inputs.confirmedNames);
   // 只有 2 字以上的姓名遮得到（redact.ts），單字姓名不算辨識或確認（複審 1）

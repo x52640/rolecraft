@@ -54,7 +54,12 @@ export type {
   WebSentLine,
 } from './types.ts';
 export { checkWebResumeParse, currentFromContext } from './web-check.ts';
-export { splitWebBlocks, type WebPersonalRow, type WebSplit } from './web-personal.ts';
+export {
+  NAME_COMBINATIONS_MAX,
+  splitWebBlocks,
+  type WebPersonalRow,
+  type WebSplit,
+} from './web-personal.ts';
 export {
   prepareWebResumeParse,
   type PreparedWebResumeParse,
