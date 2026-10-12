@@ -6,7 +6,7 @@ depends_on: ["P1-T066", "P1-T064"]
 specs: ["resume-import.md", "evidence-model.md", "providers.md", "bridge.md", "architecture.md"]
 track: resume-import
 primary_repo: rolecraft
-write_paths: ["packages/pipeline/src/resume-parse/", "packages/pipeline/src/index.ts", "packages/resume-import/src/", "packages/contracts/src/bridge/editor/import.ts", "packages/contracts/src/bridge/operations.ts", "packages/contracts/src/bridge/__fixtures__/editor-requests.ts", "packages/contracts/src/index.ts", "apps/helper/src/handlers/import/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "apps/editor/src/pages/import/", "apps/editor/src/bridge/", "docs/specs/resume-import.md", "docs/specs/bridge.md", "docs/adr/0006-contracts-interim-fields.md"]
+write_paths: ["packages/pipeline/src/resume-parse/", "packages/pipeline/src/index.ts", "packages/resume-import/src/", "packages/contracts/src/bridge/editor/import.ts", "packages/contracts/src/bridge/operations.ts", "packages/contracts/src/bridge/__fixtures__/editor-requests.ts", "packages/contracts/src/index.ts", "apps/helper/src/handlers/import/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "apps/editor/src/pages/import/", "apps/editor/src/bridge/", "docs/specs/resume-import.md", "docs/specs/bridge.md", "docs/adr/0006-contracts-interim-fields.md", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts"]
 contract_change: additive
 expected_commit: "feat(P1-T069): 履歷 PDF 用 AI 整理成欄位，逐欄照抄原文檢查，聯絡資料只在本機抽取"
 ---
