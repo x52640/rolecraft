@@ -3,15 +3,14 @@
 // - 輸入：已確認的職缺快照、唯一且已確認的個人資料、過來源關卡後可用的事實項（claim-gate.ts）。
 // - 執行經選定服務的 execute（訂閱檢查包裝，R5、R6 每次重做），R6 紀錄逐次保存。
 // - 通過檢查才寫入；寫入前快照必須仍是當時那份確認、自介仍是當時那份（使用者期間改過就不覆蓋）。
-// - 讀取與儲存編輯時，依目前的事實項重跑同一套檢查；不通過時編輯器停用複製。沒有任何送出功能（D7）。
+// - 讀取與儲存編輯時，依目前的事實項重跑檢查（check-view.ts）；R1 類不通過時編輯器停用複製，
+//   承諾字眼只提示（D25）。沒有任何送出功能（D7）。
 import {
-  introLength,
   type ApplicationIntro,
   type IntroCheckView,
   type IntroGenerationView,
 } from '@rolecraft/contracts';
 import {
-  checkIntro,
   confirmedProfile,
   prepareIntro,
   runIntro,
@@ -25,6 +24,7 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type { GenerationEngine } from '../resume/generation.ts';
 import type { ClaimGate } from '../sources/claim-gate.ts';
+import { introCheckView } from './check-view.ts';
 import type { GenerateIntroResult, IntroRefusal, IntroService } from './service.ts';
 
 export interface IntroServiceDeps {
@@ -77,9 +77,7 @@ export function createIntroService(deps: IntroServiceDeps): Required<IntroServic
   }
 
   async function checkOf(intro: ApplicationIntro): Promise<IntroCheckView> {
-    const claims = usableClaims(await currentClaims());
-    const problem = checkIntro(intro.text, intro.citations, { claims, profile: profile() });
-    return { length: introLength(intro.text), problem };
+    return introCheckView(intro, await currentClaims(), profile());
   }
 
   /** 通過檢查的結果在同一交易寫入；快照或自介在產生期間變了就不寫。 */

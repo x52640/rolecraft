@@ -5,11 +5,19 @@ import {
   type BridgeFailure,
   type IntroCheckView,
   type IntroGenerationView,
-  type IntroProblem,
   type JobSnapshot,
 } from '@rolecraft/contracts';
 
 import type { BridgeTransport } from '../../bridge/transport.ts';
+
+/** 測試用檢查結果：預設通過、沒有提示與引用。 */
+export const passingCheck = (text: string, over: Partial<IntroCheckView> = {}): IntroCheckView => ({
+  length: introLength(text),
+  problem: null,
+  warning: null,
+  citations: [],
+  ...over,
+});
 
 export const T_CONFIRM = '2026-10-11T01:02:03.000Z';
 
@@ -51,7 +59,9 @@ export interface FakeBridge {
   /** intro.generate 的回應覆寫（例如回 invalid_request）；沒給就標成執行中 */
   generateReply: unknown;
   /** intro.update 重跑檢查的假規則 */
-  checkText: (text: string) => IntroProblem | null;
+  checkText: (text: string) => IntroCheckView['problem'];
+  /** intro.update 的承諾字眼提示假規則 */
+  warnText: (text: string) => IntroCheckView['warning'];
 }
 
 const NOT_FOUND: BridgeFailure = {
@@ -69,6 +79,7 @@ export function fakeBridge(initial: JobSnapshot[] = []): FakeBridge {
     generation: null,
     generateReply: null,
     checkText: () => null,
+    warnText: () => null,
     transport: { send: (request) => Promise.resolve(handle(request as Req)) },
   };
   const find = (id: unknown) => fake.snapshots.find((s) => s.id === id);
@@ -125,7 +136,12 @@ export function fakeBridge(initial: JobSnapshot[] = []): FakeBridge {
         if (!fake.intro) return NOT_FOUND;
         const text = req.payload.text as string;
         fake.intro = { ...fake.intro, text, userEdited: true };
-        fake.introCheck = { length: introLength(text), problem: fake.checkText(text) };
+        fake.introCheck = {
+          length: introLength(text),
+          problem: fake.checkText(text),
+          warning: fake.warnText(text),
+          citations: fake.introCheck?.citations ?? [],
+        };
         return { ok: true, intro: fake.intro, check: fake.introCheck };
       }
       default:

@@ -12,7 +12,7 @@ import type {
 } from '@rolecraft/contracts';
 import type { RunOutcome } from '@rolecraft/providers';
 
-import { checkIntro, resolveIntroLabels } from './check.ts';
+import { checkIntro, introCommitmentWarning, resolveIntroLabels } from './check.ts';
 import { parseIntroOutput } from './output.ts';
 import type { PreparedIntro } from './prepare.ts';
 
@@ -70,7 +70,10 @@ export async function runIntro<S>(
   const resolved = resolveIntroLabels(parsed.output, prepared.claims);
   if (!resolved.ok) return failed('check_failed', resolved.problem);
   const context = { claims: prepared.claims, profile: prepared.profile };
-  const problem = checkIntro(parsed.output.intro, resolved.citations, context);
+  // 模型產生的內容：承諾字眼也整份不採用（D25）
+  const problem =
+    checkIntro(parsed.output.intro, resolved.citations, context) ??
+    introCommitmentWarning(parsed.output.intro);
   if (problem) return failed('check_failed', problem);
   return { ok: true, text: parsed.output.intro, citations: resolved.citations };
 }

@@ -18,7 +18,7 @@ import {
   profile,
   snapshot,
 } from '../generation/fixtures.test-helpers.ts';
-import { checkIntro } from './check.ts';
+import { checkIntro, introCommitmentWarning } from './check.ts';
 import { parseIntroOutput } from './output.ts';
 import { prepareIntro, type PreparedIntro } from './prepare.ts';
 import { runIntro } from './run.ts';
@@ -170,7 +170,10 @@ describe('使用者編輯後重跑檢查', () => {
     expect(checkIntro('載入時間縮短 40%，服務 3000 位使用者。', cited, ctx)).toBe(
       'number_not_grounded',
     );
-    expect(checkIntro('載入時間縮短 40%，明天就能面試。', cited, ctx)).toBe('commits_time');
+    // D25：使用者自己加的承諾字眼不算檢查問題，只另外提示
+    expect(checkIntro('載入時間縮短 40%，明天就能面試。', cited, ctx)).toBeNull();
+    expect(introCommitmentWarning('載入時間縮短 40%，明天就能面試。')).toBe('commits_time');
+    expect(introCommitmentWarning('載入時間縮短 40%。')).toBeNull();
     expect(checkIntro('   ', cited, ctx)).toBe('empty');
   });
 
@@ -187,5 +190,21 @@ describe('使用者編輯後重跑檢查', () => {
     const bad = { intro: 'x', citations: [{ claim: 'C1', statedCompletion: 'done' }] };
     expect(parseIntroOutput(JSON.stringify(bad)).ok).toBe(false);
     expect(parseIntroOutput('```json\n{"intro":"x","citations":[]}\n```').ok).toBe(true);
+  });
+});
+
+describe('對抗驗證修正', () => {
+  it.each([['\u200B\u200B'], ['\u200D\uFEFF\u2060'], ['\u3000\u200B']])(
+    '只有零寬／格式字元也算空白（%j）',
+    (text) => {
+      expect(
+        checkIntro(text, [{ claimId: 'claim-metric' }], { claims: CLAIMS, profile: null }),
+      ).toBe('empty');
+    },
+  );
+
+  it('模型只輸出零寬字元：不採用', async () => {
+    const { result } = await run({ text: json('\u200B') });
+    expect(result).toEqual({ ok: false, failure: 'check_failed', problem: 'empty' });
   });
 });

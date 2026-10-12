@@ -6,7 +6,13 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BridgeProvider } from '../../bridge/BridgeProvider.tsx';
-import { fakeBridge, sampleSnapshot, type FakeBridge } from './fake-bridge.test-helpers.ts';
+import {
+  fakeBridge,
+  passingCheck,
+  sampleSnapshot,
+  type FakeBridge,
+} from './fake-bridge.test-helpers.ts';
+import { INTERRUPTED_TEXT } from './useIntro.ts';
 import { IntroPanel } from './IntroPanel.tsx';
 
 afterEach(cleanup);
@@ -30,7 +36,8 @@ function setup(confirmed = true, prepare: (fake: FakeBridge) => void = () => und
   prepare(fake);
   render(
     createElement(BridgeProvider, {
-      transport: fake.transport,
+      // 間接呼叫：測試中途可換掉 fake.transport（卡住某個操作）
+      transport: { send: (request) => fake.transport.send(request) },
       children: createElement(IntroPanel, { jobSnapshotId: 'job-1', confirmed, poll: POLL }),
     }),
   );
@@ -46,7 +53,7 @@ describe('產生投遞自介', () => {
     fireEvent.click(await screen.findByRole('button', { name: '產生投遞自介' }));
     await screen.findByText(/產生中/);
     fake.intro = saved();
-    fake.introCheck = { length: [...TEXT].length, problem: null };
+    fake.introCheck = passingCheck(TEXT);
     fake.generation = { state: 'succeeded', failure: null, problem: null };
     const box = await screen.findByLabelText<HTMLTextAreaElement>('投遞自介（可編輯）');
     await waitFor(() => expect(box.value).toBe(TEXT));
@@ -94,7 +101,7 @@ describe('產生投遞自介', () => {
 describe('編輯與複製', () => {
   function withIntro(fake: FakeBridge) {
     fake.intro = saved();
-    fake.introCheck = { length: [...TEXT].length, problem: null };
+    fake.introCheck = passingCheck(TEXT);
     fake.checkText = (text) => (text.includes('3000') ? 'number_not_grounded' : null);
   }
 
@@ -137,5 +144,145 @@ describe('編輯與複製', () => {
     const fake = setup(true, withIntro);
     fireEvent.click(await screen.findByRole('button', { name: '重新產生投遞自介' }));
     await waitFor(() => expect(ops(fake, 'intro.generate')).toHaveLength(1));
+  });
+});
+
+describe('對抗驗證與 codex 修正', () => {
+  function withIntro(fake: FakeBridge) {
+    fake.intro = saved();
+    fake.introCheck = passingCheck(TEXT);
+  }
+
+  /** 讓某個操作的回應卡住，直到呼叫 release。 */
+  function hold(fake: FakeBridge, op: string) {
+    const inner = fake.transport;
+    const gate = { active: false, pass: 0, releases: [] as (() => void)[] };
+    fake.transport = {
+      send: async (request) => {
+        if (gate.active && (request as { op: string }).op === op && gate.pass-- <= 0) {
+          await new Promise<void>((resolve) => gate.releases.push(resolve));
+        }
+        return inner.send(request);
+      },
+    };
+    return gate;
+  }
+
+  it('複製前重新檢查：載入後事實項變得不可用（例如撤銷來源）就不複製並說明', async () => {
+    const fake = setup(true, withIntro);
+    await screen.findByLabelText('投遞自介（可編輯）');
+    expect(button('複製自介')).toHaveProperty('disabled', false);
+    fake.introCheck = passingCheck(TEXT, { problem: 'unknown_claim' });
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.assign(navigator, { clipboard: { writeText } });
+    fireEvent.click(button('複製自介'));
+    expect((await screen.findByRole('alert')).textContent).toContain('重新檢查沒有通過');
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('複製前發現 helper 上的文字和畫面不同：不複製', async () => {
+    const fake = setup(true, withIntro);
+    await screen.findByLabelText('投遞自介（可編輯）');
+    fake.intro = saved({ text: '別的內容' });
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.assign(navigator, { clipboard: { writeText } });
+    fireEvent.click(button('複製自介'));
+    expect((await screen.findByRole('alert')).textContent).toContain('內容已變更');
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('產生中 helper 重開（狀態變 null）：顯示產生中斷與再按一次的提示', async () => {
+    const fake = setup(true, withIntro);
+    fireEvent.click(await screen.findByRole('button', { name: '重新產生投遞自介' }));
+    await screen.findByText(/產生中/);
+    fake.generation = null;
+    expect((await screen.findByRole('alert')).textContent).toBe(INTERRUPTED_TEXT);
+  });
+
+  it('偵測到產生成功後，編輯框解鎖時已經是新文字（不需再讀一次）', async () => {
+    const fake = setup(true, withIntro);
+    fireEvent.click(await screen.findByRole('button', { name: '重新產生投遞自介' }));
+    await screen.findByText(/產生中/);
+    // 拿到「成功」的那次讀取放行，之後的讀取全部卡住：若還要再讀一次才換文字，解鎖時會是舊文字
+    const gate = hold(fake, 'intro.get');
+    gate.pass = 1;
+    gate.active = true;
+    fake.intro = saved({ text: '新的自介' });
+    fake.introCheck = passingCheck('新的自介');
+    fake.generation = { state: 'succeeded', failure: null, problem: null };
+    const box = screen.getByLabelText<HTMLTextAreaElement>('投遞自介（可編輯）');
+    await waitFor(() => expect(box.disabled).toBe(false));
+    expect(box.value).toBe('新的自介');
+  });
+
+  it('儲存中不能再按儲存（避免兩次儲存回應亂序蓋掉新狀態）', async () => {
+    const fake = setup(true, withIntro);
+    const box = await screen.findByLabelText('投遞自介（可編輯）');
+    const gate = hold(fake, 'intro.update');
+    gate.active = true;
+    fireEvent.change(box, { target: { value: '版本 A' } });
+    fireEvent.click(button('儲存修改'));
+    fireEvent.change(box, { target: { value: '版本 B' } });
+    expect(button('儲存修改')).toHaveProperty('disabled', true);
+    expect(button('複製自介')).toHaveProperty('disabled', true);
+    gate.active = false;
+    for (const release of gate.releases) release();
+    await screen.findByText(/已儲存/);
+    expect(button('儲存修改')).toHaveProperty('disabled', false);
+    expect(ops(fake, 'intro.update')).toHaveLength(1);
+  });
+
+  it('離開期間產生失敗：重新開啟時顯示失敗原因', async () => {
+    setup(true, (fake) => {
+      withIntro(fake);
+      fake.generation = { state: 'failed', failure: 'check_failed', problem: 'too_long' };
+    });
+    expect((await screen.findByRole('alert')).textContent).toContain('超過 300 字');
+  });
+
+  it('使用者自己加的承諾字眼：只提示，不停用複製（D25）', async () => {
+    const fake = setup(true, (f) => {
+      withIntro(f);
+      f.warnText = (text) => (text.includes('薪') ? 'commits_salary' : null);
+    });
+    const box = await screen.findByLabelText('投遞自介（可編輯）');
+    fireEvent.change(box, { target: { value: `${TEXT}期望薪資面議。` } });
+    fireEvent.click(button('儲存修改'));
+    await screen.findByText(/已儲存/);
+    expect(screen.getByTestId('intro-warning').textContent).toContain('提到薪資待遇');
+    expect(button('複製自介')).toHaveProperty('disabled', false);
+    expect(fake.introCheck?.problem).toBeNull();
+  });
+
+  it('列出引用的事實項、目前狀態與自介寫成的完成程度', async () => {
+    setup(true, (fake) => {
+      withIntro(fake);
+      fake.introCheck = passingCheck(TEXT, {
+        citations: [
+          {
+            claimId: 'c-doc',
+            text: '登入功能',
+            type: 'feature',
+            completionStatus: 'documented_done',
+            statedCompletion: 'in_progress',
+            usable: true,
+          },
+          {
+            claimId: 'c-gone',
+            text: null,
+            type: null,
+            completionStatus: null,
+            statedCompletion: null,
+            usable: false,
+          },
+        ],
+      });
+    });
+    const rows = await screen.findAllByTestId('intro-citation');
+    expect(rows[0]?.textContent).toContain('登入功能');
+    expect(rows[0]?.textContent).toContain('功能／文件標示完成');
+    expect(rows[0]?.textContent).toContain('進行中');
+    expect(rows[1]?.textContent).toContain('事實項已不存在');
+    expect(rows[1]?.textContent).toContain('目前不能使用');
   });
 });

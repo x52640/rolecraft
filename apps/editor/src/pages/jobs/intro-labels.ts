@@ -1,4 +1,11 @@
-import type { BridgeFailure, IntroGenerationFailure, IntroProblem } from '@rolecraft/contracts';
+import type {
+  BridgeFailure,
+  ClaimType,
+  CompletionStatus,
+  IntroGenerationFailure,
+  IntroProblem,
+  StatedCompletion,
+} from '@rolecraft/contracts';
 
 import { helperUnavailableText } from '../../bridge/helper-busy.ts';
 
@@ -32,6 +39,28 @@ export const INTRO_FAILURE_LABELS: Record<IntroGenerationFailure, string> = {
   cancelled: '已取消',
   snapshot_changed: '產生期間職缺快照被修改或取消確認，結果沒有存下',
   intro_changed: '產生期間你改過自介，為了不蓋掉你的修改，結果沒有存下',
+};
+
+export const CLAIM_TYPE_LABELS: Record<ClaimType, string> = {
+  feature: '功能',
+  deliverable: '交付物',
+  personal_role: '個人角色',
+  outcome_metric: '成果數字',
+  user_count: '使用人數',
+  link: '連結',
+};
+
+export const CLAIM_STATUS_LABELS: Record<CompletionStatus, string> = {
+  planned: '計畫中',
+  documented_done: '文件標示完成',
+  user_confirmed_done: '使用者確認完成',
+  unknown: '未知',
+};
+
+export const STATED_COMPLETION_LABELS: Record<StatedCompletion, string> = {
+  completed: '已完成',
+  in_progress: '進行中',
+  planned: '規劃中',
 };
 
 /** 產生失敗的完整說明。 */

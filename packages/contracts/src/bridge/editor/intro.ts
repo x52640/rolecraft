@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
 import { ApplicationIntro, IntroProblem } from '../../entities/application-intro.ts';
+import { ClaimType, CompletionStatus } from '../../entities/claim.ts';
+import { Id } from '../../entities/common.ts';
+import { StatedCompletion } from '../../entities/resume-version.ts';
 import { bridgeOp, OpaqueId } from '../common.ts';
 import { withFailure } from '../operations.ts';
 
@@ -45,10 +48,40 @@ export const IntroGenerationView = z
   });
 export type IntroGenerationView = z.infer<typeof IntroGenerationView>;
 
-/** 目前自介文字的檢查結果（依目前的事實項重跑）；problem 為 null 才能複製。 */
+/** 承諾字眼與聯絡方式（D25 擁有者裁定：只擋模型產生的內容；使用者編輯後只提示、不停用複製）。 */
+export const INTRO_COMMITMENT_PROBLEMS = [
+  'commits_time',
+  'commits_salary',
+  'commits_start_date',
+  'contact_info',
+] as const satisfies readonly IntroProblem[];
+export const IntroCommitmentWarning = z.enum(INTRO_COMMITMENT_PROBLEMS);
+export type IntroCommitmentWarning = z.infer<typeof IntroCommitmentWarning>;
+
+/**
+ * 引用的事實項對照（自介沒有逐段對照畫面，由使用者在這裡把關措辭與宣稱的完成程度，R1）：
+ * 事實項內容、類型、目前完成狀態，與自介把它寫成的完成程度；事實項已不存在時 text、type 為 null。
+ */
+export const IntroCitedClaim = z.strictObject({
+  claimId: Id,
+  text: z.string().nullable(),
+  type: ClaimType.nullable(),
+  completionStatus: CompletionStatus.nullable(),
+  statedCompletion: StatedCompletion.nullable(),
+  /** 目前是否可用於生成（待複核、來源已移除未確認等為 false） */
+  usable: z.boolean(),
+});
+export type IntroCitedClaim = z.infer<typeof IntroCitedClaim>;
+
+/**
+ * 目前自介文字的檢查結果（依目前的事實項重跑）。problem 為 null 才能複製（不含承諾字眼）；
+ * warning 是使用者編輯後出現的承諾字眼或聯絡方式，只提示、不停用複製。
+ */
 export const IntroCheckView = z.strictObject({
   length: z.int().min(0),
-  problem: IntroProblem.nullable(),
+  problem: IntroProblem.exclude(INTRO_COMMITMENT_PROBLEMS).nullable(),
+  warning: IntroCommitmentWarning.nullable(),
+  citations: z.array(IntroCitedClaim),
 });
 export type IntroCheckView = z.infer<typeof IntroCheckView>;
 

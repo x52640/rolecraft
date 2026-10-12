@@ -113,7 +113,21 @@ describe('intro.generate／intro.get', () => {
         generatedAt: '2026-10-12T01:00:00.000Z',
         userEdited: false,
       },
-      check: { length: expect.any(Number) as unknown, problem: null },
+      check: {
+        length: expect.any(Number) as unknown,
+        problem: null,
+        warning: null,
+        citations: [
+          {
+            claimId: 'c-metric',
+            text: '載入時間縮短 40%',
+            type: 'outcome_metric',
+            completionStatus: null,
+            statedCompletion: null,
+            usable: true,
+          },
+        ],
+      },
       generation: { state: 'succeeded', failure: null, problem: null },
     });
     expect(env.repos.runCheckRecords.listByProvider('claude')).toHaveLength(1);
@@ -243,5 +257,48 @@ describe('intro.update', () => {
     expect(await env.send({ op: 'intro.get', payload: { jobSnapshotId: 'nope' } })).toMatchObject(
       INVALID,
     );
+  });
+});
+
+describe('對抗驗證與擁有者裁定（D25）', () => {
+  it('使用者編輯加入承諾字眼：只提示（warning），不算檢查問題', async () => {
+    const env = open(() => GOOD);
+    await generated(env);
+    expect(await env.send(update('載入時間縮短 40%，期望薪資面議。'))).toMatchObject({
+      ok: true,
+      check: { problem: null, warning: 'commits_salary' },
+    });
+  });
+
+  it('儲存只有零寬字元的內容：檢查判為空白', async () => {
+    const env = open(() => GOOD);
+    await generated(env);
+    expect(await env.send(update('\u200B\u200B'))).toMatchObject({
+      check: { problem: 'empty' },
+    });
+  });
+
+  it('引用對照：事實項變成不可用時標示，並帶目前狀態與寫成的完成程度', async () => {
+    const env = open(() =>
+      json('我負責登入功能的開發。', [{ claim: 'C2', statedCompletion: 'in_progress' }]),
+    );
+    await generated(env);
+    const doc = env.repos.claims.list().find((c) => c.id === 'c-doc');
+    if (!doc) throw new Error('missing');
+    env.repos.claims.save({ ...doc, reviewStatus: 'needs_review' });
+    expect(await env.send(get)).toMatchObject({
+      check: {
+        problem: 'unknown_claim',
+        citations: [
+          {
+            claimId: 'c-doc',
+            text: '登入功能',
+            completionStatus: 'documented_done',
+            statedCompletion: 'in_progress',
+            usable: false,
+          },
+        ],
+      },
+    });
   });
 });

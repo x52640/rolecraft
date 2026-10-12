@@ -91,3 +91,14 @@
 .job-intro textarea {
   font: inherit;
 }
+
+.job-intro-citations {
+  border-collapse: collapse;
+}
+
+.job-intro-citations th,
+.job-intro-citations td {
+  text-align: start;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}

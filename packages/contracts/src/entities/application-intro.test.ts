@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { IntroGenerationView, INTRO_EDIT_MAX_CHARS } from '../bridge/editor/intro.ts';
+import {
+  IntroCheckView,
+  IntroGenerationView,
+  INTRO_EDIT_MAX_CHARS,
+} from '../bridge/editor/intro.ts';
 import { ApplicationIntro, INTRO_MAX_CHARS, introLength } from './application-intro.ts';
 
 describe('投遞自介（P1-T064）', () => {
@@ -30,5 +34,13 @@ describe('投遞自介（P1-T064）', () => {
     };
     expect(ApplicationIntro.safeParse(intro).success).toBe(true);
     expect(ApplicationIntro.safeParse({ ...intro, sent: true }).success).toBe(false);
+  });
+
+  it('檢查結果：承諾字眼只能放在 warning（D25：使用者編輯只提示），不能當 problem', () => {
+    const base = { length: 3, problem: null, warning: null, citations: [] };
+    expect(IntroCheckView.safeParse(base).success).toBe(true);
+    expect(IntroCheckView.safeParse({ ...base, warning: 'commits_salary' }).success).toBe(true);
+    expect(IntroCheckView.safeParse({ ...base, problem: 'commits_salary' }).success).toBe(false);
+    expect(IntroCheckView.safeParse({ ...base, warning: 'too_long' }).success).toBe(false);
   });
 });

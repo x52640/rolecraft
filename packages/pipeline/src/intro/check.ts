@@ -5,7 +5,8 @@
  *    （沿用履歷段落的 completionCap，D14：寫成已完成的必須是使用者確認完成）。
  * 3. 網址、網域、倍數／比例詞必須出現在所引用事實項的內容或使用者確認文字中；數字另可出自已確認的
  *    個人資料欄位（R1 檢查 3，與 domain 匯出前檢查同一組個人資料欄位）。正規化沿用 generation/grounding.ts。
- * 4. 不承諾面試時間、薪資、到職日，不寫聯絡方式（沿用 messages/commitments.ts）。
+ * 4. 不承諾面試時間、薪資、到職日，不寫聯絡方式（沿用 messages/commitments.ts）：D25 擁有者裁定只擋模型產生的
+ *    內容（introCommitmentWarning，由 run.ts 套用）；使用者編輯後只提示，不算 checkIntro 的問題。
  * 5. 最後再過 domain 的 R1 匯出前檢查（當成一段生成段落、引用不可移除）。
  * 職缺公司、職稱可以出現（自介對象本來就是它）。
  */
@@ -14,6 +15,7 @@ import {
   introLength,
   type Claim,
   type ClaimCitation,
+  type IntroCommitmentWarning,
   type IntroProblem,
   type Profile,
 } from '@rolecraft/contracts';
@@ -80,7 +82,7 @@ export function resolveIntroLabels(
 function citedClaims(
   citations: readonly ClaimCitation[],
   claims: readonly Claim[],
-): Claim[] | IntroProblem {
+): Claim[] | IntroCheckProblem {
   if (citations.length === 0) return 'no_citation';
   const byId = new Map(claims.map((claim) => [claim.id, claim]));
   const cited: Claim[] = [];
@@ -103,7 +105,7 @@ function groundingProblem(
   raw: string,
   cited: readonly Claim[],
   profile: Profile | null,
-): IntroProblem | null {
+): IntroCheckProblem | null {
   const rawSources = cited.flatMap((c) => [c.text, c.basis.userConfirmation?.text ?? '']);
   const urls = new Set(rawSources.flatMap(fullUrls));
   if (fullUrls(raw).some((url) => !urls.has(url))) return 'link_not_grounded';
@@ -121,7 +123,7 @@ function groundingProblem(
   return null;
 }
 
-const COMMITMENTS: Partial<Record<DraftProblem, IntroProblem>> = {
+const COMMITMENTS: Partial<Record<DraftProblem, IntroCommitmentWarning>> = {
   commits_time: 'commits_time',
   commits_salary: 'commits_salary',
   commits_start_date: 'commits_start_date',
@@ -144,19 +146,27 @@ function exportCheckPasses(
   return checkExportReadiness({ sections: [section], claims: ctx.claims, profile: ctx.profile }).ok;
 }
 
-/** 檢查自介文字；通過回 null，否則回第一個問題。 */
+/** R1 類問題（會停用複製）；承諾字眼另由 introCommitmentWarning 判定。 */
+export type IntroCheckProblem = Exclude<IntroProblem, IntroCommitmentWarning>;
+
+/** 承諾字眼或聯絡方式；模型產生時整份不採用，使用者編輯後只提示。 */
+export function introCommitmentWarning(text: string): IntroCommitmentWarning | null {
+  const commitment = commitmentProblem(text);
+  return commitment ? (COMMITMENTS[commitment] ?? null) : null;
+}
+
+/** 檢查自介文字（不含承諾字眼）；通過回 null，否則回第一個問題。 */
 export function checkIntro(
   text: string,
   citations: readonly ClaimCitation[],
   ctx: IntroCheckContext,
-): IntroProblem | null {
-  if (!/\S/u.test(text)) return 'empty';
+): IntroCheckProblem | null {
+  // 只有零寬、格式字元等不可見字元也算空白（對抗驗證）
+  if (!/\S/u.test(normalizeForGrounding(text))) return 'empty';
   if (introLength(text) > INTRO_MAX_CHARS) return 'too_long';
   const cited = citedClaims(citations, ctx.claims);
   if (typeof cited === 'string') return cited;
   const grounding = groundingProblem(text, cited, ctx.profile);
   if (grounding) return grounding;
-  const commitment = commitmentProblem(text);
-  if (commitment) return COMMITMENTS[commitment] ?? 'export_check_failed';
   return exportCheckPasses(text, citations, ctx) ? null : 'export_check_failed';
 }

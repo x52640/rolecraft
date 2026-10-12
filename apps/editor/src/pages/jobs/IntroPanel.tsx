@@ -1,6 +1,7 @@
 import { INTRO_MAX_CHARS, introLength } from '@rolecraft/contracts';
 import { useId, useState } from 'react';
 
+import { IntroCitations } from './IntroCitations.tsx';
 import { INTRO_PROBLEM_LABELS } from './intro-labels.ts';
 import { DEFAULT_INTRO_POLL, useIntro, type IntroPollOptions } from './useIntro.ts';
 
@@ -81,20 +82,27 @@ export function IntroPanel({
           <div className="job-actions">
             <button
               type="button"
-              disabled={generating || !state.dirty}
+              disabled={generating || state.saving || !state.dirty}
               onClick={() => void state.save()}
             >
               儲存修改
             </button>
             <button
               type="button"
-              disabled={generating || copyBlocked !== null || check === null}
+              disabled={generating || state.saving || copyBlocked !== null || check === null}
               onClick={() => void state.copy()}
             >
               複製自介
             </button>
           </div>
           {copyBlocked ? <p data-testid="copy-blocked">{copyBlocked}</p> : null}
+          {!state.dirty && check?.warning ? (
+            <p data-testid="intro-warning" className="job-hint">
+              提示：{INTRO_PROBLEM_LABELS[check.warning]}
+              。這是你自己加的內容，可以複製，但請確認不會被當成承諾。
+            </p>
+          ) : null}
+          {check ? <IntroCitations citations={check.citations} /> : null}
         </>
       ) : null}
       {state.failure ? <p role="alert">{state.failure}</p> : null}
