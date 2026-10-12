@@ -17,6 +17,9 @@ export const DEFAULT_INTRO_POLL: IntroPollOptions = { intervalMs: 3000, maxPolls
 export const INTERRUPTED_TEXT =
   '產生中斷：本機輔助程式可能重新啟動，沒有拿到結果。請再按一次產生。';
 
+/** 進行中的 helper 請求；一次只允許一個，進行中鎖住編輯框與所有按鈕。 */
+export type IntroBusy = 'loading' | 'generating' | 'saving' | 'copying' | 'reloading';
+
 interface Loaded {
   readonly intro: ApplicationIntro | null;
   readonly check: IntroCheckView | null;
@@ -24,8 +27,11 @@ interface Loaded {
 }
 
 /**
- * 單一職缺快照的投遞自介：讀取、要求產生（輪詢最近一次產生狀態）、編輯、儲存（helper 重跑檢查）、複製。
- * 複製前一律向 helper 重新讀取並重跑檢查（期間事實項或來源可能變了）。
+ * 單一職缺快照的投遞自介：讀取、要求產生（輪詢最近一次產生狀態）、編輯、儲存（helper 重跑檢查）、
+ * 複製前重檢、重新載入。結構上避免競態（codex 第三輪）：
+ * - 任何對 helper 的請求進行中（busy 不為 null），編輯框與按鈕一律鎖住，一次只允許一個請求。
+ * - 單一編輯版本號：編輯框內容每次改變（使用者輸入、套用 helper 的內容、儲存成功）都加一；
+ *   請求送出時記下版本號，回來時版本號已變就作廢，不套用、不複製。
  * 沒有任何送出（D7）：自介只存在本機，由使用者複製後自行貼到求職網站。
  */
 export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
@@ -33,27 +39,31 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
   const [intro, setIntro] = useState<ApplicationIntro | null>(null);
   const [check, setCheck] = useState<IntroCheckView | null>(null);
   const [text, setText] = useState('');
-  const [dirty, setDirtyState] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusyState] = useState<IntroBusy | null>('loading');
+  const [version, setVersionState] = useState(0);
   const [failure, setFailure] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const disposed = useRef(false);
-  const latestText = useRef('');
-  /** 儲存請求序號：只採用最新一次儲存的回應（亂序回來的舊回應丟棄） */
-  const saveSeq = useRef(0);
+  const busyRef = useRef<IntroBusy | null>('loading');
+  const versionRef = useRef(0);
 
-  /** 有沒有未儲存修改（await 之後要看最新值，所以另存一份 ref） */
-  const dirtyRef = useRef(false);
-  const setDirty = (next: boolean) => {
-    dirtyRef.current = next;
-    setDirtyState(next);
+  const setBusy = (next: IntroBusy | null) => {
+    busyRef.current = next;
+    setBusyState(next);
   };
-
-  const applyText = (next: string) => {
-    latestText.current = next;
-    setText(next);
+  const bump = () => {
+    versionRef.current += 1;
+    setVersionState(versionRef.current);
+  };
+  /** 開始一個請求；已有請求進行中就不開始。 */
+  const begin = (kind: IntroBusy): boolean => {
+    if (busyRef.current !== null) return false;
+    setBusy(kind);
+    setNotice(null);
+    setFailure(null);
+    return true;
   };
 
   useEffect(() => {
@@ -64,22 +74,24 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     };
   }, []);
 
-  /** 讀取並套用自介與檢查；讀取失敗回 undefined。 */
-  const load = useCallback(async (): Promise<Loaded | undefined> => {
+  /** 讀取（不套用）；失敗回 undefined 並顯示原因。 */
+  const fetchIntro = useCallback(async (): Promise<Loaded | undefined> => {
     const response = await bridge.send({ op: 'intro.get', payload: { jobSnapshotId } });
     if (disposed.current) return undefined;
     if (!response.ok) {
       setFailure(introFailureText(response));
       return undefined;
     }
-    setIntro(response.intro);
-    setCheck(response.check);
     return response;
   }, [bridge, jobSnapshotId]);
 
-  const replaceText = (loaded: Loaded) => {
-    applyText(loaded.intro?.text ?? '');
+  /** 套用 helper 的已儲存內容到編輯框（新版本）。 */
+  const applyLoaded = (loaded: Loaded) => {
+    setIntro(loaded.intro);
+    setCheck(loaded.check);
+    setText(loaded.intro?.text ?? '');
     setDirty(false);
+    bump();
   };
 
   const showFailure = (generation: IntroGenerationView | null) => {
@@ -88,132 +100,131 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     }
   };
 
-  const waitForResult = (remaining: number) => {
+  const waitForResult = (remaining: number, sentAt: number) => {
     timer.current = setTimeout(() => {
-      void load().then((loaded) => {
+      void fetchIntro().then((loaded) => {
         if (disposed.current) return;
-        if (loaded === undefined) {
-          setGenerating(false);
+        const { generation } = loaded ?? { generation: undefined };
+        if (loaded && generation?.state === 'running' && remaining > 1) {
+          waitForResult(remaining - 1, sentAt);
           return;
         }
-        const { generation } = loaded;
-        if (generation?.state === 'running') {
-          if (remaining > 1) {
-            waitForResult(remaining - 1);
-            return;
+        if (loaded && versionRef.current === sentAt) {
+          if (generation?.state === 'running') {
+            setFailure('還在產生中：可以先離開，稍後重新開啟這個職缺查看。');
+          } else if (generation === null) {
+            setFailure(INTERRUPTED_TEXT);
+          } else if (generation?.state === 'succeeded') {
+            applyLoaded(loaded);
+            setNotice('已產生投遞自介。請檢查、對照引用後再複製。');
+          } else {
+            showFailure(generation ?? null);
           }
-          setFailure('還在產生中：可以先離開，稍後重新開啟這個職缺查看。');
-        } else if (generation === null) {
-          setFailure(INTERRUPTED_TEXT);
-        } else if (generation.state === 'succeeded') {
-          // 同一次回應套用新文字後才解鎖編輯框，期間不會有輸入被蓋掉
-          replaceText(loaded);
-          setNotice('已產生投遞自介。請檢查、對照引用後再複製。');
-        } else {
-          showFailure(generation);
         }
-        setGenerating(false);
+        setBusy(null);
       });
     }, poll.intervalMs);
   };
 
   useEffect(() => {
-    void load().then((loaded) => {
-      if (!loaded) return;
-      replaceText(loaded);
-      if (loaded.generation?.state === 'running') {
-        setGenerating(true);
-        waitForResult(poll.maxPolls);
-      } else {
-        // 離開期間已結束的失敗也要顯示原因
-        showFailure(loaded.generation);
+    void fetchIntro().then((loaded) => {
+      if (disposed.current) return;
+      if (!loaded) {
+        setBusy(null);
+        return;
       }
+      applyLoaded(loaded);
+      if (loaded.generation?.state === 'running') {
+        setBusy('generating');
+        waitForResult(poll.maxPolls, versionRef.current);
+        return;
+      }
+      // 離開期間已結束的失敗也要顯示原因
+      showFailure(loaded.generation);
+      setBusy(null);
     });
-    // 只在切換職缺（load 改變）時讀取一次
-  }, [load]);
+    // 只在切換職缺（fetchIntro 改變）時讀取一次
+  }, [fetchIntro]);
 
   async function generate() {
-    setNotice(null);
-    setFailure(null);
-    if (timer.current) clearTimeout(timer.current);
+    if (!begin('generating')) return;
+    const sentAt = versionRef.current;
     const response = await bridge.send({ op: 'intro.generate', payload: { jobSnapshotId } });
     if (disposed.current) return;
     if (!response.ok) {
       setFailure(introFailureText(response));
+      setBusy(null);
       return;
     }
-    setGenerating(true);
-    waitForResult(poll.maxPolls);
+    waitForResult(poll.maxPolls, sentAt);
   }
 
   async function save() {
-    setNotice(null);
-    setFailure(null);
-    const submitted = text;
-    const seq = ++saveSeq.current;
-    setSaving(true);
-    try {
-      const response = await bridge.send({
-        op: 'intro.update',
-        payload: { jobSnapshotId, text: submitted },
-      });
-      if (disposed.current || seq !== saveSeq.current) return;
-      if (!response.ok) {
-        setFailure(introFailureText(response));
-        return;
-      }
+    if (!begin('saving')) return;
+    const sentAt = versionRef.current;
+    const response = await bridge.send({ op: 'intro.update', payload: { jobSnapshotId, text } });
+    if (disposed.current) return;
+    if (!response.ok) {
+      setFailure(introFailureText(response));
+    } else if (versionRef.current === sentAt) {
       setIntro(response.intro);
       setCheck(response.check);
-      if (latestText.current === submitted) setDirty(false);
+      setDirty(false);
+      bump(); // 儲存成功也是新版本：先前的確認（例如重新載入的警告）失效
       setNotice('已儲存（只存在本機，不會送出），並重新檢查。');
-    } finally {
-      if (seq === saveSeq.current) setSaving(false);
     }
+    setBusy(null);
   }
 
   /** 重新載入已儲存的內容（放棄未儲存的修改；有未存修改時由畫面先確認）。 */
   async function reload() {
-    setNotice(null);
-    setFailure(null);
-    const loaded = await load();
-    if (disposed.current || loaded === undefined) return;
-    replaceText(loaded);
-    setNotice('已重新載入已儲存的內容。');
+    if (!begin('reloading')) return;
+    const sentAt = versionRef.current;
+    const loaded = await fetchIntro();
+    if (disposed.current) return;
+    if (loaded && versionRef.current === sentAt) {
+      applyLoaded(loaded);
+      setNotice('已重新載入已儲存的內容。');
+    }
+    setBusy(null);
   }
 
-  /**
-   * 複製前重新讀取並重跑檢查；通過且已儲存內容與「目前」編輯框一致才寫入剪貼簿
-   * （比對用 await 之後的編輯框內容：重檢期間使用者可能又改了）。
-   */
+  /** 複製前重新讀取並重跑檢查；通過、版本沒變且已儲存內容與編輯框一致才寫入剪貼簿。 */
   async function copy() {
-    setNotice(null);
-    setFailure(null);
-    const loaded = await load();
-    if (disposed.current || loaded === undefined) return;
-    const fresh = loaded.intro;
-    if (!fresh || !loaded.check) {
-      setFailure('找不到已儲存的自介：請重新產生。');
-      return;
-    }
-    if (dirtyRef.current) {
-      setFailure('有尚未儲存的修改：儲存後會重新檢查，通過才能複製。');
-      return;
-    }
-    if (fresh.text !== latestText.current) {
-      // 已儲存的內容在別處變了（另一頁編輯、逾時後才產生完成）；沒有未存修改就同步成新內容
-      replaceText(loaded);
-      setNotice('已儲存的自介在別處有變更，已更新為最新內容：請確認後再按一次複製。');
-      return;
-    }
-    if (loaded.check.problem) {
-      setFailure(`重新檢查沒有通過，不能複製：${INTRO_PROBLEM_LABELS[loaded.check.problem]}。`);
-      return;
-    }
+    if (!begin('copying')) return;
+    const sentAt = versionRef.current;
+    const shown = text;
     try {
-      await navigator.clipboard.writeText(fresh.text);
-      setNotice('已複製。請到求職網站貼上，並由你自己送出。');
-    } catch {
-      setFailure('無法複製到剪貼簿：請手動選取文字複製。');
+      const loaded = await fetchIntro();
+      if (disposed.current || !loaded || versionRef.current !== sentAt) return;
+      const fresh = loaded.intro;
+      if (!fresh || !loaded.check) {
+        setFailure('找不到已儲存的自介：請重新產生。');
+        return;
+      }
+      if (dirty) {
+        setFailure('有尚未儲存的修改：儲存後會重新檢查，通過才能複製。');
+        return;
+      }
+      if (fresh.text !== shown) {
+        // 已儲存的內容在別處變了（另一頁編輯、逾時後才產生完成）；沒有未存修改就同步成新內容
+        applyLoaded(loaded);
+        setNotice('已儲存的自介在別處有變更，已更新為最新內容：請確認後再按一次複製。');
+        return;
+      }
+      setCheck(loaded.check);
+      if (loaded.check.problem) {
+        setFailure(`重新檢查沒有通過，不能複製：${INTRO_PROBLEM_LABELS[loaded.check.problem]}。`);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(fresh.text);
+        setNotice('已複製。請到求職網站貼上，並由你自己送出。');
+      } catch {
+        setFailure('無法複製到剪貼簿：請手動選取文字複製。');
+      }
+    } finally {
+      if (!disposed.current) setBusy(null);
     }
   }
 
@@ -222,12 +233,15 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     check,
     text,
     setText: (next: string) => {
-      applyText(next);
+      if (busyRef.current !== null) return; // 請求進行中鎖住編輯
+      setText(next);
       setDirty(true);
+      bump();
     },
     dirty,
-    generating,
-    saving,
+    busy,
+    generating: busy === 'generating',
+    version,
     failure,
     notice,
     generate,

@@ -23,28 +23,32 @@ export function IntroPanel({
 }: IntroPanelProps) {
   const state = useIntro(jobSnapshotId, poll);
   const textId = useId();
-  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
-  const [confirmReload, setConfirmReload] = useState(false);
-  const { intro, check, generating } = state;
+  // 二次確認綁在觸發它的版本號：之後內容有任何變動（含儲存成功）就失效
+  const [overwriteAt, setOverwriteAt] = useState<number | null>(null);
+  const [reloadAt, setReloadAt] = useState<number | null>(null);
+  const { intro, check, generating, version } = state;
+  const locked = state.busy !== null;
+  const confirmOverwrite = overwriteAt === version;
+  const confirmReload = reloadAt === version && state.dirty;
   const edited = intro !== null && (intro.userEdited || state.dirty);
   const length = introLength(state.text);
 
   const generate = () => {
     if (edited && !confirmOverwrite) {
-      setConfirmOverwrite(true);
+      setOverwriteAt(version);
       return;
     }
-    setConfirmOverwrite(false);
+    setOverwriteAt(null);
     void state.generate();
   };
 
   /** 已儲存的內容在別處變了時，可重新載入；有未存修改要再按一次確認（也可選擇儲存保留本地修改）。 */
   const reload = () => {
     if (state.dirty && !confirmReload) {
-      setConfirmReload(true);
+      setReloadAt(version);
       return;
     }
-    setConfirmReload(false);
+    setReloadAt(null);
     void state.reload();
   };
 
@@ -63,7 +67,7 @@ export function IntroPanel({
       </p>
       {!confirmed ? <p className="job-hint">請先確認快照，才能產生投遞自介。</p> : null}
       <div className="job-actions">
-        <button type="button" onClick={generate} disabled={generating || !confirmed}>
+        <button type="button" onClick={generate} disabled={locked || !confirmed}>
           {intro ? '重新產生投遞自介' : '產生投遞自介'}
         </button>
       </div>
@@ -81,7 +85,7 @@ export function IntroPanel({
             id={textId}
             rows={8}
             value={state.text}
-            disabled={generating}
+            disabled={locked}
             onChange={(e) => state.setText(e.target.value)}
           />
           <p
@@ -93,23 +97,23 @@ export function IntroPanel({
           <div className="job-actions">
             <button
               type="button"
-              disabled={generating || state.saving || !state.dirty}
+              disabled={locked || !state.dirty}
               onClick={() => void state.save()}
             >
               儲存修改
             </button>
             <button
               type="button"
-              disabled={generating || state.saving || copyBlocked !== null || check === null}
+              disabled={locked || copyBlocked !== null || check === null}
               onClick={() => void state.copy()}
             >
               複製自介
             </button>
-            <button type="button" disabled={generating || state.saving} onClick={reload}>
+            <button type="button" disabled={locked} onClick={reload}>
               重新載入已儲存內容
             </button>
           </div>
-          {confirmReload && state.dirty ? (
+          {confirmReload ? (
             <p role="alert">
               重新載入會放棄你尚未儲存的修改；要保留就直接按「儲存修改」。確定放棄的話再按一次「重新載入已儲存內容」。
             </p>

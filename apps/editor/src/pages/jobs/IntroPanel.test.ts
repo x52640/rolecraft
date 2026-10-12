@@ -222,13 +222,16 @@ describe('對抗驗證與 codex 修正', () => {
     gate.active = true;
     fireEvent.change(box, { target: { value: '版本 A' } });
     fireEvent.click(button('儲存修改'));
+    // 儲存中一律鎖住：編輯框不能改、按鈕都停用
+    expect(box).toHaveProperty('disabled', true);
     fireEvent.change(box, { target: { value: '版本 B' } });
+    expect(box).toHaveProperty('value', '版本 A');
     expect(button('儲存修改')).toHaveProperty('disabled', true);
     expect(button('複製自介')).toHaveProperty('disabled', true);
     gate.active = false;
     for (const release of gate.releases) release();
     await screen.findByText(/已儲存/);
-    expect(button('儲存修改')).toHaveProperty('disabled', false);
+    expect(box).toHaveProperty('disabled', false);
     expect(ops(fake, 'intro.update')).toHaveLength(1);
   });
 
@@ -307,7 +310,7 @@ describe('codex 複審修正', () => {
     return gate;
   }
 
-  it('複製重檢期間又改了編輯框：不複製舊內容', async () => {
+  it('複製重檢期間編輯框鎖住：改不了，複製的就是畫面上的內容', async () => {
     const fake = setup(true, withIntro);
     const box = await screen.findByLabelText('投遞自介（可編輯）');
     const gate = holdGets(fake);
@@ -316,11 +319,13 @@ describe('codex 複審修正', () => {
     Object.assign(navigator, { clipboard: { writeText } });
     fireEvent.click(button('複製自介'));
     await waitFor(() => expect(gate.releases).toHaveLength(1));
+    expect(box).toHaveProperty('disabled', true);
     fireEvent.change(box, { target: { value: `${TEXT}（重檢期間改的）` } });
+    expect(box).toHaveProperty('value', TEXT);
     gate.active = false;
     for (const release of gate.releases) release();
-    expect((await screen.findByRole('alert')).textContent).toContain('尚未儲存');
-    expect(writeText).not.toHaveBeenCalled();
+    await screen.findByText(/已複製/);
+    expect(writeText).toHaveBeenCalledWith(TEXT);
   });
 
   it('已儲存內容在別處變了、沒有未存修改：自動同步成新內容，再按一次可複製', async () => {
@@ -350,5 +355,79 @@ describe('codex 複審修正', () => {
     fireEvent.click(button('重新載入已儲存內容'));
     await waitFor(() => expect(box.value).toBe('別處改過的自介'));
     expect(button('複製自介')).toHaveProperty('disabled', false);
+  });
+});
+
+describe('codex 第三輪：請求期間一律鎖定、單一版本號', () => {
+  function withIntro(fake: FakeBridge) {
+    fake.intro = saved();
+    fake.introCheck = passingCheck(TEXT);
+  }
+
+  function holdOp(fake: FakeBridge, op: string) {
+    const inner = fake.transport;
+    const gate = { active: false, releases: [] as (() => void)[] };
+    fake.transport = {
+      send: async (request) => {
+        if (gate.active && (request as { op: string }).op === op) {
+          await new Promise<void>((resolve) => gate.releases.push(resolve));
+        }
+        return inner.send(request);
+      },
+    };
+    return gate;
+  }
+
+  it('重新載入期間編輯框與按鈕鎖住，打字不會被載入結果蓋掉', async () => {
+    const fake = setup(true, withIntro);
+    const box = await screen.findByLabelText<HTMLTextAreaElement>('投遞自介（可編輯）');
+    const gate = holdOp(fake, 'intro.get');
+    gate.active = true;
+    fireEvent.click(button('重新載入已儲存內容'));
+    await waitFor(() => expect(gate.releases).toHaveLength(1));
+    expect(box.disabled).toBe(true);
+    for (const name of ['重新產生投遞自介', '複製自介', '重新載入已儲存內容']) {
+      expect(button(name)).toHaveProperty('disabled', true);
+    }
+    fireEvent.change(box, { target: { value: '載入期間打的字' } });
+    expect(box.value).toBe(TEXT);
+    gate.active = false;
+    for (const release of gate.releases) release();
+    await screen.findByText(/已重新載入/);
+    expect(box.disabled).toBe(false);
+  });
+
+  it('重新載入的警告綁在版本號：之後儲存成功就失效，再改一次仍要重新確認', async () => {
+    const fake = setup(true, withIntro);
+    const box = await screen.findByLabelText<HTMLTextAreaElement>('投遞自介（可編輯）');
+    fireEvent.change(box, { target: { value: '第一次修改' } });
+    fireEvent.click(button('重新載入已儲存內容'));
+    await screen.findByText(/放棄你尚未儲存的修改/);
+    fireEvent.click(button('儲存修改'));
+    await screen.findByText(/已儲存（只存在本機/);
+    fireEvent.change(box, { target: { value: '第二次修改' } });
+    fake.intro = saved({ text: '第一次修改' });
+    fireEvent.click(button('重新載入已儲存內容'));
+    // 一按不能直接丟掉修改：要重新出現警告
+    expect((await screen.findByRole('alert')).textContent).toContain('放棄你尚未儲存的修改');
+    expect(box.value).toBe('第二次修改');
+    expect(ops(fake, 'intro.get')).toHaveLength(1);
+  });
+
+  it('複製重檢期間儲存與編輯都鎖住：晚到的讀取不會蓋掉較新的已儲存內容', async () => {
+    const fake = setup(true, withIntro);
+    const box = await screen.findByLabelText<HTMLTextAreaElement>('投遞自介（可編輯）');
+    const gate = holdOp(fake, 'intro.get');
+    gate.active = true;
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(() => Promise.resolve()) } });
+    fireEvent.click(button('複製自介'));
+    await waitFor(() => expect(gate.releases).toHaveLength(1));
+    expect(box.disabled).toBe(true);
+    expect(button('儲存修改')).toHaveProperty('disabled', true);
+    expect(button('重新載入已儲存內容')).toHaveProperty('disabled', true);
+    gate.active = false;
+    for (const release of gate.releases) release();
+    await screen.findByText(/已複製/);
+    expect(ops(fake, 'intro.update')).toHaveLength(0);
   });
 });
