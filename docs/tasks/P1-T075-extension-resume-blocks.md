@@ -1,7 +1,7 @@
 ---
 id: P1-T075
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T074"]
 specs: ["web-resume-capture.md", "bridge.md"]
 track: extension
@@ -75,16 +75,21 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 變更全在 write_paths 內
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 變更全在 write_paths 內（另有本 Task 檔狀態與 task:index 產生的 INDEX／CURRENT_TASK）
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等 P1-T074 收官後改 ready
-- Blocker：無（相依 P1-T074 已於 2026-10-12 收官）
+- 最後完成：工作者實作與單元測試（2026-10-12）
+- 已通過驗證：`npm run verify` 綠（Vitest 3849 通過、13 略過）
+- 下一步：協調者收官（對抗驗證 E3＋codex review）
+- Blocker：無
 
 ## 完成結果
+
+- 程式（`apps/extension/src/sites/resume/`）：`extract.ts` `extractBlocks`（抽取規則 1–6）、`dom.ts`（`isSkipped`、`controlValue`、`flatText`、`findPairs` 標籤＋值配對）、`text.ts`（正規化）、`limits.ts` `applyLimits`、`capture.ts`（`buildResumeCapture`、`runResumeCapture`、`resumeNoticeText`）、`start.ts` `startResumeCapture`（各站腳本入口，P1-T077 用）、`notice.ts`（提示文字與 `showResumeNotice`）、`chrome-oracle.ts`／`simple-oracle.ts`（N6 判定分開）。
+- 測試：`extract.test.ts`、`capture.test.ts`、`notice.test.ts`（38 案例，合成 DOM、假資料）。
+- 保守選擇：根節點有找到但抽不出任何區塊（schema 要至少 1 個）視同找不到根節點；送出前先用 contracts schema 驗，不符就不送、提示失敗；只有回應通過 schema 且 `ok: true` 才算成功；input 只讀文字類（text、search、email、tel、url、number、日期時間類），勾選框、單選、按鈕、range、color 不讀；姓名文字空白或超過 200 字給 null；失敗提示多加「（在其他分頁點 RoleCraft 圖示開啟）」與找不到提示一致；表格一般列的儲存格內換行併成空白（th＋td 列的值才切續行）。
+- 殘餘：換行判定用計算後 display 近似 innerText（`white-space: pre` 文字內的換行當空白、CSS 產生內容不讀）；真實 Chrome 的 fixture 比對在 P1-T077。
