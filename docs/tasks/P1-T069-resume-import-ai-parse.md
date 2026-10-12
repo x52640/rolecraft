@@ -1,7 +1,7 @@
 ---
 id: P1-T069
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T066", "P1-T064"]
 specs: ["resume-import.md", "evidence-model.md", "providers.md", "bridge.md", "architecture.md"]
 track: resume-import
@@ -108,7 +108,7 @@ npm run verify
 - codex 審查待修 3 項已修（先寫測試重現，3 項都重現；見完成結果「codex 審查項修正」）
 - 對抗審查待修 3 項＋codex review cc63fdb 追加 3 項已修（先寫測試重現，修正前 30 個案例失敗；見完成結果「對抗審查項修正」）
 - codex 複審待修 3 項已修（修正 d069fcd；先寫測試重現，修正前 11 個案例失敗；防退步比對 276 個案例無退步；見完成結果「codex 複審項修正」）
-- 下一步：codex review 本次修正 diff 後收官
+- 下一步：已收官（2026-10-12 協調者：codex／對抗審查屬實項皆已修，974936f 的 codex review 無發現，三版防退步比對 276 案例無退步；main `npm run verify` 綠，Vitest 3607 通過）。以開發入口用擁有者 PDF 實跑併入 P1-T032
 - Blocker：無
 
 ## 完成結果
