@@ -1,7 +1,7 @@
 ---
 id: P1-T066
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T065"]
 specs: ["resume-import.md", "bridge.md"]
 track: resume-import
