@@ -75,6 +75,7 @@
 | [P1-T066](P1-T066-resume-import-104-layout.md) | 104 履歷 PDF 版面辨識 | in_progress | 1 | resume-import | P1-T065 |
 | [P1-T067](P1-T067-import-page-layout.md) | 匯入頁版面重整 | done | 1 | editor | P1-T020 |
 | [P1-T068](P1-T068-dev-web-harness.md) | 開發用網頁測試入口（協調者自測用） | in_progress | 1 | dev-tooling | P1-T059 |
+| [P1-T069](P1-T069-resume-import-ai-parse.md) | 履歷 PDF 用 AI 整理欄位 | in_progress | 1 | resume-import | P1-T066、P1-T064 |
 
 ## 依賴清單
 
@@ -146,8 +147,9 @@
 - P1-T061：P1-T060 → P1-T063
 - P1-T062：P1-T058 → P1-T064
 - P1-T063：P1-T061 → —
-- P1-T064：P1-T060、P1-T062 → —
+- P1-T064：P1-T060、P1-T062 → P1-T069
 - P1-T065：P1-T009 → P1-T066
-- P1-T066：P1-T065 → —
+- P1-T066：P1-T065 → P1-T069
 - P1-T067：P1-T020 → —
 - P1-T068：P1-T059 → —
+- P1-T069：P1-T066、P1-T064 → —
