@@ -45,6 +45,12 @@ expected_commit: "feat(P1-T069): 履歷 PDF 用 AI 整理成欄位，逐欄照�
   - 捏造：短英數值無詞界（「Go」取自「Google」）→ 英數開頭／結尾要求詞界
   - 日期只要求含數字（「100人」可當開始日期）→ 要求年份或年月格式
 
+- codex 審查待修（2026-10-12，修正 commit 2024faa 的 codex review，協調者寫入）：
+  1. （P1，個資）`resume-parse/text.ts` 逐個碼位正規化，已知姓名含分解式重音（例如 `Jose\u0301 Sample`）時，`createRedactor` 把整段姓名正規化成組合字，比對不到，姓名原文送進模型。組合序列要一起正規化，同時保留原文位置。
+  2. （P2）`resume-parse/labels.ts` 單獨一行的標籤判斷太寬：`Mobile Developer`、`GitHub Actions` 這類一般內容被當成個資標籤，`split` 把它和下一行（例如公司名、技能）一起刪掉。單獨一行要用嚴格的個資標籤辨識。
+  3. （P2）`resume-parse/match.ts` 判斷「至今」時只認西元年（19xx／20xx），`民國110年7月～至今` 會變成 `current: false`。改用與日期驗證相同的年份格式。
+  - 每項補測試。
+
 ### 不包含
 
 - OCR、圖片 PDF
@@ -95,7 +101,7 @@ npm run verify
 
 - 最後完成：首次實作（pipeline resume-parse、helper import.ai_parse／ai_status、編輯器自動整理與退路、規格）；頁首姓名去標語；main.ts 接上 AI 整理服務（協調者擴充 write_paths 後另一個 commit）；第二輪：104 改用規則（擁有者改裁定 #16）、個資遮蔽 8 項與捏造檢查 4 項修正
 - 已通過驗證：worktree `npm run verify` 綠（見完成結果「第二輪」）；第二輪新增的 15 項回歸測試換回舊實作全部失敗；全程假 provider
-- 下一步：協調者收官（對抗驗證、以開發入口用擁有者 PDF 實跑）
+- 下一步：協調者派 worker 修「codex 審查待修」各項（先重現，重現不了就記錄理由不修）；修完 codex review 修正 diff
 - Blocker：無
 
 ## 完成結果
