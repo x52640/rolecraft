@@ -22,6 +22,12 @@ export const RESUME_BLOCK_MAX_LEVEL = 6;
 /** nameText 字數上限（姓名元素的文字；不算進區塊文字合計）。 */
 export const RESUME_CAPTURE_NAME_TEXT_MAX_CHARS = 200;
 
+/**
+ * capturedAt 字數上限：ISO 時間的小數秒本身沒有長度限制，不設上限時超長的小數秒能讓請求超過
+ * 1 MiB、讓 helper 斷線（codex review）。小數秒 9 位＋時區也只有 35 字。
+ */
+export const RESUME_CAPTURE_TIMESTAMP_MAX_CHARS = 40;
+
 /** url 字數上限（只有 origin＋路徑）。 */
 export const RESUME_CAPTURE_URL_MAX_CHARS = 2048;
 
@@ -155,7 +161,7 @@ export const SubmitResumeCaptureRequest = z.strictObject({
     /** LinkedIn 只走手動貼上（D8），不收網頁擷取 */
     platform: Platform.exclude(['linkedin']),
     url: ResumeCaptureUrl,
-    capturedAt: Timestamp,
+    capturedAt: Timestamp.max(RESUME_CAPTURE_TIMESTAMP_MAX_CHARS),
     /** 超過上限時只送前面放得下的完整區塊並標 true */
     truncated: z.boolean(),
     /** 登記的姓名元素的文字；只給 helper 本機遮蔽與預填，不送模型（W6） */

@@ -100,4 +100,5 @@ npm run verify
 - helper：分派表註冊 7 個 handler（`handlers/import/` 三個、`photo/`、`profile/`），服務缺席回 not_implemented；`services.ts` 加 `photo`、`profile`；`needsStorage` 讓新操作在資料區被占用時回 helper_unavailable（測試證明）
 - 上限常數（請協調者稽核）：區塊 2,000、文字含標籤 UTF-8 256 KiB、AI 草稿 512 KiB（以上為規格值）；`nameText` 200 字、url 2,048 字、確認姓名 8 個 × 64 字、縮圖 256 KiB（base64 後連信封 < 1 MiB）、照片原檔 10 MiB、照片最長邊 1,200 px（工作者暫定）。測試證明上限內最大的 `submit_resume_capture` 請求、對應的 `import.get` 回應、`photo.pick` 回應都低於 1 MiB
 - 保守選擇：(1) 需確認姓名／多份 Profile 用失敗回應的 `reason` 表示，不比對文字；(2) 網頁來源丟棄原因沿用 `unknown_line`、`lines_not_consecutive`（不加新值以免編輯器對照表失效）；(3) 新 ImportResult（`web_capture`、`manual`）都帶 `displayName`；(4) `photo.pick` 的 busy 是成功形狀；(5) `submit_resume_capture` 比規格嚴：至少一個區塊、續行須接同種類／層級／標籤、文字標籤與 nameText 只能一行不含控制字元（Tab 除外）、url 須為 `origin+pathname` 正規寫法、LinkedIn 拒收；(6) `import.get` 網頁結果不帶網址與 nameText；`profile.get` 只回已確認的 Profile；(7) `submit_resume_capture` 範例請求放在 editor-requests fixture
+- codex review 修正：`submit_resume_capture.capturedAt` 加長度上限 `RESUME_CAPTURE_TIMESTAMP_MAX_CHARS`（40 字；超長小數秒原可讓請求超過 1 MiB），補回歸測試；本次新增的請求字串欄位皆已有上限
 - 殘餘：import 服務 `aiParse` 介面未加 `names`（P1-T080）

@@ -8,6 +8,7 @@ import {
   RESUME_CAPTURE_MAX_BLOCKS,
   RESUME_CAPTURE_MAX_TEXT_BYTES,
   RESUME_CAPTURE_NAME_TEXT_MAX_CHARS,
+  RESUME_CAPTURE_TIMESTAMP_MAX_CHARS,
   RESUME_CAPTURE_URL_MAX_CHARS,
   resumeCaptureTextBytes,
   utf8ByteLength,
@@ -177,6 +178,15 @@ describe('submit_resume_capture 請求（D28，web-resume-capture）', () => {
     expect(ok(withPayload({ nameText: '' }))).toBe(false);
     const long = '王'.repeat(RESUME_CAPTURE_NAME_TEXT_MAX_CHARS + 1);
     expect(ok(withPayload({ nameText: long }))).toBe(false);
+  });
+
+  it('擷取時間有長度上限：超長小數秒被拒，序列化不會超過 1 MiB（codex review）', () => {
+    expect(ok(withPayload({ capturedAt: '2026-10-10T08:00:00.123456789+08:00' }))).toBe(true);
+    const huge = `2026-10-10T08:00:00.${'0'.repeat(MiB)}Z`;
+    expect(ok(withPayload({ capturedAt: huge }))).toBe(false);
+    const justOver = `2026-10-10T08:00:00.${'0'.repeat(RESUME_CAPTURE_TIMESTAMP_MAX_CHARS - 20)}Z`;
+    expect(justOver.length).toBe(RESUME_CAPTURE_TIMESTAMP_MAX_CHARS + 1);
+    expect(ok(withPayload({ capturedAt: justOver }))).toBe(false);
   });
 
   it('擷取時間要有時區；truncated 必填', () => {
