@@ -45,6 +45,11 @@ export interface WebSplit {
    * 都至少 2 字（遮蔽只遮 2 字以上的姓名，單字不算已辨識；複審 1）。
    */
   readonly labeledNames: readonly string[];
+  /**
+   * 所有姓名標籤的值（含只有姓或名的部分，去重）：一律交給 knownNames 遮蔽與拆別名，
+   * 與上面的確認門檻分開（複審 2-1）。
+   */
+  readonly nameValues: readonly string[];
 }
 
 type Region = { label: string; level: number | null; remaining: number };
@@ -159,7 +164,14 @@ export function splitWebBlocks(blocks: readonly ImportWebBlock[]): WebSplit {
     }
     kept.push(block);
   }
-  return { rows, kept, removed: secretsOf(chains), labeledNames: namesOf(chains) };
+  const nameValues = [...new Set(chains.filter((c) => c.name).map((c) => c.parts.join(' ')))];
+  return {
+    rows,
+    kept,
+    removed: secretsOf(chains),
+    labeledNames: namesOf(chains),
+    nameValues,
+  };
 }
 
 /** 標題區塊開的聯絡區到下一個同級或更高級的標題區塊為止；段落形式的照 PDF 規則（段落標題、最多 8 行）。 */
@@ -180,14 +192,19 @@ function secretsOf(chains: readonly Chain[]): Secret[] {
 
 const atLeastTwo = (value: string) => [...normalizeForMatch(value)].length >= 2;
 
+/** 姓 × 名的組合上限（去重後）；超過就不組合，只用各自的值（複審 2-2，保守：可能因此 name_unconfirmed）。 */
+export const NAME_COMBINATIONS_MAX = 16;
+
 function namesOf(chains: readonly Chain[]): string[] {
   const named = chains.filter((c) => c.name);
-  const valuesOf = (part: ReturnType<typeof namePart>) =>
-    named.filter((c) => namePart(c.label) === part).map((c) => c.parts.join(' '));
+  const valuesOf = (part: ReturnType<typeof namePart>) => [
+    ...new Set(named.filter((c) => namePart(c.label) === part).map((c) => c.parts.join(' '))),
+  ];
   const family = valuesOf('family');
   const given = valuesOf('given');
-  const combined = family.flatMap((f) =>
-    given.flatMap((g) => [f + g, `${f} ${g}`, `${g} ${f}`, g + f]),
-  );
-  return [...valuesOf(null), ...combined].filter(atLeastTwo);
+  const combined =
+    family.length * given.length > NAME_COMBINATIONS_MAX
+      ? []
+      : family.flatMap((f) => given.flatMap((g) => [f + g, `${f} ${g}`, `${g} ${f}`, g + f]));
+  return [...new Set([...valuesOf(null), ...combined])].filter(atLeastTwo);
 }

@@ -39,6 +39,9 @@ expected_commit: "feat(P1-T078): pipeline：網頁區塊來源的去個資、提
   1. （個資）`labels.ts` 新認得的「姓：林」「名：晴」滿足姓名確認條件，但遮蔽只遮 2 字以上姓名，「我是林晴」原樣送出 → 姓＋名合併成完整姓名（含中間空白變體）加入遮蔽；合併不出 ≥2 字姓名時不算已確認姓名（name_unconfirmed）；單字值不加入遮蔽，但標籤區塊一律不送。
   2. （個資）`web-labels.ts` 標籤＋值區塊標籤沒認出、值是「姓名：林雨晴」時，把整串當值，遮蔽比不到後文「我是林雨晴」→ 預填與遮蔽改用內層的值。
   - 補通則測試：任何讓姓名確認條件成立的路徑，其姓名在後文段落都必須被遮蔽。
+- 複審待修 2（2026-10-12，codex 複審修正 commit 8b78299，協調者寫入；fix commit 另提）：
+  1. （個資，退步）名字欄位沒有對應姓氏欄位時，值被排除在 `knownNames` 外、失去別名拆分：「名字：雨晴／Rainy」＋姓名元素「林雨晴」＋段落「英文名 Rainy」→ 提示含 Rainy → 所有姓名部分的值（≥2 字的部分與依 ／ / ( 拆出的別名）一律加入遮蔽與別名抽取，與確認門檻分開；門檻照舊。
+  2. （效能）姓／名組合是笛卡兒積且在去重前產生，近 2000 區塊的重複欄位可產生數百萬字串 → 組合前先去重，並限制組合數上限（超過時只用去重後的值、不組合）。
 
 ### 不包含
 
@@ -95,8 +98,8 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：2026-10-12 複審 2 項修正（第三個 commit `fix(P1-T078): 複審 2 項…`，未 push）；之前：審查 6 項修正
-- 已通過驗證：`npm run verify` 綠（Vitest 3862 通過、13 略過）；P1-T069 既有 resume-parse 測試全過、resume-import header-name 測試全過；104 fixture 粗略區塊模擬 0 項可疑
+- 最後完成：2026-10-12 複審 2 第 2 輪修正（第四個 commit `fix(P1-T078): 複審 2 項（名字部分保留別名拆分、姓名組合去重）`，未 push）；之前：審查 6 項、複審 2 項
+- 已通過驗證：`npm run verify` 綠（Vitest 3865 通過、13 略過）；P1-T069 既有 resume-parse 測試全過、resume-import header-name 測試全過；104 fixture 粗略區塊模擬 0 項可疑
 - 下一步：協調者複審後收官（標 done）；helper 接線在 P1-T080
 - Blocker：無
 - write_paths 擴充理由（協調者 2026-10-12 指示）：審查 1 的英文別名結尾規則與 resume-import `headerNameAlias` 同一條，兩邊要同步，故加入 `packages/resume-import/src/draft/header-name.ts` 與其測試
@@ -125,4 +128,7 @@ npm run verify
   1. `web-labels.ts` `namePart`、`web-personal.ts` `namesOf`：「姓／姓氏／Last Name／Family Name／Surname」與「名／名字／First Name／Given Name／Middle Name」的值合併成完整姓名（姓名、姓 名、名 姓、名姓）加入遮蔽；完整姓名標籤的值、合併姓名都至少 2 字才算辨識。`web-prepare.ts`：姓名元素與使用者確認的姓名也要至少 2 字才算。單字值不加入遮蔽，但標籤區塊照樣移除。
   2. `web-labels.ts` `labelOf`：標籤沒認出時改用內層「標籤：值」的值預填與遮蔽（內層值空白才用整塊）。
   - 通則測試：姓名、Name、Full Name、英文姓名、中文名、英文名、暱稱、姓＋名（兩種順序）、姓氏＋名字、First／Given／Surname 組合、段落、表格列、4 格表格列、標籤獨占一塊、內層標籤、聯絡區內、姓名元素，各自的姓名在後文段落都被遮蔽。104 fixture 模擬重跑仍 0 項可疑。PDF 路徑不受影響。
+- 複審 2 第 2 輪修正（`web-name-paths.test.ts` 新增 3 項，共 29 項全過；修正前 2 項重現失敗）：
+  1. `web-personal.ts` `WebSplit.nameValues`：所有姓名標籤的值（含只有姓或名的部分，去重）一律交給 `knownNames` 遮蔽與依 ／ / ( 拆別名；`labeledNames`（確認門檻：完整姓名或姓＋名合併、至少 2 字）照舊。
+  2. `namesOf`：姓、名的值先去重再組合；去重後組合數（姓 × 名）超過 `NAME_COMBINATIONS_MAX`＝16 時不組合、只用各自的值（保守：此時若沒有完整姓名欄位、姓名元素或使用者確認，會回 name_unconfirmed，要使用者確認姓名）。1000 組不同姓／名欄位的 prepare 實測 16 ms、22 MB。
 

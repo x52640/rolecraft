@@ -56,7 +56,13 @@ export function prepareWebResumeParse(
   if (!recognized && !maskable(confirmed)) return { ok: false, reason: 'name_unconfirmed' };
 
   const names = knownNames(
-    [...split.labeledNames, ...pageNames, ...confirmed, ...filled(inputs.profileNames)],
+    [
+      ...split.labeledNames,
+      ...split.nameValues,
+      ...pageNames,
+      ...confirmed,
+      ...filled(inputs.profileNames),
+    ],
     inputs.blocks.flatMap((b) => (b.label === null ? [b.text] : [b.label, b.text])),
   );
   const { redact, tokens } = createRedactor([

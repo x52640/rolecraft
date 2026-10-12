@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 import { budget, idSource } from '../generation/fixtures.test-helpers.ts';
 import { h, inputsOf, lv, p, tr, type BlockSpec } from './web-fixtures.test-helpers.ts';
+import { splitWebBlocks } from './web-personal.ts';
+import { blocks } from './web-fixtures.test-helpers.ts';
 import { prepareWebResumeParse } from './web-prepare.ts';
 
 const prepare = (specs: readonly BlockSpec[], pageNames: string[] = []) =>
@@ -90,5 +92,39 @@ describe('合併不出 2 字以上的姓名：不算已確認', () => {
     expect(result.prepared.personalInfo).toEqual([
       { label: '姓名', value: { value: '林雨晴', blockId: 'b1', containsPersonalData: false } },
     ]);
+  });
+});
+
+describe('複審 2（2026-10-12）', () => {
+  it('名字欄位沒有姓氏欄位：值與拆出的別名仍加入遮蔽', () => {
+    const specs = [lv('名字', '雨晴／Rainy'), p('英文名 Rainy，大家叫我雨晴')];
+    const result = prepare(specs, ['林雨晴']);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.prepared.prompt).not.toContain('Rainy');
+    expect(result.prepared.prompt).not.toContain('雨晴');
+  });
+
+  it('只有姓氏欄位（2 字以上）也加入遮蔽，但門檻照舊', () => {
+    const specs = [lv('Last Name', 'Linn'), p('Ms Linn 門市')];
+    expect(prepare(specs)).toEqual({ ok: false, reason: 'name_unconfirmed' });
+    const result = prepare(specs, ['林雨晴']);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.prepared.prompt).not.toContain('Linn');
+  });
+
+  it('大量重複的姓／名欄位：先去重、組合數有上限', () => {
+    const many = Array.from({ length: 1000 }, (_, i) => [
+      lv('姓', i % 2 === 0 ? '林' : '王'),
+      lv('名', '雨晴'),
+    ]).flat();
+    const split = splitWebBlocks(blocks(many));
+    expect(split.labeledNames.length).toBeLessThanOrEqual(16);
+    expect(split.labeledNames).toContain('林雨晴');
+    const distinct = Array.from({ length: 1000 }, (_, i) => [
+      lv('Last Name', `Fam${String(i)}`),
+      lv('First Name', `Giv${String(i)}`),
+    ]).flat();
+    const big = splitWebBlocks(blocks(distinct));
+    expect(big.labeledNames.length).toBeLessThan(5000);
   });
 });
