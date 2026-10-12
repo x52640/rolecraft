@@ -7,11 +7,12 @@
 
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本（`docs/tasks/P1-T017-spike-104-job.md`）
 - P1-T077 extension：104 履歷頁登記與 fixture 比對（`docs/tasks/P1-T077-extension-104-resume-page.md`）
+- P1-T080 helper：網頁來源的 AI 整理接線（`docs/tasks/P1-T080-helper-web-ai-parse.md`）
 - P1-T083 helper：照片選取與處理、photo.* 操作（`docs/tasks/P1-T083-helper-photo-ops.md`）
 
 ## ready
 
-- P1-T080 helper：網頁來源的 AI 整理接線
+- 無
 <!-- index:end -->
 
 ## 下一步（2026-10-11 codex 補審後）

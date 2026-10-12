@@ -14,7 +14,9 @@ import { newId as defaultNewId } from '@rolecraft/storage';
 
 import { uniqueProfile } from '../profile/unique.ts';
 import { createAiParser, type AiSource, type ImportAiDeps } from './ai-runner.ts';
+import type { AiJob } from './ai-jobs.ts';
 import { aiSourceOf } from './ai-source.ts';
+import { webInputsOf } from './ai-web-source.ts';
 import type {
   ConfirmOutcome,
   PickPdfOutcome,
@@ -70,6 +72,19 @@ interface ImportEntry {
 function isEmptyProfile(profile: ProfileInput): boolean {
   const hasInfo = Object.values(profile.personalInfo).some((value) => /\S/u.test(value));
   return !hasInfo && profile.experiences.length === 0 && profile.skills.length === 0;
+}
+
+/** 這筆匯入要整理的來源：PDF 用解析出的行；網頁用區塊＋姓名來源（呼叫當下讀資料區 Profile）；手動沒有。 */
+function aiJobOf(
+  entry: ImportEntry,
+  names: readonly string[],
+  profiles: ProfileStore,
+): AiJob | null {
+  if (entry.result.status === 'web_capture' && entry.capture) {
+    const inputs = webInputsOf(entry.result, entry.capture, profiles.list(), names);
+    return { kind: 'web', inputs };
+  }
+  return entry.aiSource === null ? null : { kind: 'pdf', source: entry.aiSource };
 }
 
 export function createResumeImportService(deps: ResumeImportDeps): ResumeImportService {
@@ -176,10 +191,10 @@ export function createResumeImportService(deps: ResumeImportDeps): ResumeImportS
     },
 
     ...(ai && {
-      aiParse(importId: string) {
+      aiParse(importId: string, names: readonly string[] = []) {
         const entry = imports.get(importId);
         if (!entry) return Promise.resolve({ ok: false, reason: 'unknown_import' } as const);
-        return ai.start(importId, entry.aiSource);
+        return ai.start(importId, aiJobOf(entry, names, deps.profiles));
       },
       aiStatus(importId: string) {
         if (!imports.has(importId)) return { ok: false, reason: 'unknown_import' } as const;

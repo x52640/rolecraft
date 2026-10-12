@@ -36,9 +36,17 @@ export type ConfirmOutcome =
  * - no_text：移除姓名與聯絡資料後沒有任何文字可送
  * - no_service：沒有可用且已選定模型的 AI 服務（不代為挑選）
  * - over_budget：提示超過輸入預算（R8）
+ * - name_required：網頁來源，本次頁面姓名沒辨識出來、請求也沒帶可用的確認姓名（P1-T080）
+ * - name_parts_over_limit：網頁來源，姓／名欄位組合過多、遮不全；確認姓名也解不開（P1-T080）
  */
 export type AiParseRefusal =
-  'unknown_import' | 'not_parsed' | 'no_text' | 'no_service' | 'over_budget';
+  | 'unknown_import'
+  | 'not_parsed'
+  | 'no_text'
+  | 'no_service'
+  | 'over_budget'
+  | 'name_required'
+  | 'name_parts_over_limit';
 
 export type AiParseOutcome =
   { ok: true; parse: ImportAiParseView } | { ok: false; reason: AiParseRefusal };
@@ -55,8 +63,11 @@ export interface ResumeImportService {
   saveCorrections?(importId: string, profile: ProfileInput): SaveOutcome;
   /** 以請求帶來的（使用者確認當下看到的）內容寫入 Profile，並標為已確認（R10）。 */
   confirm?(importId: string, profile: ProfileInput): ConfirmOutcome;
-  /** 用選定的 Claude 模型在背景整理（P1-T069）；立即回狀態，已有執行中的就回同一個。 */
-  aiParse?(importId: string): Promise<AiParseOutcome>;
+  /**
+   * 用選定的 Claude 模型在背景整理（P1-T069）；立即回狀態，已有執行中的就回同一個。
+   * names：使用者確認的姓名（網頁來源用於本機遮蔽與送出條件，P1-T080；PDF 不用）。
+   */
+  aiParse?(importId: string, names?: readonly string[]): Promise<AiParseOutcome>;
   /** 最近一次 AI 整理的狀態與（成功時）草稿。 */
   aiStatus?(importId: string): AiStatusOutcome;
   /** D28：建立網頁來源的匯入工作階段（只在記憶體），不呼叫模型。 */

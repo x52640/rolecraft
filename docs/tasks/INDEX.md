@@ -86,7 +86,7 @@
 | [P1-T077](P1-T077-extension-104-resume-page.md) | extension：104 履歷頁登記與 fixture 比對 | in_progress | 1 | extension | P1-T017、P1-T075、P1-T076 |
 | [P1-T078](P1-T078-pipeline-web-resume-parse.md) | pipeline：網頁區塊來源的去個資、提示與照抄檢查 | done | 1 | pipeline | P1-T074 |
 | [P1-T079](P1-T079-helper-import-session-web.md) | helper：網頁擷取與手動輸入的匯入工作階段、確認更新唯一 Profile、profile.get | done | 1 | helper | P1-T074 |
-| [P1-T080](P1-T080-helper-web-ai-parse.md) | helper：網頁來源的 AI 整理接線 | ready | 1 | helper | P1-T078、P1-T079 |
+| [P1-T080](P1-T080-helper-web-ai-parse.md) | helper：網頁來源的 AI 整理接線 | in_progress | 1 | helper | P1-T078、P1-T079 |
 | [P1-T081](P1-T081-editor-web-import-page.md) | editor：匯入頁接網頁擷取與手動輸入 | done | 1 | editor | P1-T074 |
 | [P1-T082](P1-T082-storage-photo-material.md) | storage：照片保存與照片素材的 D19 刪除 | done | 1 | storage | P1-T074 |
 | [P1-T083](P1-T083-helper-photo-ops.md) | helper：照片選取與處理、photo.* 操作 | in_progress | 1 | helper | P1-T082、P1-T079 |

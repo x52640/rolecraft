@@ -1,7 +1,7 @@
 ---
 id: P1-T080
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T078", "P1-T079"]
 specs: ["resume-import.md", "providers.md", "bridge.md"]
 track: helper
@@ -82,9 +82,19 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等相依完成後改 ready
-- Blocker：無（P1-T078、T079 已收官）
+- 最後完成：網頁來源 AI 整理接線＋測試（worker 一個 commit）
+- 已通過驗證：`npm run verify` 綠（Vitest 4137 通過、21 略過）
+- 下一步：協調者收官（對抗驗證 E3、codex review、開發入口手動實跑一次）
+- Blocker：無
 
 ## 完成結果
+
+- 接線：`import.ai_parse` 收 `names`（使用者確認姓名）；網頁來源在按下當下組 `WebResumeParseInputs`（`ai-web-source.ts`）：(1) `cleanHeaderName(nameText)`＋`headerNameAlias(nameText)`（附註 1）、(2) 由 pipeline 從區塊找、(3)／聯絡值＝資料區全部 Profile 的個人資料（姓名類標籤→姓名，其餘 `isPersonalLabel`→聯絡值）、(4) 請求 `names`。網址不放進輸入；送模型的只有 `prepareWebResumeParse` 的提示。
+- 執行：`ai-jobs.ts` 把 PDF／網頁兩種來源的準備與執行收成同一介面，`ai-runner.ts` 沿用既有選模型、R5／R6 每次重做、R6 紀錄、背景執行、執行中不重送；網頁狀態帶 `source: 'web'`、草稿放 `webDraft`。
+- 拒絕對應：`name_unconfirmed`→`invalid_request`＋`reason: name_required`；`name_parts_over_limit`→`invalid_request`（無 reason，訊息「姓名欄位過多，請改用手動輸入」，附註 2）；`no_text`、`over_budget`、`no_service` 照舊；都不呼叫模型。
+- 測試：`web-ai-parse.test.ts`（四個姓名來源各一、只有舊 Profile→name_required 且模型 0 次、確認後才送、單字姓名不算確認、姓名欄位過多、擷取與查詢不呼叫、沒有模型、R6 不通過不送、執行中與同時兩次只送一次、格式錯、還原個資標示）；`web-ai-parse-104.test.ts` 端到端（104 履歷頁結構經 submit_resume_capture→ai_parse→ai_status，假 provider 記錄提示，斷言無姓名、英文名、電話、email、地址、網址）。P1-T077 的 expected-blocks.json 尚未在 main，區塊仿 fixture 與 pipeline 104 測試。
+- 保守選擇：Profile 姓名欄位用本地寬鬆比對（含「姓名」「名字」「name」等就當姓名，多遮不漏）；多份 Profile 時全部的姓名與聯絡值都遮；PDF 路徑忽略 `names`。
+- 殘餘（需協調者／擁有者看）：
+  1. 規格送出條件把「姓名標籤的值」算辨識：頁面只有「英文姓名：Ivy」、姓名元素沒找到（nameText 為 null）時會送出，沒有標籤的頁首中文名會進提示（測試已記錄此行為）。104 有登記姓名元素時不受影響；要堵需改規格（例如只有英文名標籤不算）或 pipeline。
+  2. nameText 是純英文（沒有中文名開頭）時 `cleanHeaderName` 不切，整串含標語當一個姓名遮；單獨出現的英文名（不接中文名）不會被遮。
+  3. `unknownImport` 訊息仍是「請重新選擇 PDF」（網頁來源也用）；未改。
