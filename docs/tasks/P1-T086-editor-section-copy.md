@@ -1,7 +1,7 @@
 ---
 id: P1-T086
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T025", "P1-T064"]
 specs: ["resume-output.md", "evidence-model.md", "bridge.md"]
 track: editor
@@ -79,9 +79,22 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：實作與測試完成（工作者 worktree，單一 commit）
+- 已通過驗證：`npm run verify` 綠（Vitest 3618 通過、13 略過）
+- 下一步：協調者收官前跑對抗驗證（E3）與 codex review
 - Blocker：無
 
 ## 完成結果
+
+- 新增 `apps/editor/src/pages/resumes/copy/`：
+  - `copy-rules.ts`：`copyBlockReason`（空白、任何 R1 問題、已退回、未接受〔只逐段確認另有說明〕、blockers 都不能複製）、`firstProblem`、`COPY_TEXT`。
+  - `useSectionCopy.ts`：按下時 `resume.get` → `resume.check_export` → `resume.get`；兩次讀到的該段完全相同、文字等於畫面、已接受、檢查結果中該段沒有問題與 blocker，才寫剪貼簿。進行中鎖按鈕；卡片卸載、版本切換、畫面上該段改變、頁面有寫入進行中，回應一律作廢。
+  - `SectionCopy.tsx`：按鈕＋停用原因＋結果訊息。
+  - `copy-context.ts`：`publishCopyContext`／`useCopyContext`，由 `useResumeEditor` 發布畫面上的版本 id 與「有無檢查結果」（沒有檢查結果一律不能複製）。
+- `SectionCard.tsx` 加 `<SectionCopy>`；`useResumeEditor.ts` 發布複製用狀態（卸載清空）。未改 `ResumesPage.tsx`。
+- 未儲存修改：段落編輯中卡片被編輯框取代，沒有複製按鈕；檢查期間開始編輯，卡片卸載、回應作廢。
+- 測試：`copy/SectionCopy.test.ts` 11 案例（通過才複製且請求順序固定；R1 問題／只逐段確認未接受／已退回／已接受但有 blocker／沒有檢查結果不能複製；編輯中；重檢變不通過；重檢期間被改；helper 與畫面不一致；進行中鎖定與過期作廢），用假 bridge transport 與假剪貼簿。
+- 保守選擇與殘餘：
+  - `ResumesPage.tsx` 不在 write_paths，版本 id 改由模組層級的小型 store 傳給段落卡片（單一編輯器頁面假設）；若日後 ResumesPage 可改，宜改為 props。
+  - helper 內容與畫面不一致時只提示按「重新整理」，不自動更新畫面（自介是自動同步再按一次）。
+  - 未接受除了 helper blockers 外在本機再擋一次；畫面任何寫入進行中也作廢複製。

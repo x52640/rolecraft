@@ -8,6 +8,7 @@ import { useState } from 'react';
 
 import { hrefFor } from '../../app/router.ts';
 import { COMPLETION_LABELS, TYPE_LABELS } from '../claims/labels.ts';
+import { SectionCopy } from './copy/SectionCopy.tsx';
 import { DECISION_LABELS, STATED_LABELS, placementLabel } from './labels.ts';
 
 interface Props {
@@ -114,6 +115,7 @@ export function SectionCard(props: Props) {
             逐段確認本段屬實
           </button>
         ) : null}
+        <SectionCopy gate={{ section, issues, blockers: props.blockers }} busy={props.busy} />
         {needsClaimWork ? <a href={hrefFor('claims')}>到事實項頁確認</a> : null}
         {confirmDelete ? (
           <>

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
 import type { ResponseOf } from '../../bridge/client.ts';
+import { publishCopyContext } from './copy/copy-context.ts';
 import {
   DEFAULT_RESUME_POLL,
   useGenerateResume,
@@ -82,6 +83,16 @@ export function useResumeEditor(poll: ResumePollOptions = DEFAULT_RESUME_POLL) {
   });
   const cancelGeneration = useRef(generation.cancel);
   cancelGeneration.current = generation.cancel;
+
+  // 段落複製（P1-T086）要知道畫面上的版本與有沒有檢查結果；卸載時清掉，複製一律停用
+  const shownVersion = view?.version.id ?? null;
+  const shownChecked = view?.check != null;
+  useEffect(() => {
+    publishCopyContext(
+      shownVersion === null ? null : { versionId: shownVersion, checked: shownChecked },
+    );
+  }, [shownVersion, shownChecked]);
+  useEffect(() => () => publishCopyContext(null), []);
 
   useEffect(() => {
     void bridge.send({ op: 'jobs.list', payload: {} }).then((res) => {
