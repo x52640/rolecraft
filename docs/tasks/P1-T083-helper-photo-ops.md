@@ -1,7 +1,7 @@
 ---
 id: P1-T083
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T082", "P1-T079"]
 specs: ["resume-output.md", "bridge.md"]
 track: helper
@@ -84,7 +84,7 @@ npm run verify
 
 - 最後完成：2026-10-12 主體 commit 已併入 main；codex review 無發現；對抗驗證屬實 1 項＋小瑕疵 1 項已修（`fix(P1-T083)` commit）
 - 已通過驗證：`npm run verify` 綠（Vitest 4056 通過、19 略過）；`RUN_CHROME=1` 照片測試 27 案例本機通過（含真實 Chrome 夾帶假 SOF 4 案例）
-- 下一步：協調者收官；擁有者／協調者用真實選取器選一張照片（手動驗證）
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，最後一輪 codex review 無發現；main `npm run verify` 綠）
 - Blocker：無
 
 ## 完成結果

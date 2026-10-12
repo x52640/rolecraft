@@ -1,7 +1,7 @@
 ---
 id: P1-T077
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T017", "P1-T075", "P1-T076"]
 specs: ["web-resume-capture.md"]
 track: extension
@@ -84,8 +84,8 @@ npm run verify
 
 - 最後完成（2026-10-12）：全部實作、測試、ADR-0004 5.4、README `RUN_CHROME` 那一列；單一 commit
 - 已通過驗證：`npm run verify` 綠；`RUN_CHROME=1` 下 `apps/extension/src/sites/104/resume` 16 項全過（Chrome 155）
-- 下一步：協調者收官（範圍稽核、codex review）
-- Blocker：無。write_paths 擴充（協調者 2026-10-12 核准）：`background/actions.test.ts`、`relay/resume-relay.test.ts` 是 P1-T076 留的「正式 registry 還沒有履歷頁規則」佔位測試，本 Task 登記規則後必須反轉；`README.md` 只改 `RUN_CHROME` 那一列（補上擴充功能 Chrome 測試）
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，最後一輪 codex review 無發現；main `npm run verify` 綠）
+- Blocker：無
 
 ## 完成結果
 
