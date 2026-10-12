@@ -70,7 +70,7 @@ describe('品質檢查', () => {
     expect(assessQuality(raw(runs))).toMatchObject({ reason: 'reading_order_unreliable' });
   });
 
-  it('只有一頁疊字時，比例以全份字元計算', () => {
+  it('某頁少量疊字（全份與該頁都低於門檻）→ 通過', () => {
     const clean = (pageNumber: number): RawPage => ({
       pageNumber,
       width: 595,
@@ -81,12 +81,52 @@ describe('品質檢查', () => {
       pageNumber: 5,
       width: 595,
       height: 842,
-      runs: [run('Overlapped text'), run('Overlapped text', 55)],
+      runs: [
+        ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => run('Clean line of resume text', 50, 700 - i * 20)),
+        run('Overlapped text'),
+        run('Overlapped text', 55),
+      ],
     };
     const pages = [clean(1), clean(2), clean(3), clean(4), messy];
     expect(disorderRatio(pages)).toBeGreaterThan(0);
     expect(disorderRatio(pages)).toBeLessThan(0.2);
     expect(assessQuality(pages)).toBeNull();
+  });
+
+  it('少數頁整頁疊字或旋轉，即使全份比例被稀釋也擋下', () => {
+    const lines = (pageNumber: number, mutate: (r: TextRun) => TextRun[]): RawPage => ({
+      pageNumber,
+      width: 595,
+      height: 842,
+      runs: Array.from({ length: 40 }, (_, i) =>
+        run('Twenty char resume ln', 50, 800 - i * 20),
+      ).flatMap(mutate),
+    });
+    const ok = (n: number) => lines(n, (r) => [r]);
+    const doubled = [
+      lines(1, (r) => [r, { ...r, x: r.x + 5 }]),
+      ...[2, 3, 4, 5, 6, 7, 8, 9, 10].map(ok),
+    ];
+    expect(disorderRatio(doubled)).toBeLessThan(0.2);
+    expect(assessQuality(doubled)).toMatchObject({ reason: 'reading_order_unreliable' });
+    const rotated = [lines(1, (r) => [{ ...r, rotated: true }]), ...[2, 3, 4, 5].map(ok)];
+    expect(assessQuality(rotated)).toMatchObject({ reason: 'reading_order_unreliable' });
+  });
+
+  it('字太少的頁（例如只有旋轉頁碼）不觸發逐頁門檻', () => {
+    const body: RawPage = {
+      pageNumber: 1,
+      width: 595,
+      height: 842,
+      runs: [0, 1, 2, 3].map((i) => run('Clean line of resume text', 50, 800 - i * 20)),
+    };
+    const label: RawPage = {
+      pageNumber: 2,
+      width: 595,
+      height: 842,
+      runs: [{ ...run('p. 2'), rotated: true }],
+    };
+    expect(assessQuality([body, label])).toBeNull();
   });
 });
 

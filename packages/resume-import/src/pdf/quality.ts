@@ -69,6 +69,19 @@ export function disorderRatio(pages: readonly RawPage[]): number {
   return pages.reduce((sum, p) => sum + disorderedChars(p.runs), 0) / total;
 }
 
+/**
+ * 單頁異常比例的最大值；字太少的頁（例如只有旋轉頁碼）不算，避免誤擋。
+ * 用來抓「少數頁壞掉、被其他正常頁稀釋」的情況。
+ */
+export function worstPageDisorder(pages: readonly RawPage[]): number {
+  let worst = 0;
+  for (const p of pages) {
+    const total = countVisible(p.runs);
+    if (total >= MIN_TEXT_CHARS) worst = Math.max(worst, disorderedChars(p.runs) / total);
+  }
+  return worst;
+}
+
 /** 檢查文字層品質；有問題就回傳失敗，沒問題回傳 null。 */
 export function assessQuality(pages: readonly RawPage[]): ExtractFailure | null {
   const runs = pages.flatMap((p) => p.runs);
@@ -88,11 +101,13 @@ export function assessQuality(pages: readonly RawPage[]): ExtractFailure | null 
     };
   }
   const disorder = disorderRatio(pages);
-  if (disorder > MAX_DISORDER_RATIO) {
+  const worstPage = worstPageDisorder(pages);
+  if (disorder > MAX_DISORDER_RATIO || worstPage > MAX_DISORDER_RATIO) {
+    const share = disorder > MAX_DISORDER_RATIO ? '' : '部分頁面';
     return {
       ok: false,
       reason: 'reading_order_unreliable',
-      message: `有 ${Math.round(disorder * 100)}% 的文字重疊或旋轉，讀取順序不可靠，請手動輸入或校正。`,
+      message: `${share}有 ${Math.round(Math.max(disorder, worstPage) * 100)}% 的文字重疊或旋轉，讀取順序不可靠，請手動輸入或校正。`,
     };
   }
   return null;

@@ -7,6 +7,7 @@ describe('部首相似字還原', () => {
     expect(normalizeCjkLookalikes('⼯作經驗')).toBe('工作經驗');
     expect(normalizeCjkLookalikes('專⻑')).toBe('專長');
     expect(normalizeCjkLookalikes('⾃傳、語⾔能⼒、客⼾')).toBe('自傳、語言能力、客戶');
+    expect(normalizeCjkLookalikes('⻣幹網路、⻇色')).toBe('骨幹網路、角色');
   });
 
   it('全形標點、數字與一般文字不變', () => {
