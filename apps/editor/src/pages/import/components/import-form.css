@@ -145,6 +145,9 @@
   border-radius: 999px;
   background: var(--import-subtle);
   padding: 0 0.25rem 0 0.75rem;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .import-form .import-chip input {
@@ -152,9 +155,14 @@
   background: transparent;
   padding: 0.2rem 0;
   width: auto;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+  text-overflow: ellipsis;
 }
 
 .import-chip-remove {
+  flex-shrink: 0;
   font: inherit;
   cursor: pointer;
   border: 0;

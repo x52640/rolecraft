@@ -113,21 +113,6 @@
   align-items: start;
 }
 
-@media (min-width: 70rem) {
-  .import-layout {
-    grid-template-columns: minmax(0, 3fr) minmax(20rem, 2fr);
-  }
-
-  .import-source {
-    position: sticky;
-    top: 1rem;
-  }
-
-  .import-source-scroll {
-    max-height: calc(100vh - 16rem);
-  }
-}
-
 .import-form-column {
   min-width: 0;
 }
@@ -165,9 +150,25 @@
 }
 
 .import-lines li::marker {
-  color: color-mix(in srgb, currentColor 40%, transparent);
+  color: var(--import-muted);
   font-size: 0.8em;
   font-variant-numeric: tabular-nums;
+}
+
+/* 寬螢幕兩欄；放在原文欄基本規則之後，依視窗高度的限制才不會被 32rem 蓋掉。 */
+@media (min-width: 70rem) {
+  .import-layout {
+    grid-template-columns: minmax(0, 3fr) minmax(20rem, 2fr);
+  }
+
+  .import-source {
+    position: sticky;
+    top: 1rem;
+  }
+
+  .import-source-scroll {
+    max-height: calc(100vh - 16rem);
+  }
 }
 
 .import-draft summary {
@@ -199,8 +200,22 @@
   border-top: 1px solid var(--import-border);
 }
 
-.import-confirm-bar .import-hint {
+.import-confirm-messages {
   margin-right: auto;
+}
+
+.import-confirm-messages p {
+  margin: 0;
+}
+
+/* 確認列黏在底部（換行時約 101px 高）：鍵盤聚焦或捲到的元素至少留出這段距離，不被蓋住。 */
+html:has(.import-confirm-bar) {
+  scroll-padding-bottom: 8rem;
+}
+
+.import-error:focus {
+  outline: 2px solid var(--import-danger);
+  outline-offset: 4px;
 }
 
 .import-visually-hidden {

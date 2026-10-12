@@ -169,6 +169,26 @@ describe('<ImportPage />（P1-T020）', () => {
     const problems = await screen.findByRole('alert', { name: '需要修正' });
     expect(problems.textContent).toContain('第 1 段經歷：公司不可空白');
     expect(sent('import.confirm')).toEqual([]);
+    // 確認列在視窗底部：清單要被聚焦（捲進畫面），確認列也提示項數。
+    await waitFor(() => expect(document.activeElement).toBe(problems));
+    expect(problems.getAttribute('tabindex')).toBe('-1');
+    const bar = screen.getByRole('group', { name: '確認列' });
+    expect(bar.textContent).toContain(`有 ${String(problems.children.length)} 項需要修正`);
+    expect(within(bar).getByRole('note', { name: '尚未存入提醒' })).toBeTruthy();
+  });
+
+  it('再次送出仍失敗：焦點回到錯誤清單', async () => {
+    setup(PARSED);
+    await pickFile();
+    fireEvent.change(screen.getByLabelText('第 1 段經歷公司'), { target: { value: ' ' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: '我已逐欄核對，以上內容正確' }));
+    const confirm = screen.getByRole('button', { name: '確認並寫入個人資料' });
+    fireEvent.click(confirm);
+    const problems = await screen.findByRole('alert', { name: '需要修正' });
+    await waitFor(() => expect(document.activeElement).toBe(problems));
+    confirm.focus();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(document.activeElement).toBe(problems));
   });
 
   it('取消選檔：回到初始畫面，不讀解析結果', async () => {

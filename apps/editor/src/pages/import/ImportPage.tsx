@@ -1,5 +1,5 @@
 import type { BridgeFailure, ImportResult } from '@rolecraft/contracts';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
 import { helperUnavailableText } from '../../bridge/helper-busy.ts';
@@ -38,6 +38,13 @@ export function ImportPage() {
   const [checked, setChecked] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // 每次送出驗證失敗加一：把錯誤清單捲進畫面並聚焦（確認列在視窗底部，清單可能在畫面外）。
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const problemsRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    if (failedAttempts > 0) problemsRef.current?.focus();
+  }, [failedAttempts]);
 
   async function pick() {
     setError(null);
@@ -72,7 +79,11 @@ export function ImportPage() {
   async function submit(review: Extract<Phase, { kind: 'review' }>) {
     setError(null);
     const input = toProfileInput(form);
-    if (!input.ok) return setProblems(input.problems);
+    if (!input.ok) {
+      setProblems(input.problems);
+      setFailedAttempts((n) => n + 1);
+      return;
+    }
     setProblems([]);
     const payload = { importId: review.importId, profile: input.profile };
     setPhase({ kind: 'busy', what: '寫入個人資料…' });
@@ -155,7 +166,13 @@ export function ImportPage() {
             <div className="import-form-column">
               <ProfileFormFields form={form} onChange={changeForm} />
               {problems.length > 0 && (
-                <ul role="alert" aria-label="需要修正" className="import-error">
+                <ul
+                  ref={problemsRef}
+                  tabIndex={-1}
+                  role="alert"
+                  aria-label="需要修正"
+                  className="import-error"
+                >
                   {problems.map((problem) => (
                     <li key={problem}>{problem}</li>
                   ))}
@@ -165,7 +182,7 @@ export function ImportPage() {
             {phase.result.status === 'parsed' && <ParsePreview result={phase.result} />}
           </div>
 
-          <ConfirmBar checked={checked} onCheck={setChecked} />
+          <ConfirmBar checked={checked} onCheck={setChecked} problemCount={problems.length} />
         </form>
       )}
     </section>

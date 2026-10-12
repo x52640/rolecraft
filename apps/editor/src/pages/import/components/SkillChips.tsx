@@ -1,5 +1,8 @@
 import { useId } from 'react';
 
+/** 輸入框寬度跟著字數，但有上限；更長的交給 CSS 限制在欄寬內。 */
+const chipSize = (skill: string): number => Math.min(24, Math.max(4, skill.length + 1));
+
 /** 技能：標籤（chip）樣式，可改、可刪單一個、可新增。 */
 export function SkillChips(props: {
   skills: readonly string[];
@@ -26,7 +29,7 @@ export function SkillChips(props: {
               <input
                 id={`${id}-${n}`}
                 value={skill}
-                size={Math.max(4, skill.length + 1)}
+                size={chipSize(skill)}
                 onChange={(e) => onChange(i, e.target.value)}
               />
               <button
