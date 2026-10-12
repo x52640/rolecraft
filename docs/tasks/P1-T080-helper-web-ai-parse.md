@@ -1,7 +1,7 @@
 ---
 id: P1-T080
 phase: 1
-status: blocked
+status: ready
 depends_on: ["P1-T078", "P1-T079"]
 specs: ["resume-import.md", "providers.md", "bridge.md"]
 track: helper
@@ -27,6 +27,8 @@ expected_commit: "feat(P1-T080): helper：網頁來源 AI 整理接線（姓名�
 - `import.ai_status` 回網頁來源草稿（區塊出處、還原個資旗標、512 KiB 上限失敗）
 
 - 協調者附註（2026-10-12）：P1-T078 回報：`cleanHeaderName(nameText)` 會切掉「中文名 英文名 標語」的英文名，接線時要把 `headerNameAlias` 的結果一起放進姓名來源 (1) 陣列，否則只出現在頁首的英文名不會被遮。
+
+- 協調者附註 2（2026-10-12）：pipeline 新增拒絕原因 `name_parts_over_limit`（姓／名組合超過上限，fail closed），接線時對應 `import.ai_parse` 失敗 `invalid_request`，訊息「姓名欄位過多，請改用手動輸入」；不可對應成 name_required（確認姓名也解不開）。
 
 ### 不包含
 
@@ -83,6 +85,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：等相依完成後改 ready
-- Blocker：相依 P1-T078、P1-T079 未完成
+- Blocker：無（P1-T078、T079 已收官）
 
 ## 完成結果

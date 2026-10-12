@@ -1,7 +1,7 @@
 ---
 id: P1-T078
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T074"]
 specs: ["resume-import.md", "evidence-model.md"]
 track: pipeline
@@ -101,7 +101,7 @@ npm run verify
 
 - 最後完成：2026-10-12 複審 3 修正（第五個 commit `fix(P1-T078): 姓名組合超過上限時拒絕送出（複審）`，未 push）；之前：審查 6 項、複審 2 項、複審 2 第 2 輪
 - 已通過驗證：`npm run verify` 綠（Vitest 3867 通過、13 略過）；P1-T069 既有 resume-parse 測試全過、resume-import header-name 測試全過；104 fixture 粗略區塊模擬 0 項可疑
-- 下一步：協調者複審後收官（標 done）；helper 接線在 P1-T080
+- 下一步：已收官（2026-10-12 協調者：對抗＋codex 共 4 輪審查屬實項皆已修，最後一輪 codex 無發現；main `npm run verify` 綠）
 - Blocker：無
 - write_paths 擴充理由（協調者 2026-10-12 指示）：審查 1 的英文別名結尾規則與 resume-import `headerNameAlias` 同一條，兩邊要同步，故加入 `packages/resume-import/src/draft/header-name.ts` 與其測試
 
