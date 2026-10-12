@@ -1,4 +1,10 @@
-import type { BridgeResponseOf, CheckOutcome, Provider } from '@rolecraft/contracts';
+import type {
+  BridgeResponseOf,
+  CheckOutcome,
+  Provider,
+  ReverifyOutcome,
+  VersionCheckState,
+} from '@rolecraft/contracts';
 
 export type ServiceStatus = Extract<
   BridgeResponseOf<'providers.status'>,
@@ -56,6 +62,25 @@ export const VERIFY_TEXT: Readonly<Record<CheckOutcome, string>> = {
   passed: '已驗證可用，之後的工作會用這個模型。',
   failed: '驗證失敗，沒有改變目前的選擇。',
   unknown: '執行前確認沒有通過，未驗證；沒有改變目前的選擇。',
+};
+
+/** Claude CLI 版本重新驗證（D22、D24；P1-T062）。 */
+export const VERSION_CHECK_TITLE: Readonly<Record<VersionCheckState, string>> = {
+  running: '正在重新驗證',
+  failed: '這個版本的 Claude CLI 已停用',
+  incomplete: '需要重新驗證',
+};
+
+/** 呼叫次數對應 providers 的重新驗證流程（實際 2 次，硬上限 CLAUDE_REVERIFY_MAX_MODEL_CALLS＝3）。 */
+export const REVERIFY_COST_NOTE =
+  '重新啟用會對目前版本重跑一次隔離與「只走訂閱」的安全測試：約 2 次、最多 3 次極短的模型呼叫' +
+  '（用最便宜的模型，算在你的訂閱額度內），可能需要幾分鐘。通過才恢復使用，不會不測就放行。';
+
+export const REVERIFY_RESULT_TEXT: Readonly<Record<ReverifyOutcome, string>> = {
+  passed: '上次重新啟用：通過，已恢復使用。',
+  failed: '上次重新啟用：沒有通過，這個版本仍停用。',
+  not_needed: '上次重新啟用：目前版本不需要重新啟用，沒有呼叫模型。',
+  blocked: '上次重新啟用：沒有開始。',
 };
 
 /** 首版只接 Claude（D13）。 */

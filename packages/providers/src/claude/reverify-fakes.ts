@@ -20,6 +20,8 @@ export interface VersionedFakeOptions {
   readonly formal?: string;
   readonly formalExitCode?: number;
   readonly decoyAuth?: string;
+  /** 空工作目錄的 auth status（預設訂閱登入） */
+  readonly auth?: string;
 }
 
 export function versionedFake(options: VersionedFakeOptions) {
@@ -27,6 +29,7 @@ export function versionedFake(options: VersionedFakeOptions) {
   const version = { stdout: options.versionStdout ?? `${options.version} (Claude Code)\n` };
   const empty = fakeClaude({
     version,
+    ...(options.auth === undefined ? {} : { auth: { stdout: options.auth } }),
     run: { stdout: options.formal ?? ok, exitCode: options.formalExitCode ?? 0 },
   });
   const decoy = fakeClaude({

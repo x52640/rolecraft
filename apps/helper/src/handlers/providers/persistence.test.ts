@@ -41,6 +41,9 @@ function fakeProbe(model: Partial<ClaudeModelCheck> = {}): ClaudeProbe {
   return {
     candidates: ['haiku', 'sonnet', 'opus', 'fable'],
     check: vi.fn(() => Promise.resolve(OK_CHECK)),
+    reverify: vi.fn<NonNullable<ClaudeProbe['reverify']>>(() =>
+      Promise.resolve({ outcome: 'not_needed', reason: null }),
+    ),
     verifyModel: vi.fn<ClaudeProbe['verifyModel']>(() =>
       Promise.resolve({
         verification: 'passed',

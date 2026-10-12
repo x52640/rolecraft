@@ -139,7 +139,7 @@ describe('保存介面', () => {
     expect(res.outcome.status).toBe('blocked');
   });
 
-  it('保存清單已有失敗紀錄 → 啟動即停用，不重跑（連驗證版本也不執行）', async () => {
+  it('保存清單已有失敗紀錄 → 該版本停用、不重跑；其他已驗證版本照常（D24 失敗只綁版本）', async () => {
     const failed: ClaudeVersionRecord = {
       version: NEW,
       outcome: 'failed',
@@ -148,12 +148,16 @@ describe('保存介面', () => {
       modelCalls: 1,
       reason: 'no-tool-calls：x',
     };
-    const fake = versionedFake({ version: '2.1.296' });
+    const fake = versionedFake({ version: NEW });
     const svc = service(memoryStore([failed]).store);
     const res = await svc.run(REQ, runDeps(fake.spawn));
     expect(res.outcome.status).toBe('blocked');
     expect(res.outcome.record.items.cliConfig.basis).toContain('不自動重試');
     expect(fake.modelCalls()).toHaveLength(0);
+
+    const verifiedFake = versionedFake({ version: '2.1.296' });
+    const ok = await service(memoryStore([failed]).store).run(REQ, runDeps(verifiedFake.spawn));
+    expect(ok.outcome.status).toBe('executed');
   });
 });
 

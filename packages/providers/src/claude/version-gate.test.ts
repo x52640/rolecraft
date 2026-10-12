@@ -40,7 +40,7 @@ describe('jsonClaudeVersionStore', () => {
     expect(restarted.canReverify).toBe(true);
   });
 
-  it('只有 verified 才接受：只留下暫定失敗紀錄（中途當掉）→ 重啟後不接受且停用', async () => {
+  it('只有 verified 才接受：只留下暫定紀錄（中途當掉）→ 重啟後不接受、需要重新驗證（D24）', async () => {
     const rows = memoryRows();
     const gate = new ClaudeVersionGate(jsonClaudeVersionStore(rows));
     await gate.load();
@@ -51,7 +51,9 @@ describe('jsonClaudeVersionStore', () => {
     expect(await restarted.load()).toBe(true);
     expect(restarted.isAccepted('9.9.9')).toBe(false);
     expect(restarted.isAccepted(CLAUDE_VERIFIED_VERSION)).toBe(true);
-    expect(restarted.state.kind).toBe('disabled');
+    expect(restarted.statusOf('9.9.9').kind).toBe('incomplete');
+    restarted.observe('9.9.9');
+    expect(restarted.state.kind).toBe('needs_reverify');
   });
 
   it('列內容壞掉：讀取失敗，只接受 ADR-0002 版本、不自動重新驗證', async () => {

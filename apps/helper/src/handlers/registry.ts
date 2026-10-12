@@ -38,6 +38,7 @@ import { submitMessageCapture } from './messages/submit-message-capture.ts';
 import { messagesUpdateDraft } from './messages/update-draft.ts';
 import { providersListCandidates } from './providers/list-candidates.ts';
 import { providersRecheck } from './providers/recheck.ts';
+import { providersReverifyClaude } from './providers/reverify-claude.ts';
 import { providersSelectCandidate } from './providers/select-candidate.ts';
 import { providersStartLogin } from './providers/start-login.ts';
 import { providersStatus } from './providers/status.ts';
@@ -83,6 +84,7 @@ const RAW_HANDLERS: HandlerTable = {
   'providers.list_candidates': providersListCandidates,
   'providers.select_candidate': providersSelectCandidate,
   'providers.start_login': providersStartLogin,
+  'providers.reverify_claude': providersReverifyClaude,
   'export.create': exportCreate,
   'export.list_versions': exportListVersions,
   'export.get_version': exportGetVersion,

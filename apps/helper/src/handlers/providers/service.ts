@@ -27,4 +27,9 @@ export interface ProvidersService {
   listCandidates?(service: Provider): Promise<readonly ServiceCandidate[]>;
   /** 只接受自己列過的候選 ID；請求字串不會直接成為 CLI 參數。 */
   selectCandidate?(service: Provider, candidateId: string): Promise<SelectResult>;
+  /**
+   * 重新啟用 Claude（D24、P1-T062）：在背景對目前版本重跑注入測試，立即回覆。
+   * started=false 表示已有一次在跑；結果記在 Claude 狀態的 versionCheck／lastReverify。
+   */
+  reverifyClaude?(): Promise<{ readonly started: boolean; readonly status: ServiceStatus }>;
 }

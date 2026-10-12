@@ -3,7 +3,12 @@
 import { randomUUID } from 'node:crypto';
 import process from 'node:process';
 
-import type { CheckOutcome, RunCheckRecord } from '@rolecraft/contracts';
+import type {
+  CheckOutcome,
+  ReverifyOutcome,
+  RunCheckRecord,
+  VersionCheck,
+} from '@rolecraft/contracts';
 import {
   checkConnection,
   CLAUDE_MODEL_CANDIDATES,
@@ -25,7 +30,15 @@ export interface ClaudeCheck {
   readonly subscriptionOnly: CheckOutcome;
   /** R5：CLI 版本是已驗證版本（ADR-0002 或 D22 重新驗證通過），且服務未停用 */
   readonly isolation: CheckOutcome;
+  /** 目前版本停用（failed）或上次重新驗證沒完成（incomplete）；其他情況 null／省略（P1-T062） */
+  readonly versionIssue?: VersionCheck | null;
   readonly checkedAt: string;
+}
+
+/** 重新啟用（D24）的結果；reason 已去掉路徑。 */
+export interface ClaudeReverify {
+  readonly outcome: ReverifyOutcome;
+  readonly reason: string | null;
 }
 
 /** 模型短驗證結果。 */
@@ -43,6 +56,8 @@ export interface ClaudeProbe {
   check(): Promise<ClaudeCheck>;
   /** model 只能是 helper 自己的候選常數（呼叫端以 candidateId 查表取得） */
   verifyModel(model: string): Promise<ClaudeModelCheck>;
+  /** 使用者重新啟用：目前版本停用或未完成時重跑注入測試（呼叫模型 3 次以內）；測試替換的 probe 可省略 */
+  reverify?(): Promise<ClaudeReverify>;
   /** 候選別名（CLI 沒有列模型的指令，所以是常數；可用與否要 verifyModel） */
   readonly candidates: readonly string[];
 }
@@ -68,6 +83,19 @@ export interface ClaudeProbeOptions {
  */
 export function createHelperClaudeService(store?: ClaudeVersionStore): ClaudeService {
   return createClaudeService(store ? { store } : {});
+}
+
+/** 給使用者看的原因不帶路徑（R7）：錯誤訊息可能含 CLI 或暫存目錄的絕對路徑。 */
+export const redactPaths = (text: string): string =>
+  text.replace(/(?:~|\/)[^\s：；，、（）()「」]*\/[^\s：；，、（）()「」]*/gu, '〔路徑〕');
+
+function versionIssueOf(service: ClaudeService): VersionCheck | null {
+  const state = service.gate.state;
+  if (state.kind === 'disabled') return { state: 'failed', reason: redactPaths(state.reason) };
+  if (state.kind === 'needs_reverify') {
+    return { state: 'incomplete', reason: redactPaths(state.reason) };
+  }
+  return null;
 }
 
 export function createClaudeProbe(options: ClaudeProbeOptions = {}): ClaudeProbe {
@@ -100,7 +128,23 @@ export function createClaudeProbe(options: ClaudeProbeOptions = {}): ClaudeProbe
         eligibility: connection.eligibility,
         subscriptionOnly: connection.subscriptionOnly,
         isolation,
+        versionIssue: versionIssueOf(service),
         checkedAt: connection.checkedAt,
+      };
+    },
+
+    async reverify() {
+      const result = await service.reverify(deps());
+      if (result.status === 'reverified') return { outcome: 'passed', reason: null };
+      if (result.status === 'blocked') {
+        return {
+          outcome: result.record ? 'failed' : 'blocked',
+          reason: redactPaths(result.reason),
+        };
+      }
+      return {
+        outcome: 'not_needed',
+        reason: `Claude CLI ${result.version} 目前沒有停用，也沒有未完成的重新驗證，不需要重新啟用`,
       };
     },
 

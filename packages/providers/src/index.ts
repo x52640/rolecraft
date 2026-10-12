@@ -81,6 +81,7 @@ export {
   type ClaudeServiceOptions,
   createClaudeService,
   type EnsureVersionResult,
+  type ReverifyResult,
   type ServiceDeps,
 } from './claude/service.ts';
 export {
@@ -91,6 +92,7 @@ export {
   type GateState,
   jsonClaudeVersionStore,
   type ReverifyCaseResult,
+  type VersionStatus,
 } from './claude/version-gate.ts';
 export type { AcceptVersion, StreamViolation } from './claude/stream.ts';
 export {

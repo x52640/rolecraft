@@ -25,9 +25,9 @@ import {
 } from './version-gate.ts';
 
 /**
- * Claude 服務（P1-T039）：適配器＋版本閘門＋自動重新驗證。
- * run()：先讀 CLI 版本；已驗證就照常執行；未驗證就先自動重新驗證（期間與一般執行互斥），
- * 通過才執行。無論哪種情況都經 runWithSubscriptionCheck，被擋下時 RunCheckRecord 會寫原因
+ * Claude 服務（P1-T039、P1-T062）：適配器＋版本閘門＋自動重新驗證。
+ * run()／ensureVersion()：先讀 CLI 版本；已驗證就照常執行；沒有紀錄的版本或上次重新驗證被打斷的版本
+ * 先自動重新驗證（期間與一般執行互斥），通過才執行；最後一筆失敗的版本直接擋下（只有 reverify() 能重跑）。無論哪種情況都經 runWithSubscriptionCheck，被擋下時 RunCheckRecord 會寫原因
  * （停用、重新驗證中 → support 無法確認；版本未驗證 → executionMode unknown）。
  * 版本讀不到、保存清單讀不到、有其他執行進行中 → 不重新驗證、不視為已驗證，該次執行被擋下。
  */
@@ -49,6 +49,10 @@ export type EnsureVersionResult =
       readonly record: ClaudeVersionRecord | null;
     };
 
+/** 使用者按「重新啟用」的結果；not_needed＝目前版本沒有停用也不是未完成，沒有呼叫任何模型。 */
+export type ReverifyResult =
+  EnsureVersionResult | { readonly status: 'not_needed'; readonly version: string };
+
 export interface ClaudeRunResult {
   readonly outcome: RunOutcome;
   readonly version: EnsureVersionResult;
@@ -58,6 +62,8 @@ export interface ClaudeService {
   readonly adapter: ClaudeAdapter;
   readonly gate: ClaudeVersionGate;
   ensureVersion(deps: ServiceDeps): Promise<EnsureVersionResult>;
+  /** 使用者重新啟用：目前版本停用或未完成時，重跑一次注入測試（D24），通過才接受。 */
+  reverify(deps: ServiceDeps): Promise<ReverifyResult>;
   run(request: RunRequest, deps: ServiceDeps): Promise<ClaudeRunResult>;
 }
 
@@ -91,32 +97,35 @@ export function createClaudeService(options: ClaudeServiceOptions = {}): ClaudeS
     }
   };
 
-  const ensureVersion = async (deps: ServiceDeps): Promise<EnsureVersionResult> => {
+  type Located = { readonly storeOk: boolean; readonly path: string; readonly version: string };
+
+  /** 讀保存清單、找 CLI、讀版本（--version 不呼叫模型）並記為目前版本；失敗回 blocked。 */
+  const locateVersion = async (deps: ServiceDeps): Promise<Located | EnsureVersionResult> => {
     const storeOk = await gate.load();
-    const state = gate.state;
-    if (state.kind === 'disabled') return blocked(state.reason);
-    if (state.kind === 'reverifying') return blocked(REVERIFYING_REASON);
+    if (gate.state.kind === 'reverifying') return blocked(REVERIFYING_REASON);
     const path = await locate();
     if (!path) return blocked('找不到官方 Claude CLI');
     const version = await readVersion(path, deps);
     if (version === null) return blocked('無法取得 Claude CLI 版本，不視為已驗證');
-    if (gate.isAccepted(version)) return { status: 'ready', version };
-    if (!storeOk) {
-      return blocked(`Claude CLI ${version} 未驗證，且無法讀取已驗證版本清單，不做自動重新驗證`);
-    }
+    gate.observe(version);
+    return { storeOk, path, version };
+  };
+
+  /** 對這個版本重跑注入測試：先存暫定紀錄（寫不進去就 0 次模型呼叫），再跑、再存結果。 */
+  const reverifyNow = async (
+    { path, version }: Located,
+    deps: ServiceDeps,
+  ): Promise<EnsureVersionResult> => {
     if (!gate.beginReverify(version)) {
-      const now = gate.state;
-      if (now.kind === 'disabled') return blocked(now.reason);
       return blocked(
-        now.kind === 'reverifying'
+        gate.state.kind === 'reverifying'
           ? REVERIFYING_REASON
           : `Claude CLI ${version} 需要重新驗證，但有其他 Claude 執行進行中；請稍後再試`,
       );
     }
-    // 先寫暫定失敗紀錄；寫不進去就 0 次模型呼叫、直接停用。
     if (!(await gate.saveProvisional(version, deps.now().toISOString()))) {
-      const now = gate.state;
-      return blocked(now.kind === 'disabled' ? now.reason : '無法保存驗證狀態');
+      const status = gate.statusOf(version);
+      return blocked(status.kind === 'failed' ? status.reason : '無法保存驗證狀態');
     }
     let record: ClaudeVersionRecord;
     try {
@@ -136,15 +145,43 @@ export function createClaudeService(options: ClaudeServiceOptions = {}): ClaudeS
       };
     }
     const final = await gate.finishReverify(record);
-    return final.outcome === 'verified'
-      ? { status: 'reverified', record: final }
-      : blocked(final.reason ?? '自動重新驗證未通過', final);
+    if (final.outcome === 'verified') return { status: 'reverified', record: final };
+    const status = gate.statusOf(version);
+    return blocked(status.kind === 'failed' ? status.reason : '重新驗證未通過', final);
+  };
+
+  const ensureVersion = async (deps: ServiceDeps): Promise<EnsureVersionResult> => {
+    const located = await locateVersion(deps);
+    if ('status' in located) return located;
+    const { storeOk, version } = located;
+    const status = gate.statusOf(version);
+    if (status.kind === 'accepted') return { status: 'ready', version };
+    // 失敗只綁這個版本，不自動重試；要使用者在設定頁重新啟用（D24）。
+    if (status.kind === 'failed') return blocked(status.reason);
+    if (!storeOk) {
+      return blocked(`Claude CLI ${version} 未驗證，且無法讀取已驗證版本清單，不做自動重新驗證`);
+    }
+    // 沒有紀錄的新版本（D22）或上次被打斷（incomplete，D24）：這次是使用者發起的工作，重跑。
+    return reverifyNow(located, deps);
+  };
+
+  const reverify = async (deps: ServiceDeps): Promise<ReverifyResult> => {
+    const located = await locateVersion(deps);
+    if ('status' in located) return located;
+    const status = gate.statusOf(located.version);
+    // 只在目前版本停用或未完成時可用；不提供「不測就放行」。
+    if (status.kind !== 'failed' && status.kind !== 'incomplete') {
+      return { status: 'not_needed', version: located.version };
+    }
+    if (!located.storeOk) return blocked('無法讀取已驗證版本清單，不做重新驗證');
+    return reverifyNow(located, deps);
   };
 
   return {
     adapter,
     gate,
     ensureVersion,
+    reverify,
     async run(request, deps) {
       const runDeps = claudeRunDeps(deps, { acceptVersion: gate.isAccepted });
       // 已取消就不讀版本、不觸發重新驗證；交給 runWithSubscriptionCheck 回 cancelled（不啟動子程序）。

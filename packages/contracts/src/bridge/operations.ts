@@ -39,6 +39,7 @@ export const BridgeOperation = z.enum([
   'providers.list_candidates',
   'providers.select_candidate',
   'providers.start_login',
+  'providers.reverify_claude', // 重新啟用 Claude：重跑注入測試，通過才接受（P1-T062、D24）
   // export：匯出版本（P1-T040）
   'export.create',
   'export.list_versions',

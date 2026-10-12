@@ -14,6 +14,7 @@ import {
   createClaudeProbe,
   createHelperClaudeService,
 } from './claude-probe.ts';
+import { createClaudeReverifyRunner } from './claude-reverify.ts';
 import type { ProvidersStore } from './persistence.ts';
 import type { ProvidersService, SelectResult, ServiceCandidate, ServiceStatus } from './service.ts';
 import { ALL_SERVICES, claudeState, initialStatus } from './state.ts';
@@ -68,6 +69,8 @@ interface CandidateEntry {
 export interface ProvidersServiceImpl extends Required<ProvidersService> {
   /** 最近一次模型短驗證的 R6 確認紀錄（S9-2 證據；有資料區時另寫進 run_check_records） */
   readonly lastRunCheck: RunCheckRecord | null;
+  /** 進行中的背景重新啟用（測試等它結束用） */
+  readonly reverifyTask: Promise<void> | null;
 }
 
 export function createProvidersService(
@@ -105,8 +108,13 @@ export function createProvidersService(
   /** 這個程序內短驗證通過過的模型（provider_connections.availableModels） */
   const verifiedModels = new Set<string>();
 
-  const current = (service: Provider): ServiceStatus =>
-    statuses.get(service) ?? initialStatus(service);
+  // 重新啟用（D24）：背景重跑注入測試，跑完重新檢查；狀態上疊 versionCheck／lastReverify。
+  const reverify = createClaudeReverifyRunner(probe, () => refresh());
+
+  const current = (service: Provider): ServiceStatus => {
+    const status = statuses.get(service) ?? initialStatus(service);
+    return service === 'claude' ? reverify.decorate(status) : status;
+  };
 
   const update = (service: Provider, patch: Partial<ServiceStatus>): ServiceStatus => {
     const next = { ...current(service), ...patch };
@@ -133,6 +141,7 @@ export function createProvidersService(
   };
 
   const applyCheck = (check: ClaudeCheck): ServiceStatus => {
+    reverify.noteCheck(check.versionIssue ?? null);
     const next = update('claude', {
       state: claudeState(check, false),
       login: check.login,
@@ -191,6 +200,15 @@ export function createProvidersService(
   const impl: ProvidersServiceImpl = {
     get lastRunCheck() {
       return lastRunCheck;
+    },
+
+    get reverifyTask() {
+      return reverify.task;
+    },
+
+    reverifyClaude() {
+      const started = reverify.start();
+      return Promise.resolve({ started, status: current('claude') });
     },
 
     status() {

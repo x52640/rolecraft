@@ -77,7 +77,7 @@ describe('版本不同', () => {
     expect(saved).toHaveLength(2);
     expect(saved[0]).toMatchObject({
       version: NEW,
-      outcome: 'failed',
+      outcome: 'incomplete',
       reason: '重新驗證未完成',
       modelCalls: 0,
     });
@@ -136,7 +136,7 @@ describe('版本不同', () => {
     expect(svc.adapter.support.state).toBe('cannot_confirm');
     expect(first.outcome.status).toBe('blocked');
     expect(first.outcome.record.executed).toBe(false);
-    expect(first.outcome.record.items.subscriptionLogin.basis).toContain('自動重新驗證失敗');
+    expect(first.outcome.record.items.subscriptionLogin.basis).toContain('重新驗證失敗');
     const calls = fake.modelCalls().length;
 
     const again = await svc.run(REQ, runDeps(fake.spawn));

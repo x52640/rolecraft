@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BridgeProvider } from '../../bridge/BridgeProvider.tsx';
 import type { BridgeTransport } from '../../bridge/transport.ts';
 import type { ServiceStatus } from './labels.ts';
-import { SettingsPage } from './SettingsPage.tsx';
+import { REVERIFY_POLL_MS, SettingsPage } from './SettingsPage.tsx';
 
 afterEach(cleanup);
 
@@ -181,5 +181,77 @@ describe('<SettingsPage />', () => {
     renderPage(null);
     await screen.findByRole('alert');
     expect(screen.queryByRole('article')).toBeNull();
+  });
+
+  describe('重新啟用 Claude（P1-T062）', () => {
+    const FAILED = { state: 'failed' as const, reason: 'Claude CLI 2.1.300 重新驗證失敗：x' };
+    const RUNNING = { state: 'running' as const, reason: '正在重跑注入測試' };
+
+    it('停用時顯示原因、呼叫次數說明與重新啟用；執行中按鈕停用，結果出來後更新', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      try {
+        let claude = status({ service: 'claude', versionCheck: FAILED });
+        const requests: string[] = [];
+        const transport: BridgeTransport = {
+          send: vi.fn((raw: unknown) => {
+            const { op } = raw as { op: string };
+            requests.push(op);
+            if (op === 'providers.reverify_claude') {
+              claude = { ...claude, versionCheck: RUNNING };
+              return Promise.resolve({ ok: true, started: true, status: claude });
+            }
+            return Promise.resolve({
+              ok: true,
+              services: [claude, status({ service: 'codex' }), status({ service: 'antigravity' })],
+            });
+          }),
+        };
+        renderPage(transport);
+        const claudeCard = await screen.findByRole('article', { name: /Claude/ });
+        expect(within(claudeCard).getByText('這個版本的 Claude CLI 已停用')).toBeTruthy();
+        expect(within(claudeCard).getByText(FAILED.reason)).toBeTruthy();
+        expect(within(claudeCard).getByText(/最多 3 次極短的模型呼叫/)).toBeTruthy();
+
+        fireEvent.click(within(claudeCard).getByRole('button', { name: '重新啟用' }));
+        const busy = await within(card(/Claude/)).findByRole('button', { name: '重新驗證中…' });
+        expect((busy as HTMLButtonElement).disabled).toBe(true);
+        expect(requests.filter((op) => op === 'providers.reverify_claude')).toHaveLength(1);
+        // helper 回覆「執行中」後才開始輪詢
+        await within(card(/Claude/)).findByText(RUNNING.reason);
+
+        claude = {
+          ...claude,
+          state: 'available',
+          versionCheck: null,
+          lastReverify: { outcome: 'passed', reason: null, finishedAt: '2026-10-12T00:00:00Z' },
+        };
+        await act(async () => {
+          vi.advanceTimersByTime(REVERIFY_POLL_MS);
+          await Promise.resolve();
+        });
+        await within(card(/Claude/)).findByText(/上次重新啟用：通過/);
+        expect(within(card(/Claude/)).getByText('可用')).toBeTruthy();
+        expect(within(card(/Claude/)).queryByRole('button', { name: '重新啟用' })).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('沒有停用也沒有結果時不顯示重新啟用', async () => {
+      const { transport } = fakeHelper({ state: 'available' });
+      renderPage(transport);
+      await screen.findByRole('article', { name: /Claude/ });
+      expect(screen.queryByRole('button', { name: '重新啟用' })).toBeNull();
+    });
+
+    it('需要重新驗證（上次沒跑完）也顯示原因與按鈕', async () => {
+      const { transport } = fakeHelper({
+        versionCheck: { state: 'incomplete', reason: '上次沒有完成' },
+      });
+      renderPage(transport);
+      const claudeCard = await screen.findByRole('article', { name: /Claude/ });
+      expect(within(claudeCard).getByText('需要重新驗證')).toBeTruthy();
+      expect(within(claudeCard).getByRole('button', { name: '重新啟用' })).toBeTruthy();
+    });
   });
 });

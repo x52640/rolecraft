@@ -5,12 +5,16 @@ import { useBridge } from '../../bridge/BridgeProvider.tsx';
 import { SERVICE_ORDER, type ServiceStatus } from './labels.ts';
 import { ProviderCard } from './ProviderCard.tsx';
 
+/** 重新驗證進行中時輪詢狀態的間隔（P1-T062）。 */
+export const REVERIFY_POLL_MS = 3000;
+
 /** 設定：AI 服務狀態與設定精靈（F01、S9-1、S9-3；P1-T030）。 */
 export function SettingsPage() {
   const bridge = useBridge();
   const [statuses, setStatuses] = useState<readonly ServiceStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState<Provider | null>(null);
+  const [reverifyStarting, setReverifyStarting] = useState(false);
 
   const load = useCallback(async () => {
     const res = await bridge.send({ op: 'providers.status', payload: {} });
@@ -26,6 +30,21 @@ export function SettingsPage() {
     void load();
   }, [load]);
 
+  // 重新驗證在 helper 背景跑（可能數分鐘）：進行中就定時重讀狀態，直到結果出來。
+  const reverifyRunning = statuses?.some((s) => s.versionCheck?.state === 'running') ?? false;
+  useEffect(() => {
+    if (!reverifyRunning) return undefined;
+    const timer = setInterval(() => void load(), REVERIFY_POLL_MS);
+    return () => clearInterval(timer);
+  }, [reverifyRunning, load]);
+
+  const replaceStatus = (next: ServiceStatus) =>
+    setStatuses((prev) =>
+      (prev ?? []).some((s) => s.service === next.service)
+        ? (prev ?? []).map((s) => (s.service === next.service ? next : s))
+        : [...(prev ?? []), next],
+    );
+
   const recheck = async (service: Provider) => {
     setChecking(service);
     const res = await bridge.send({ op: 'providers.recheck', payload: { service } });
@@ -35,11 +54,19 @@ export function SettingsPage() {
       return;
     }
     setError(null);
-    setStatuses((prev) =>
-      (prev ?? []).some((s) => s.service === service)
-        ? (prev ?? []).map((s) => (s.service === service ? res.status : s))
-        : [...(prev ?? []), res.status],
-    );
+    replaceStatus(res.status);
+  };
+
+  const reverify = async () => {
+    setReverifyStarting(true);
+    const res = await bridge.send({ op: 'providers.reverify_claude', payload: {} });
+    setReverifyStarting(false);
+    if (!res.ok) {
+      setError(`重新啟用失敗：${res.error.message}`);
+      return;
+    }
+    setError(null);
+    replaceStatus(res.status);
   };
 
   const ordered = SERVICE_ORDER.flatMap((service) => {
@@ -75,6 +102,8 @@ export function SettingsPage() {
             busy={checking === status.service}
             onRecheck={() => void recheck(status.service)}
             onSettled={() => void load()}
+            reverifyStarting={reverifyStarting}
+            onReverify={() => void reverify()}
           />
         ))}
       </div>

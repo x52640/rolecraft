@@ -54,7 +54,7 @@ describe('使用者設定：init 欄位嚴格檢查（只用於重新驗證）',
   });
 });
 
-describe('呼叫模型前先寫暫定失敗紀錄', () => {
+describe('呼叫模型前先寫暫定紀錄', () => {
   it('保存一直丟錯 → 模型呼叫 0 次、停用；多次重啟仍 0 次', async () => {
     const fake = versionedFake({ version: NEW });
     const store: ClaudeVersionStore = {
@@ -71,7 +71,7 @@ describe('呼叫模型前先寫暫定失敗紀錄', () => {
     expect(fake.modelCalls()).toHaveLength(0);
   });
 
-  it('重新驗證中途當掉 → 重啟讀到暫定失敗紀錄，維持停用、不再呼叫模型', async () => {
+  it('重新驗證中途當掉 → 重啟讀到暫定紀錄：需要重新驗證、不自己呼叫模型；使用者發起工作才重跑一次（D24）', async () => {
     const fake = versionedFake({ version: NEW });
     const records: ClaudeVersionRecord[] = [];
     const store: ClaudeVersionStore = {
@@ -83,7 +83,7 @@ describe('呼叫模型前先寫暫定失敗紀錄', () => {
     };
     let reached!: () => void;
     const hung = new Promise<void>((r) => (reached = r));
-    // 模擬當掉：沙箱建立永遠不回來（程序在呼叫模型前後被殺都一樣，紀錄已是失敗）
+    // 模擬當掉：沙箱建立永遠不回來（程序在呼叫模型前後被殺都一樣，紀錄是暫定）
     const makeSandbox = () => {
       reached();
       return new Promise<never>(() => undefined);
@@ -91,16 +91,23 @@ describe('呼叫模型前先寫暫定失敗紀錄', () => {
     void service(store).run(REQ, { ...runDeps(fake.spawn), makeSandbox });
     await hung;
     expect(records).toEqual([
-      expect.objectContaining({ version: NEW, outcome: 'failed', reason: '重新驗證未完成' }),
+      expect.objectContaining({ version: NEW, outcome: 'incomplete', reason: '重新驗證未完成' }),
     ]);
 
+    const spawned = fake.calls().length;
     const restarted = service(store);
-    const res = await restarted.run(REQ, runDeps(fake.spawn));
-    expect(restarted.gate.state.kind).toBe('disabled');
-    expect(res.outcome.status).toBe('blocked');
-    expect(res.outcome.record.items.cliConfig.basis).toContain('重新驗證未完成');
+    expect(await restarted.gate.load()).toBe(true);
+    expect(restarted.gate.statusOf(NEW).kind).toBe('incomplete');
+    expect(restarted.adapter.support.state).toBe('supported');
+    expect(fake.calls()).toHaveLength(spawned);
     expect(fake.modelCalls()).toHaveLength(0);
-    expect(records).toHaveLength(1);
+
+    const res = await restarted.run(REQ, runDeps(fake.spawn));
+    expect(res.version.status).toBe('reverified');
+    expect(res.outcome.status).toBe('executed');
+    // 重新驗證 2 次＋這次工作 1 次
+    expect(fake.modelCalls()).toHaveLength(3);
+    expect(records.map((r) => r.outcome)).toEqual(['incomplete', 'incomplete', 'verified']);
   });
 
   it('同版本以最後一筆為準：暫定失敗之後的 verified 覆蓋', async () => {

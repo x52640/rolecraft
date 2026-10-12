@@ -7,16 +7,27 @@ import {
   STATE_TEXT,
 } from './labels.ts';
 import { ModelPicker } from './ModelPicker.tsx';
+import { ReverifyPanel } from './ReverifyPanel.tsx';
 
 interface ProviderCardProps {
   status: ServiceStatus;
   busy: boolean;
   onRecheck: () => void;
   onSettled: () => void;
+  /** 重新啟用請求送出中 */
+  reverifyStarting: boolean;
+  onReverify: () => void;
 }
 
 /** 單一服務的狀態卡：狀態、各項檢查、下一步；可用時才顯示模型選擇。 */
-export function ProviderCard({ status, busy, onRecheck, onSettled }: ProviderCardProps) {
+export function ProviderCard({
+  status,
+  busy,
+  onRecheck,
+  onSettled,
+  reverifyStarting,
+  onReverify,
+}: ProviderCardProps) {
   const name = SERVICE_NAMES[status.service];
   const text = STATE_TEXT[status.state];
   const supported = isFirstVersionSupported(status.service);
@@ -43,6 +54,7 @@ export function ProviderCard({ status, busy, onRecheck, onSettled }: ProviderCar
           <button type="button" onClick={onRecheck} disabled={busy}>
             {busy ? '檢查中…' : '重新檢查'}
           </button>
+          <ReverifyPanel status={status} starting={reverifyStarting} onReverify={onReverify} />
           {status.state === 'available' ? (
             <ModelPicker
               service={status.service}

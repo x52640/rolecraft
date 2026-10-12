@@ -76,16 +76,26 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：
-- 已通過驗證：
-- 下一步：
-- Blocker：
+- 最後完成：版本閘門改以版本為單位（verified／failed／incomplete）、`providers.reverify_claude` 背景重新啟用、設定頁原因與按鈕、spec 規則
+- 已通過驗證：worktree 內 `npm run verify` 綠（3008 個測試：2995 通過、13 略過）；全部用假 spawn，未呼叫真實 CLI
+- 下一步：協調者收官（高風險：對抗驗證）
+- Blocker：無
 
 ## 完成結果
+
+- providers.md 新增 P1-T062 規則（D24）：每個版本以最後一筆為準，分 verified／failed／incomplete。暫定紀錄改用獨立 outcome `incomplete`；P1-T058 舊格式（outcome=failed、reason 為舊暫定原因字串（PROVISIONAL_REASON）、沒有案例）讀成 incomplete。
+- 版本閘門（`version-gate.ts`）：記每個版本最後一筆；`observe` 記目前讀到的版本，停用（`disabled`）與「需要重新驗證」（`needs_reverify`）只看目前版本；`statusOf(version)` 給原因。暫定紀錄寫不進去 → 該版本只在記憶體記為失敗、0 次模型呼叫。
+- 服務（`service.ts`）：`ensureVersion` 對沒有紀錄或 incomplete 的版本自動重跑（使用者發起的重新檢查、選定模型、生成／分析才會走到），failed 版本直接擋下；新增 `reverify()`：只在目前版本 failed／incomplete 時重跑，其他回 `not_needed`，沿用互斥、暫定紀錄、R6 案例在模型呼叫之前等保護。
+- 橋接：新增 `providers.reverify_claude`（payload 空），helper 在背景跑、立即回 `{ started, status }`；`ServiceStatus` 加選填 `versionCheck`（running／failed／incomplete＋原因）與 `lastReverify`（passed／failed／not_needed／blocked＋原因＋時間）。原因先去掉路徑再回（R7）。背景執行理由：重新驗證最長十幾分鐘，擴充功能一般請求逾時 30 秒。
+- 編輯器設定頁：Claude 卡片在停用或需要重新驗證時顯示原因、呼叫次數說明（約 2 次、最多 3 次）與「重新啟用」；執行中按鈕停用並每 3 秒重讀狀態，結果出來後顯示上次重新啟用結果。
+- 測試：`reverify-recovery.test.ts`（失敗綁版本 A→B→A、舊資料相容、重新啟用通過／不通過／不需要、互斥、R6 不通過 0 次模型呼叫、建立服務與查狀態不啟動程式）、`reverify-strict.test.ts`（中斷→重開需要重新驗證、0 次呼叫；使用者發起工作重跑一次）、helper `reverify-claude.test.ts`（真實檢查路徑＋假 spawn、schema 相符）、編輯器 `SettingsPage.test.ts`。
+- 範圍外改動：`packages/contracts/src/bridge/operations.ts`（操作列舉加一項）與 `packages/contracts/src/bridge/__fixtures__/editor-requests.ts`（fixture 加一項）。新增橋接操作一定要改這兩個檔，write_paths 沒列；協調者訊息允許本 Task 改 contracts，兩處都只加一行。
+- 保守選擇：重新檢查（使用者按的）遇到 incomplete 或新版本會自動重跑，與 D22 原本行為一致；重新啟用時 R6 不通過也會記一筆 failed（注入測試的 auth-subscription 案例在模型呼叫之前失敗）。
+- 手動驗證：無（live 測試不在本 Task）。
 

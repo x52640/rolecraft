@@ -60,6 +60,7 @@ export const editorRequests = {
     payload: { service: 'claude', candidateId: ID },
   },
   'providers.start_login': { op: 'providers.start_login', payload: { service: 'codex' } },
+  'providers.reverify_claude': { op: 'providers.reverify_claude', payload: {} },
   'export.create': { op: 'export.create', payload: { resumeVersionId: ID } },
   'export.list_versions': { op: 'export.list_versions', payload: {} },
   'export.get_version': { op: 'export.get_version', payload: { exportVersionId: ID } },

@@ -27,6 +27,9 @@ describe('驗證槽位硬期限', () => {
       const probe = {
         candidates: ['haiku', 'sonnet'],
         check: vi.fn(() => Promise.resolve(OK_CHECK)),
+        reverify: vi.fn<NonNullable<ClaudeProbe['reverify']>>(() =>
+          Promise.resolve({ outcome: 'not_needed', reason: null }),
+        ),
         verifyModel: vi.fn<ClaudeProbe['verifyModel']>(),
       } satisfies ClaudeProbe;
       probe.verifyModel.mockImplementationOnce(() => new Promise((r) => (finishHung = r)));
@@ -74,6 +77,9 @@ describe('驗證槽位硬期限', () => {
       const probe = {
         candidates: ['haiku', 'sonnet'],
         check: vi.fn<ClaudeProbe['check']>(),
+        reverify: vi.fn<NonNullable<ClaudeProbe['reverify']>>(() =>
+          Promise.resolve({ outcome: 'not_needed', reason: null }),
+        ),
         verifyModel: vi.fn<ClaudeProbe['verifyModel']>(),
       } satisfies ClaudeProbe;
       probe.check.mockResolvedValueOnce(OK_CHECK);

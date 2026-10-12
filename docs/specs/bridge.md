@@ -61,6 +61,7 @@
 | `providers.recheck` | 重新檢查一家 |
 | `providers.list_candidates` | 該服務實際可用的模型候選（id 由 helper 配發＋顯示名稱） |
 | `providers.select_candidate` | 選定候選並短驗證；只接受 helper 列過的候選 id，請求字串不會直接成為 CLI 參數 |
+| `providers.reverify_claude` | 重新啟用 Claude（D24、P1-T062）：目前 CLI 版本停用或重新驗證未完成時，helper 在背景重跑注入測試、立即回覆；進度與結果看 `providers.status` 的 `versionCheck`／`lastReverify`（只有 Claude 有）。其他情況回「不需要」、不呼叫模型；沒有不測就放行 |
 | `providers.start_login` | 開啟該服務的官方登入流程；不代為輸入、不擷取憑證（D3） |
 | `export.create` | 以履歷版本匯出 PDF、建立不可變匯出版本（R3）；R1 未過，或有段落阻擋（與 `resume.check_export` 的 blockers 同一套規則：未接受、已退回、缺段落歸屬、對不到經歷）回 not_ready，不呼叫匯出器（P1-T040、P1-T025） |
 | `export.list_versions`／`export.get_version` | 匯出版本清單／單一版本內容 |
