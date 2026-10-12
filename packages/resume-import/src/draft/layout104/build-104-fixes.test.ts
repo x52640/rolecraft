@@ -108,3 +108,32 @@ describe('網址與標籤切法', () => {
     ]);
   });
 });
+
+describe('子職務日期留在描述（codex 複審）', () => {
+  const entry = (subRows: ReturnType<typeof r>[]) => [
+    page104(1, [
+      r(23, 11.7, '學歷'),
+      r(23, 10.5, '示範大學'),
+      r(23, 11.7, '工作經驗'),
+      r(68, 11.7, '專案經理'),
+      r(505, 9.4, '2019/1~2020/12', { column: 1, dy: -2 }),
+      r(68, 10.5, '範例資訊有限公司（電腦軟體服務業 30~100人）', { dy: 17 }),
+      r(68, 9.4, '專案管理 | 台北市'),
+      ...subRows,
+      r(77, 10.5, '• 帶領三人小組。'),
+      r(23, 11.7, '自傳'),
+    ]),
+  ];
+
+  it('描述裡的「子職務 |⇥日期」不拆成主日期，經歷起訖不變', () => {
+    const [exp] = build104(entry([r(68, 10.5, '會員專案 |\t2018/1~2021/6')]))?.experiences ?? [];
+    expect([exp?.startDate?.value, exp?.endDate?.value]).toEqual(['2019/1', '2020/12']);
+    expect(exp?.description?.value).toBe('會員專案 | 2018/1~2021/6\n• 帶領三人小組。');
+  });
+
+  it('「子職務 | 日期」小字行不被當成職務類別略過', () => {
+    const [exp] = build104(entry([r(68, 9.4, '會員專案 | 2021/01 – 2022/06')]))?.experiences ?? [];
+    expect(exp?.description?.value).toBe('會員專案 | 2021/01 – 2022/06\n• 帶領三人小組。');
+    expect([exp?.startDate?.value, exp?.endDate?.value]).toEqual(['2019/1', '2020/12']);
+  });
+});

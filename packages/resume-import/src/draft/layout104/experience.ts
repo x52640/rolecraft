@@ -45,9 +45,14 @@ const unclosed = (text: string): boolean => count(text, /[（(]/gu) > count(text
 /** 104 公司行特徵：結尾「（…業 …人）」。 */
 const INDUSTRY_SIZE = /[（(][^（）()]*業[^（）()]*\d[^（）()]*人[^（）()]*[）)]\s*$/u;
 const isBullet = (at: Located): boolean => at.line.text.trimStart().startsWith('•');
-/** 「職務類別 | 地點」小字行。 */
+/** 含年月（2021/01、2021.1、2021年1月）：「子職務 | 日期」不是職務類別。 */
+const HAS_DATE = /(?:19|20)\d{2}\s*[./\-年]\s*\d{1,2}/u;
+/** 「職務類別 | 地點」小字行（含日期的不算，留在描述）。 */
 const isCategory = (at: Located): boolean =>
-  isSmall(at.line) && /[|｜]/u.test(at.line.text) && !at.line.text.trimStart().startsWith('#');
+  isSmall(at.line) &&
+  /[|｜]/u.test(at.line.text) &&
+  !at.line.text.trimStart().startsWith('#') &&
+  !HAS_DATE.test(at.line.text);
 
 function addDescription(entry: Entry, at: Located): void {
   const text = plain(at.line.text);
@@ -88,10 +93,15 @@ export interface ExperienceResult {
   signals: ExperienceSignals;
 }
 
+/** 形狀像公司行：內文字高、與職稱同一個 x、不是條列。 */
+function companyShaped(entry: Entry, at: Located): boolean {
+  const aligned = Math.abs(at.line.x - entry.title.line.x) <= 3;
+  return isBody(at.line) && aligned && !isBullet(at);
+}
+
 /** 公司（或換行續行）是否收下這行；收下回傳 true。 */
 function takeCompany(entry: Entry, at: Located): boolean {
-  const aligned = Math.abs(at.line.x - entry.title.line.x) <= 3;
-  if (!isBody(at.line) || !aligned || isBullet(at)) return false;
+  if (!companyShaped(entry, at)) return false;
   const text = plain(at.line.text);
   if (entry.stage === 'company') entry.company = { text, at };
   else if (entry.company) entry.company.text = joinWrapped(entry.company.text, text);
@@ -112,13 +122,31 @@ function signalsOf(entries: readonly Entry[], categoryLine: boolean, onRight: bo
   };
 }
 
+/**
+ * 只拆兩種 metadata 合併行：「職稱⇥日期」與「公司⇥年資」（公司只拆年資，不拆日期）。
+ * 描述裡的「子職務 |⇥日期」不拆，留在描述，不會被當成主日期。
+ */
+function metadataSplit(at: Located, current: Entry | undefined): Located[] {
+  const pieces = splitMerged(at);
+  const [main, side] = pieces;
+  if (!main || !side) return [at];
+  if (isEntryTitle(main.line)) return pieces;
+  const tenureOnly = metaRanges(side.line.text)?.length === 0;
+  if (current?.stage === 'company' && tenureOnly && companyShaped(current, main)) return pieces;
+  return [at];
+}
+
 /** 整理「工作經驗」段的行（已依版面由上到下排好）。 */
 export function parseExperience(lines: readonly Located[]): ExperienceResult {
   const entries: Entry[] = [];
   const pending: PendingMeta[] = [];
   const tags = new TagCollector();
   let categoryLine = false;
-  for (const at of lines.flatMap(splitMerged)) {
+  const queue = [...lines];
+  for (let next = queue.shift(); next; next = queue.shift()) {
+    const [at, ...rest] = metadataSplit(next, entries.at(-1));
+    if (!at) continue;
+    queue.unshift(...rest);
     const { line } = at;
     const current = entries.at(-1);
     const ranges = metaRanges(line.text);
