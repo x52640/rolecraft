@@ -20,6 +20,8 @@ function removeAt<T>(list: readonly T[], index: number): T[] {
 
 /** 逐欄校正表單：個人資料、經歷、技能都可改、可增刪。 */
 export function ProfileFormFields({ form, onChange, disabled = false }: ProfileFormProps) {
+  // 技能的個資標示與 skills 同索引；沒有標示時補成同長度的 false
+  const personalSkills = form.skills.map((_, i) => form.personalSkills?.[i] === true);
   return (
     <fieldset disabled={disabled} className="profile-form import-form">
       <legend className="import-visually-hidden">校正內容</legend>
@@ -60,10 +62,22 @@ export function ProfileFormFields({ form, onChange, disabled = false }: ProfileF
 
       <SkillChips
         skills={form.skills}
-        personal={form.personalSkills}
+        personal={personalSkills}
         onChange={(i, value) => onChange({ ...form, skills: replaceAt(form.skills, i, value) })}
-        onRemove={(i) => onChange({ ...form, skills: removeAt(form.skills, i) })}
-        onAdd={() => onChange({ ...form, skills: [...form.skills, ''] })}
+        onRemove={(i) =>
+          onChange({
+            ...form,
+            skills: removeAt(form.skills, i),
+            personalSkills: removeAt(personalSkills, i),
+          })
+        }
+        onAdd={() =>
+          onChange({
+            ...form,
+            skills: [...form.skills, ''],
+            personalSkills: [...personalSkills, false],
+          })
+        }
       />
     </fieldset>
   );

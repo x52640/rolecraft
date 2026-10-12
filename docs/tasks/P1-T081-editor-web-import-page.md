@@ -84,8 +84,13 @@ npm run verify
 
 - 最後完成：2026-10-12 「包含」各項已實作並 commit（工作者 worktree，未 push）
 - 已通過驗證：`npm run verify` 全綠（Vitest 3821 通過、13 略過）；新測試 `ImportPage.web.test.ts` 10 項，另以「網頁來源 auto 改 true」突變確認計費測試會失敗
-- 下一步：協調者收官——高風險 E3 對抗驗證（上限 4）＋ codex review，再標 done
+- 下一步：codex 審查 2 項已修（另一個 commit）；協調者收官——E3 對抗驗證＋修正 diff 複審，再標 done
 - Blocker：無
+
+## codex 審查待修（2026-10-12，main 119d202）
+
+1. `ImportPage.tsx`：helper 回 name_required 後表單解鎖，使用者可先改欄位；「確認姓名並用 AI 整理」繞過 edited／rerunArmed 保護，默默蓋掉修改 → 改走與「用 AI 重新整理」相同的覆寫確認，並保留已確認的姓名
+2. `SkillChips.tsx`：技能的含個資標示靠與原值完全相等比對，編輯後（「林測試開發」→「林測試開發工具」）標示消失但姓名還在 → 標示跟著技能項目（索引隨編輯與刪除同步）走，編輯後仍保留
 
 ## 完成結果
 
@@ -93,4 +98,5 @@ npm run verify
 - 新檔：`useLatestCapture.ts`；`ImportReview.tsx`（核對畫面，從 ImportPage 拆出）；`components/LatestCapturePanel.tsx`（平台、時間、截斷、「使用這份」「重新查詢」）、`WebPreview.tsx`（「區塊 bN」＋種類，截斷持續顯示「內容不完整」）、`NameConfirm.tsx`（`profile.get` 預填、多寫法、`checkNames` 驗 1～8 個×64 字）、`PersonalMark.tsx`
 - 改檔：`useAiParse.ts`（`needs_name` 狀態對應 `reason: name_required`；成功草稿依 `source` 取 `webDraft`／`draft`；`restart(names?)`）；`ai-form.ts`（`AiDraftLike` 結構型別共用 PDF／網頁草稿；`formFromAiDraft` 帶個資旗標）；`form-model.ts`（`InfoRow.personal`、`ExperienceRow.personal`、`ProfileForm.personalSkills`，不進 `toProfileInput`）；`AiParsePanel.tsx`（`web` 時首按鈕「用 AI 整理」、失敗提示對照區塊手動輸入、其他段落個資標示）；`ConfirmBar.tsx`（「會取代目前的個人資料」）；`InfoRows`／`ExperienceCard`／`SkillChips`（「含姓名或聯絡資料」）；`ImportPage.tsx`（「手動輸入」入口在初始、完成、核對畫面都有；`multiple_profiles` 顯示原因）
 - 保守選擇：(1) 最近擷取只在開頁與按「重新查詢」時查，不輪詢；(2) 查不到擷取只在擷取區塊提示，不出錯誤警示；(3) 網頁來源使用者先改過欄位再按「用 AI 整理」也要再按一次確認（會覆蓋）；(4) 個資標示跟著列／欄位走、使用者改值後仍保留（技能以值比對）；(5) 姓名確認只在 helper 回 `name_required` 時顯示，確認過的姓名在同一次核對內重新整理時一併帶上
+- codex 審查 2 項已修（先寫 `ImportPage.web-guard.test.ts` 重現、修前 2 項失敗）：(1) `ImportPage.confirmNames` 先記住姓名，改過欄位就武裝覆寫確認（`NameConfirm` 加 `confirmingRerun`，按鈕變「確定重新整理（放棄目前的修改）」並顯示覆蓋提醒），第二次按才帶姓名送出；(2) `ProfileForm.personalSkills` 改成與 skills 同索引的 boolean 陣列，`ProfileFormFields` 刪除／新增時同步、編輯保留，`SkillChips` 依索引標示，`ai-form.skillRows` 去重時任一同值有旗標即標示。verify 綠（Vitest 3824 通過、13 略過）
 - 殘餘：表單欄位不顯示各自的出處區塊編號（只在右側預覽列區塊）；編輯器已開著時新擷取送達要按「重新查詢」才看得到

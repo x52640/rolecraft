@@ -63,6 +63,15 @@ export interface AiDraftLike {
 const flagged = (field: AiFieldLike | null | undefined): boolean =>
   field?.containsPersonalData === true;
 
+/** 技能去空白、去重；同一值任何一個有個資旗標就標示（與 skills 同索引）。 */
+function skillRows(skills: readonly { value: string; personal: boolean }[]) {
+  const personal = new Map<string, boolean>();
+  for (const s of skills) {
+    if (s.value !== '') personal.set(s.value, (personal.get(s.value) ?? false) || s.personal);
+  }
+  return { skills: [...personal.keys()], personalSkills: [...personal.values()] };
+}
+
 const EXPERIENCE_KEYS: readonly ExperienceKey[] = [
   'company',
   'title',
@@ -99,7 +108,6 @@ export function formFromAiDraft(draft: AiDraftLike): ProfileForm {
       description: e.description?.value ?? '',
       personal: EXPERIENCE_KEYS.filter((key) => flagged(e[key])),
     })),
-    skills: [...new Set(skills.map((s) => s.value).filter((s) => s !== ''))],
-    personalSkills: skills.filter((s) => s.personal && s.value !== '').map((s) => s.value),
+    ...skillRows(skills),
   };
 }

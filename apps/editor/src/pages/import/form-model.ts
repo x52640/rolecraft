@@ -34,8 +34,11 @@ export interface ProfileForm {
   info: InfoRow[];
   experiences: ExperienceRow[];
   skills: string[];
-  /** 還原出姓名或聯絡資料的技能值（技能只是字串，以值比對標示） */
-  personalSkills?: readonly string[];
+  /**
+   * 與 skills 同索引：該技能還原出姓名或聯絡資料（D28／W7）。跟著項目走（刪除同步、新增為 false），
+   * 使用者編輯後仍保留標示（保守；不靠和原值比對）。
+   */
+  personalSkills?: readonly boolean[];
 }
 
 export const EMPTY_EXPERIENCE: ExperienceRow = {

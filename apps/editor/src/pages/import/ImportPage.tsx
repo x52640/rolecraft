@@ -144,8 +144,14 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
     ai.restart(names);
   }
 
+  // 確認姓名也會用 AI 結果覆蓋表單：改過欄位就和「用 AI 重新整理」一樣要再按一次（codex 審查）。
+  // 姓名先記住，第二次按時送的是使用者當下確認的寫法。
   function confirmNames(list: string[]) {
     setNames(list);
+    if (edited && !rerunArmed) {
+      setRerunArmed(true);
+      return;
+    }
     setRerunArmed(false);
     ai.restart(list);
   }

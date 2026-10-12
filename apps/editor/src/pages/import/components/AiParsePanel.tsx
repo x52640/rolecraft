@@ -47,7 +47,9 @@ export function AiParsePanel(props: AiParsePanelProps) {
           AI 整理中…（用你選定的 Claude 模型；姓名與聯絡資料不會送出）。完成前表單暫時鎖住。
         </p>
       )}
-      {state.kind === 'needs_name' && <NameConfirm onConfirm={onConfirmNames} />}
+      {state.kind === 'needs_name' && (
+        <NameConfirm onConfirm={onConfirmNames} confirmingRerun={confirmingRerun} />
+      )}
       {state.kind === 'failed' && (
         <p role="status" className="import-warning">
           AI 整理沒有完成：{state.message}。目前欄位是用「{PREFILL_LABELS[source]}」預填的，

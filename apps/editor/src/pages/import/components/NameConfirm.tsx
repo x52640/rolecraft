@@ -21,7 +21,12 @@ export function checkNames(names: readonly string[]): string[] | string {
  * 預填資料區既有 Profile 的姓名（profile.get），可修改、可加多個寫法（例如中文名與英文名）；
  * 按確認後才送 AI 整理。姓名只用於本機遮蔽與預填，不送模型。
  */
-export function NameConfirm({ onConfirm }: { onConfirm: (names: string[]) => void }) {
+export function NameConfirm(props: {
+  onConfirm: (names: string[]) => void;
+  /** 使用者改過欄位：確認後的 AI 結果會蓋掉表單，要再按一次（與「用 AI 重新整理」相同） */
+  confirmingRerun: boolean;
+}) {
+  const { onConfirm, confirmingRerun } = props;
   const bridge = useBridge();
   const id = useId();
   const [names, setNames] = useState<string[]>(['']);
@@ -102,9 +107,14 @@ export function NameConfirm({ onConfirm }: { onConfirm: (names: string[]) => voi
           加一個寫法
         </button>
         <button type="button" className="import-btn import-btn-primary" onClick={confirm}>
-          確認姓名並用 AI 整理
+          {confirmingRerun ? '確定重新整理（放棄目前的修改）' : '確認姓名並用 AI 整理'}
         </button>
       </p>
+      {confirmingRerun && (
+        <p role="note" aria-label="覆蓋提醒" className="import-hint">
+          你已修改過欄位，用 AI 整理會蓋掉目前的內容。
+        </p>
+      )}
       {prefilled && <p className="import-hint">預填的是目前個人資料裡的姓名，請確認是否正確。</p>}
     </div>
   );

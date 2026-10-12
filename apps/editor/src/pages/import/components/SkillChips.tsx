@@ -8,8 +8,8 @@ const chipSize = (skill: string): number => Math.min(24, Math.max(4, skill.lengt
 /** 技能：標籤（chip）樣式，可改、可刪單一個、可新增。 */
 export function SkillChips(props: {
   skills: readonly string[];
-  /** 還原出姓名或聯絡資料的技能值（D28／W7） */
-  personal?: readonly string[] | undefined;
+  /** 與 skills 同索引：該技能還原出姓名或聯絡資料（D28／W7），跟著項目走 */
+  personal?: readonly boolean[] | undefined;
   onChange: (index: number, value: string) => void;
   onRemove: (index: number) => void;
   onAdd: () => void;
@@ -45,7 +45,7 @@ export function SkillChips(props: {
               >
                 ×
               </button>
-              {skill.trim() !== '' && personal.includes(skill.trim()) && <PersonalMark />}
+              {personal[i] === true && <PersonalMark />}
             </li>
           );
         })}
