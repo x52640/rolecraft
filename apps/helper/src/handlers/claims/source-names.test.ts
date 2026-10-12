@@ -72,16 +72,32 @@ describe('事實項來源名稱', () => {
     ]);
   });
 
-  it('相對路徑：絕對路徑去掉資料夾前綴、資料夾外只給最後一段、`..` 不往上走、每段清理', () => {
+  it('相對路徑：絕對路徑去掉資料夾前綴、資料夾外只給最後一段、`..` 走出資料夾只給檔名、每段清理', () => {
     expect(relativeNameOf(`${ROOT}/a/設計.md`, ROOT)).toBe('a/設計.md');
     expect(relativeNameOf('/etc/secret/x.md', ROOT)).toBe('x.md');
-    expect(relativeNameOf('../../x/y.md', ROOT)).toBe('x/y.md');
+    expect(relativeNameOf('../../x/y.md', ROOT)).toBe('y.md');
     expect(relativeNameOf('a\\b\\c.txt', ROOT)).toBe('a/b/c.txt');
     expect(relativeNameOf('a\u0007b/c\u0000d.md', ROOT)).toBe('a b/c d.md');
     expect(relativeNameOf('///', ROOT)).toBe('（未命名）');
     expect(relativeNameOf(`${'字'.repeat(500)}/x.md`, ROOT)).toBe(`${'字'.repeat(100)}/x.md`);
     const deep = Array.from({ length: 12 }, (_, i) => `d${String(i)}`).join('/');
     expect(relativeNameOf(`${deep}/x.md`, ROOT)).toBe('…/d5/d6/d7/d8/d9/d10/d11/x.md');
+  });
+
+  it('先用完整路徑判斷在不在資料夾內：資料夾外的目錄名不出現（回歸：codex 審查）', () => {
+    const root = '/Users/me/project';
+    // 資料夾名後接空白：修剪後會和資料夾同名
+    expect(relativeNameOf('/Users/me/project /private/report.md', root)).toBe('report.md');
+    // 含 `..`：正規化後已在資料夾外
+    expect(relativeNameOf('/Users/me/project/../private/report.md', root)).toBe('report.md');
+    expect(relativeNameOf('../private/report.md', root)).toBe('report.md');
+    expect(relativeNameOf('/etc/secret/..', root)).toBe('（未命名）');
+    // 前 100 字相同的不同目錄：截斷後會撞名
+    const long = `/x/${'a'.repeat(100)}`;
+    expect(relativeNameOf(`${long}b/private/report.md`, long)).toBe('report.md');
+    // 正規化後仍在資料夾內的照常給相對路徑
+    expect(relativeNameOf('/Users/me/project/a/../b/c.md', root)).toBe('b/c.md');
+    expect(relativeNameOf('a/./../b/c.md', root)).toBe('b/c.md');
   });
 
   it('資料夾名稱只取最後一段；控制字元換掉、空的給「（未命名）」', () => {

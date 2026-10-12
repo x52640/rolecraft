@@ -29,20 +29,40 @@ export function lastSegmentOf(value: string): string {
 const isAbsolute = (value: string) => /^([/\\]|[A-Za-z]:)/u.test(value);
 
 /**
- * 文件在授權資料夾內的相對路徑（以 `/` 連接）。documentPath 一般就是相對路徑；
- * 若是絕對路徑且在資料夾內就去掉資料夾前綴，不在資料夾內就只給最後一段（不洩漏上層路徑）。
- * 段數過多時只留最後幾段、前面以「…」表示。
+ * 正規化成原樣的路徑段（不修剪、不截斷，判斷位置用）：去掉空段與 `.`，`..` 往上一段。
+ * 往上超出起點時回傳 null（無法確定位置）。
+ */
+function normalizedSegments(value: string): string[] | null {
+  const out: string[] = [];
+  for (const part of value.split(/[/\\]/u)) {
+    if (part === '' || part === '.') continue;
+    if (part === '..') {
+      if (out.pop() === undefined) return null;
+    } else out.push(part);
+  }
+  return out;
+}
+
+/**
+ * 文件在授權資料夾內的相對路徑（以 `/` 連接）。先用正規化、未清理的完整路徑判斷是否在資料夾內
+ * （相對路徑視為相對於資料夾），在內才去掉資料夾前綴；不在內只給原始路徑最後一段（是 `.`／`..` 就不給），不洩漏資料夾外的目錄名。
+ * 判斷完才對結果做顯示用清理；段數過多時只留最後幾段、前面以「…」表示。
  */
 export function relativeNameOf(documentPath: string, folderPath: string): string {
-  let segments: string[];
-  if (isAbsolute(documentPath)) {
-    const folder = segmentsOf(folderPath);
-    const doc = segmentsOf(documentPath);
-    const inside = folder.length > 0 && folder.every((part, i) => doc[i] === part);
-    segments = inside ? doc.slice(folder.length) : doc.slice(-1);
-  } else {
-    segments = segmentsOf(documentPath);
-  }
+  const folder = normalizedSegments(folderPath);
+  const full = normalizedSegments(
+    isAbsolute(documentPath) ? documentPath : `${folderPath}/${documentPath}`,
+  );
+  const inside =
+    folder !== null &&
+    full !== null &&
+    folder.length > 0 &&
+    full.length > folder.length &&
+    folder.every((part, i) => full[i] === part);
+  let segments =
+    inside && full !== null
+      ? segmentsOf(full.slice(folder.length).join('/'))
+      : segmentsOf(documentPath.split(/[/\\]/u).at(-1) ?? '');
   if (segments.length === 0) return UNNAMED;
   if (segments.length > MAX_SEGMENTS) segments = ['…', ...segments.slice(-MAX_SEGMENTS)];
   return segments.join('/');
