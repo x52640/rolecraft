@@ -1,7 +1,7 @@
 ---
 id: P1-T092
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T090"]
 specs: ["resume-output.md", "bridge.md"]
 track: editor
@@ -81,9 +81,15 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等 P1-T090 完成後讀必讀入口開工
-- Blocker：無（P1-T090 契約與 helper 已合入 main 545217e，審查中；協調者 2026-10-13 提前放行，若 T090 審查改動契約再同步）
+- 最後完成：stale/ hook＋提示元件＋測試，ResumesPage 掛載點（工作者 worktree，單一 commit）
+- 已通過驗證：`npm run verify` 綠
+- 下一步：協調者收官（範圍稽核、重跑 verify；手動驗證等 P1-T091 上線）
+- Blocker：無
 
 ## 完成結果
+
+- `pages/resumes/stale/useProfileVersion.ts`：依 trigger（畫面上的版本物件）重讀 `profile.get`；失敗、null、多份、讀取中一律回 null（不顯示、不報錯）；trigger 換掉或卸載時舊回應作廢。不輪詢。
+- `pages/resumes/stale/StaleNotice.tsx`：`isStale`（版本 `profileVersion` 缺少當 0，與 `profileVersionOf` 比）；不同時在匯出狀態上方顯示「個人資料在此版本產生後改過。需要的話重新產生。」；只提示，不碰匯出檢查、複製、段落。
+- `ResumesPage.tsx`：只加 `<StaleNotice key={版本 id} version=… />` 掛載點（+2 行）。比對只用 `resume.get` 的版本，不依賴 `resume.list`。
+- 測試 `stale/StaleNotice.test.ts`（12 項，假 bridge）：isStale 規則；不同顯示且匯出前檢查／複製照常；相同、舊版本＋Profile 0／無版本號不顯示；舊版本＋Profile>0 顯示；失敗、null、多份不顯示且複製可用；重新整理才重新比對（不自動輪詢）；切換版本與重新整理同一版本時舊 `profile.get` 晚到不影響（已確認拿掉作廢檢查時後者會失敗）。
+- 殘餘：寫入段落後 `loadView` 也會換版本物件，因此接受／退回／編輯後同樣會重讀一次 `profile.get`（多一次唯讀請求，規格未禁止）；手動驗證待 P1-T091。

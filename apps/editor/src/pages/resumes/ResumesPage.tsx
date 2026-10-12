@@ -1,6 +1,7 @@
 import { ProfilePhotoPanel } from './profile/ProfilePhotoPanel.tsx';
 import { SectionCard } from './SectionCard.tsx';
 import { SectionEditor } from './SectionEditor.tsx';
+import { StaleNotice } from './stale/StaleNotice.tsx';
 import type { ResumePollOptions } from './useGenerateResume.ts';
 import {
   EDITING_BLOCKS_GENERATE_TEXT,
@@ -153,6 +154,7 @@ export function ResumesPage({ poll }: { readonly poll?: ResumePollOptions }) {
       {editor.versions?.length === 0 ? <p>這個職缺還沒有履歷版本。</p> : null}
       {editor.view ? (
         <>
+          <StaleNotice key={editor.view.version.id} version={editor.view.version} />
           <ExportStatus view={editor.view} />
           <Sections key={editor.view.version.id} editor={editor} view={editor.view} />
         </>

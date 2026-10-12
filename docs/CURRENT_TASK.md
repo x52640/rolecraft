@@ -7,11 +7,11 @@
 
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本（`docs/tasks/P1-T017-spike-104-job.md`）
 - P1-T090 contracts＋helper：profile.update、Profile 版本號與各欄出處（D30）（`docs/tasks/P1-T090-profile-update-contract-helper.md`）
+- P1-T092 editor：履歷頁過期提示（D30 (a)）（`docs/tasks/P1-T092-editor-resume-stale-notice.md`）
 
 ## ready
 
 - P1-T091 editor：個人資料頁（D30）
-- P1-T092 editor：履歷頁過期提示（D30 (a)）
 <!-- index:end -->
 
 ## 下一步（2026-10-11 codex 補審後）
