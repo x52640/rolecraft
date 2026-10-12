@@ -6,7 +6,6 @@
 ## 進行中
 
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本（`docs/tasks/P1-T017-spike-104-job.md`）
-- P1-T091 editor：個人資料頁（D30）（`docs/tasks/P1-T091-editor-profile-page.md`）
 
 ## ready
 
@@ -32,7 +31,7 @@
 
 - 2026-10-12 擁有者說「開工」：web-resume-import 已轉正式規格（plan.md D28；`docs/specs/web-resume-capture.md`、`resume-import.md`、`resume-output.md`、`bridge.md`）並拆成 P1-T074～P1-T087；先跑 T074（契約）與 T086（段落複製），T077 等 P1-T017 履歷頁樣本。
 
-- web-resume-import：正式規格 `docs/specs/web-resume-capture.md` 等；P1-T074～T086 已全部收官（2026-10-12），只剩 P1-T087（拿掉 PDF 匯入入口），等擁有者用自己的 104 履歷頁實跑通過。作品集網址、區級居住地已裁定 D31（遮蔽不送模型，P1-T093）。協調者保守裁定：只有英文姓名標籤不算已辨識姓名（P1-T080）。
+- web-resume-import：P1-T074～T086、T088～T093 全部收官（2026-10-13；含 D29 匯入不強制核對、D30 個人資料編輯頁與過期提示、D31 遮蔽網址與區級居住地）。剩 P1-T087（拿掉 PDF 匯入入口），等擁有者用自己的 104 履歷頁實跑通過。協調者保守裁定：只有英文姓名不算已辨識（P1-T080）、只有縣市不遮、無協定網域要遮（P1-T093）。
 - 方向變更：匯入改走「擴充功能讀求職網站履歷頁 HTML」，PDF 只負責輸出（加照片、匯出）。規格 `docs/spec-discussions/web-resume-import/spec.md`。
 - 2026-10-12 收官 P1-T070～T073：舊審查屬實項與修正 diff 的 codex／對抗審查屬實項皆已修，最後一輪 codex 無發現；harness 手動實跑併入 P1-T032。
 - 2026-10-12 收官 P1-T069：codex 3 項、對抗＋codex 複審 6 項、再複審 3 項（含 2 項個資退步）皆已修，最後一輪 codex 無發現；防退步比對 276 案例無退步。

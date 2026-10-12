@@ -1,7 +1,7 @@
 ---
 id: P1-T091
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T090"]
 specs: ["resume-import.md", "bridge.md"]
 track: editor
@@ -86,7 +86,7 @@ npm run verify
 
 - 最後完成：審查項修正＋codex 複審 beforeunload returnValue（worker，2026-10-13）
 - 已通過驗證：見完成結果
-- 下一步：協調者合併、範圍稽核、收官
+- 下一步：已收官（2026-10-13 協調者：codex 3 項＋殘餘 2 項、複審 1 項皆已修；最後一行修正未再跑 codex；main `npm run verify` 綠）。手動驗證（匯入後改欄、刪經歷、加技能、重新整理一致）待擁有者
 - Blocker：無
 - 審查待修（codex＋worker 殘餘，協調者 2026-10-13 指派，另一個 commit）：
   1. 基本資料值用單行 input，學歷等多行值的換行被吃掉並寫回 → 改 textarea
