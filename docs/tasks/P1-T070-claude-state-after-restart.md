@@ -81,10 +81,11 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：協調者裁定 A 後的實作（`createServices` 可注入假 probe、D24 走使用者發起的工作、失敗訊息帶具體原因）
-- 已通過驗證：worktree `npm run verify` 綠（Vitest 3445 通過、13 略過）。另外暫時改 providers 的預設 spawn，讓它記錄並拒絕執行，跑完整測試確認沒有任何測試啟動真實 `claude`；只記到 `core/process.test.ts`、`core/connection.test.ts` 本來就會用的暫存假 CLI。檢查完已還原。
-- 下一步：協調者派 worker 修「審查屬實待修」4 項；修完對抗驗證＋codex review
-- Blocker：無（手動驗證要用 harness 重開，由協調者做）
+- 最後完成：「審查屬實待修」4 項（並行檢查結果、失敗後重試、等待上限、未選模型不檢查），每項補假 runner 計次測試
+- 已通過驗證：worktree `npm run verify` 綠（Vitest 3526 通過、13 略過）
+- 下一步：協調者稽核、對抗驗證＋codex review；手動以 harness 重開後直接產生自介
+- Blocker：無
+- 第 3 項（重新驗證可能超過橋接 30 秒逾時）的選擇：helper 端給 `prepareRun` 加等待上限（`CLAUDE_PREPARE_RUN_WAIT_MS` 20 秒），等不到就回既有的失敗碼（no_model／no_service）加具體原因「正在檢查…請稍後再試」，檢查在背景繼續、下次發起接著等同一次。理由：改動最小，不動 contracts、bridge 規格與 extension 逾時；延長單一請求逾時要改 extension／contracts（超出 write_paths），回「檢查中」狀態讓前端輪詢要新增回應欄位（contract 變更）。代價：使用者第一次要再按一次。
 
 ## 完成結果
 
@@ -100,3 +101,14 @@ npm run verify
 - 殘餘：
   - 具體原因靠模組層的「最近一次解析結果」傳給失敗訊息，前提是 helper 單一程序、單一使用者。
   - 履歷匯入的 AI 整理（`import/`，P1-T069）的 `no_service` 文字沒有接具體原因，不在範圍內。
+
+### 審查屬實項修正（2026-10-12）
+
+1. 並行檢查丟結果：`providers/check-scheduler.ts` 的 `refresh` 加 `rescues`。晚到的較舊結果原本一律丟棄；改成它是一般檢查且通過、而最近套用的那次找得到 CLI 卻確認不了版本（`isolation` 不是 passed，例如重新驗證進行中被閘門擋）時採用。較舊結果沒通過照舊丟棄。另外 `ensureChecked` 在一般檢查進行中不另開自動檢查。
+2. 失敗後重試：`prepareRun` 改成「目前狀態不是 available／quota_exhausted 就做一般檢查」（原本一般檢查做過一次就不再做）。停用版本的一般檢查只重讀版本與登入，不重新驗證（D24）；額度用完不重新檢查（R9）。
+3. 逾時：`prepareRun(waitMs)` 最多等 `CLAUDE_PREPARE_RUN_WAIT_MS`（20 秒），回 false 時 `ProvidersService.prepareRun` 回 `{ status, checking: true }`（新型別 `PrepareRunResult`，`providers/service.ts`，helper 內部介面）；`messages/claude-engine.ts` 記下 `CLAUDE_CHECKING_REASON` 回 null。測試可用 `ProvidersServiceOptions.prepareRunWaitMs` 調短。
+4. 未選模型：`ProvidersService.prepareRun` 在 Claude 沒有 `selectedCandidateId` 時不呼叫排程；`claude-engine.ts` 先判斷未選定，回 `CLAUDE_NO_MODEL_REASON`。`main.test.ts` 分析案例改為期望「尚未選定模型」。
+- 測試：`providers/check-scheduler.test.ts`（較舊通過採用／較舊失敗丟棄、沒通過後下次再檢查、超過上限回檢查中且不重開檢查、未選模型 0 次一般檢查，全部假 probe 計次、verifyModel 0 次）；`providers/auto-check.test.ts` 新增「停用版本再次發起會重新檢查但 0 次模型呼叫」「未選模型新版本不重新驗證」（假 spawn 計次）。
+- `docs/specs/providers.md` P1-T070 段同步。
+- 殘餘：一般檢查背景進行中、且本程序還沒做過任何檢查時，設定頁讀狀態看到的是初始「資格未知」（不顯示「檢查中」）；要顯示需新增狀態欄位或沿用 versionCheck=running 的語意，沒做。手動「重新檢查」（`providers.recheck`）本身會同步重新驗證、可能超過 30 秒，是 P1-T062 以來的既有行為，不在這 4 項內。
+

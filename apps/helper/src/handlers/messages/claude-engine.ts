@@ -16,7 +16,12 @@ import {
 import { helperClaudeDeps } from '../../services/claude-deps.ts';
 import { claudeServiceOf } from '../providers/providers-service.ts';
 import type { ProvidersService } from '../providers/service.ts';
-import { claudeUnavailableReason, noteClaudeUnavailable } from '../providers/unavailable-reason.ts';
+import {
+  CLAUDE_CHECKING_REASON,
+  CLAUDE_NO_MODEL_REASON,
+  claudeUnavailableReason,
+  noteClaudeUnavailable,
+} from '../providers/unavailable-reason.ts';
 
 export interface DraftEngine {
   readonly provider: Provider;
@@ -40,15 +45,23 @@ export interface ClaudeDraftEngineOptions {
 /**
  * 由 providers 的狀態與候選清單找出選定的模型別名；對不上就不猜，回 null。
  * 使用者發起工作前先 prepareRun（P1-T070：重開後自動檢查，D22／D24 照常），拿不到模型時記下具體原因。
+ * 沒選定模型時 prepareRun 不檢查（不重新驗證），直接回「尚未選定模型」。
  */
 async function selectedClaudeModel(
   providers: ProvidersService,
   candidates: readonly string[],
 ): Promise<string | null> {
   if (!providers.status || !providers.listCandidates) return null;
-  await providers.prepareRun?.('claude');
+  const prepared = await providers.prepareRun?.('claude');
+  if (prepared?.checking) {
+    noteClaudeUnavailable(CLAUDE_CHECKING_REASON);
+    return null;
+  }
   const claude = (await providers.status()).find((s) => s.service === 'claude');
-  const reason = claudeUnavailableReason(claude);
+  const reason =
+    claude && claude.selectedCandidateId === null
+      ? CLAUDE_NO_MODEL_REASON
+      : claudeUnavailableReason(claude);
   noteClaudeUnavailable(reason);
   if (reason !== null || !claude?.selectedCandidateId) return null;
   const listed = await providers.listCandidates('claude');

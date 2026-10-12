@@ -60,10 +60,10 @@ function fakeCli(script: { version?: string; auth?: string } = {}) {
   };
 }
 
-/** 上次程序選定了 sonnet（資料區）。 */
-function memoryProvidersStore(): ProvidersStore {
+/** 上次程序選定了 sonnet（資料區）；null＝沒選過。 */
+function memoryProvidersStore(selected: string | null = 'sonnet'): ProvidersStore {
   return {
-    loadSelectedModel: () => 'sonnet',
+    loadSelectedModel: () => selected,
     saveSelectedModel: vi.fn(),
     saveConnection: vi.fn(),
     appendRunCheck: vi.fn(),
@@ -74,6 +74,7 @@ function memoryProvidersStore(): ProvidersStore {
 function restarted(
   script: { version?: string; auth?: string } = {},
   versions: ClaudeVersionRecord[] = [],
+  selected: string | null = 'sonnet',
 ) {
   const cli = fakeCli(script);
   const saved: ClaudeVersionRecord[] = [];
@@ -89,7 +90,11 @@ function restarted(
     },
   });
   const runDeps = { spawn: cli.spawn, parentEnv: { HOME: '/Users/owner' } };
-  const providers = createProvidersService({ service, runDeps, store: memoryProvidersStore() });
+  const providers = createProvidersService({
+    service,
+    runDeps,
+    store: memoryProvidersStore(selected),
+  });
   const resolve = createClaudeDraftEngine({ providers, runDeps });
   return { cli, providers, resolve, saved };
 }
@@ -160,6 +165,26 @@ describe('重開後使用者直接發起 AI 工作（P1-T070）', () => {
     expect(cli.modelCalls()).toBe(0);
     expect(saved).toHaveLength(0);
     expect(withUnavailableReason('固定文字')).toContain('已停用');
+  });
+
+  it('目前版本停用：再次發起會重新檢查版本與登入，但仍不重試（0 次模型呼叫）', async () => {
+    const { cli, resolve, saved } = restarted({ version: '2.1.300' }, [record('failed')]);
+    expect(await resolve()).toBeNull();
+    const checks = cli.checkCalls();
+    expect(await resolve()).toBeNull();
+    expect(cli.checkCalls()).toBeGreaterThan(checks);
+    expect(cli.modelCalls()).toBe(0);
+    expect(saved).toHaveLength(0);
+  });
+
+  it('沒有選定模型：新版本也不重新驗證（0 次模型呼叫），回「尚未選定模型」', async () => {
+    const { cli, resolve, saved } = restarted({ version: '2.1.300' }, [], null);
+    expect(await resolve()).toBeNull();
+    expect(cli.modelCalls()).toBe(0);
+    expect(saved).toHaveLength(0);
+    expect(withUnavailableReason('固定文字')).toBe(
+      '沒有可用的 AI 服務：尚未選定模型，請到設定頁選定模型',
+    );
   });
 
   it('未登入時失敗訊息帶具體原因', async () => {

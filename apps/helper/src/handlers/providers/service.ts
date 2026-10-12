@@ -18,6 +18,12 @@ export type SelectResult =
   | { readonly kind: 'not_available' }
   | { readonly kind: 'verified'; readonly verification: CheckOutcome };
 
+export interface PrepareRunResult {
+  readonly status: ServiceStatus;
+  /** 檢查還在背景進行（等超過上限） */
+  readonly checking: boolean;
+}
+
 export interface ProvidersService {
   /**
    * 三家最近一次檢查的狀態。本程序還沒檢查過 Claude 時先自動做一次連線檢查（不重新驗證、
@@ -25,10 +31,11 @@ export interface ProvidersService {
    */
   status?(): Promise<readonly ServiceStatus[]>;
   /**
-   * 使用者發起需要該服務的工作前（P1-T070）：本程序還沒檢查過，或上次只是自動檢查且不可用，
-   * 就做一次一般檢查（D22／D24 照常自動重新驗證），回檢查後的狀態。
+   * 使用者發起需要該服務的工作前（P1-T070）：已選定模型、且目前不是可用時做一次一般檢查
+   * （D22／D24 照常自動重新驗證；停用的版本不重試），回檢查後的狀態。沒選定模型不檢查。
+   * 檢查超過等待上限（橋接逾時）時 checking=true：檢查在背景繼續，呼叫端回「檢查中」。
    */
-  prepareRun?(service: Provider): Promise<ServiceStatus>;
+  prepareRun?(service: Provider): Promise<PrepareRunResult>;
   /** 重新檢查一家（安裝、登入、R5 版本閘門、R6），回新的狀態。 */
   recheck?(service: Provider): Promise<ServiceStatus>;
   /** 候選清單；ID 由 helper 配發，同一個 helper 程序內穩定。 */

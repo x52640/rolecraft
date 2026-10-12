@@ -245,12 +245,12 @@ describe('服務組裝（createServices，P1-T043）', () => {
     });
     const services = createServices(storage(), {});
     expect(await send(services, 'analysis.status')).toEqual({ ok: true, analysis: null });
-    // 自動檢查不通過（假檢查的登入狀態是未知）：回具體原因（P1-T070），不呼叫模型。
+    // 沒選定模型：不做會重新驗證的完整檢查，回「尚未選定模型」（P1-T070），不呼叫模型。
     expect(await send(services, 'analysis.start')).toMatchObject({
       ok: false,
       error: {
         code: 'invalid_request',
-        message: expect.stringContaining('登入方式或方案') as unknown,
+        message: expect.stringContaining('尚未選定模型') as unknown,
       },
     });
     expect(fakeVerifyModel).not.toHaveBeenCalled();

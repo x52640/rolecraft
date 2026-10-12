@@ -28,6 +28,8 @@ export interface ProvidersServiceOptions extends ClaudeProbeOptions {
   readonly newCandidateId?: () => string;
   /** 資料區保存（P1-T058）；省略時全在記憶體（未設資料區） */
   readonly store?: ProvidersStore;
+  /** 測試用：prepareRun 最多等多久（預設 CLAUDE_PREPARE_RUN_WAIT_MS） */
+  readonly prepareRunWaitMs?: number;
 }
 
 /** providers 服務用的 Claude 服務，供生成端共用同一個版本閘門（claudeServiceOf）。 */
@@ -211,8 +213,12 @@ export function createProvidersService(
     },
 
     async prepareRun(service) {
-      if (service === 'claude') await checks.prepareRun();
-      return current(service);
+      // 沒有選定模型就不做完整檢查（可能重新驗證、呼叫模型），由呼叫端回「尚未選定模型」。
+      if (service !== 'claude' || current('claude').selectedCandidateId === null) {
+        return { status: current(service), checking: false };
+      }
+      const done = await checks.prepareRun(options.prepareRunWaitMs);
+      return { status: current(service), checking: !done };
     },
 
     reverifyClaude() {

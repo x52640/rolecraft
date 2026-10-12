@@ -2,6 +2,12 @@
 // versionCheck.reason 已在 claude-probe 去掉路徑（R7）；不含帳號、環境變數值。
 import type { ServiceStatus } from './service.ts';
 
+export const CLAUDE_NO_MODEL_REASON = '尚未選定模型，請到設定頁選定模型';
+
+/** 使用者發起工作時的自動檢查超過等待上限，仍在背景進行（P1-T070）。 */
+export const CLAUDE_CHECKING_REASON =
+  '正在檢查 Claude 服務（Claude CLI 更新後要先重新驗證，可能需要幾分鐘），請稍後再試一次';
+
 /** Claude 狀態 → 為什麼現在不能執行；可用且已選定模型時回 null。 */
 export function claudeUnavailableReason(status: ServiceStatus | undefined): string | null {
   if (!status) return 'Claude 服務沒有接上，請到設定頁檢查';
@@ -19,7 +25,7 @@ export function claudeUnavailableReason(status: ServiceStatus | undefined): stri
     case 'unsupported':
       return unsupportedReason(status);
     case 'available':
-      return status.selectedCandidateId === null ? '尚未選定模型，請到設定頁選定模型' : null;
+      return status.selectedCandidateId === null ? CLAUDE_NO_MODEL_REASON : null;
   }
 }
 
