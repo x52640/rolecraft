@@ -76,6 +76,10 @@
 | [P1-T067](P1-T067-import-page-layout.md) | 匯入頁版面重整 | done | 1 | editor | P1-T020 |
 | [P1-T068](P1-T068-dev-web-harness.md) | 開發用網頁測試入口（協調者自測用） | done | 1 | dev-tooling | P1-T059 |
 | [P1-T069](P1-T069-resume-import-ai-parse.md) | 履歷 PDF 用 AI 整理欄位 | in_progress | 1 | resume-import | P1-T066、P1-T064 |
+| [P1-T070](P1-T070-claude-state-after-restart.md) | helper 重開後 Claude 狀態歸零 | in_progress | 1 | providers | P1-T062 |
+| [P1-T071](P1-T071-intro-failed-draft-visible.md) | 自介沒通過檢查時看不到草稿 | in_progress | 1 | pipeline | P1-T064 |
+| [P1-T072](P1-T072-resume-experience-tailoring.md) | 客製履歷沒有改寫工作經歷 | in_progress | 1 | pipeline | P1-T025 |
+| [P1-T073](P1-T073-claims-page-usability.md) | 事實項頁實用性 | in_progress | 1 | editor | P1-T063 |
 
 ## 依賴清單
 
@@ -108,7 +112,7 @@
 - P1-T022：P1-T002、P1-T003、P1-T004、P1-T005、P1-T012、P1-T008 → P1-T023、P1-T024
 - P1-T023：P1-T022、P1-T016 → P1-T025、P1-T032
 - P1-T024：P1-T022、P1-T019 → P1-T025、P1-T029
-- P1-T025：P1-T024、P1-T023 → P1-T032
+- P1-T025：P1-T024、P1-T023 → P1-T032、P1-T072
 - P1-T026：P0-T001 → P1-T027
 - P1-T027：P1-T026、P1-T007 → P1-T028、P1-T040
 - P1-T028：P1-T027、P1-T041 → P1-T032、P1-T043
@@ -145,11 +149,15 @@
 - P1-T059：— → P1-T068
 - P1-T060：P1-T058 → P1-T061、P1-T064
 - P1-T061：P1-T060 → P1-T063
-- P1-T062：P1-T058 → P1-T064
-- P1-T063：P1-T061 → —
-- P1-T064：P1-T060、P1-T062 → P1-T069
+- P1-T062：P1-T058 → P1-T064、P1-T070
+- P1-T063：P1-T061 → P1-T073
+- P1-T064：P1-T060、P1-T062 → P1-T069、P1-T071
 - P1-T065：P1-T009 → P1-T066
 - P1-T066：P1-T065 → P1-T069
 - P1-T067：P1-T020 → —
 - P1-T068：P1-T059 → —
 - P1-T069：P1-T066、P1-T064 → —
+- P1-T070：P1-T062 → —
+- P1-T071：P1-T064 → —
+- P1-T072：P1-T025 → —
+- P1-T073：P1-T063 → —

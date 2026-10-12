@@ -6,6 +6,10 @@
 ## 進行中
 
 - P1-T069 履歷 PDF 用 AI 整理欄位（`docs/tasks/P1-T069-resume-import-ai-parse.md`）
+- P1-T070 helper 重開後 Claude 狀態歸零（`docs/tasks/P1-T070-claude-state-after-restart.md`）
+- P1-T071 自介沒通過檢查時看不到草稿（`docs/tasks/P1-T071-intro-failed-draft-visible.md`）
+- P1-T072 客製履歷沒有改寫工作經歷（`docs/tasks/P1-T072-resume-experience-tailoring.md`）
+- P1-T073 事實項頁實用性（`docs/tasks/P1-T073-claims-page-usability.md`）
 
 ## ready
 
