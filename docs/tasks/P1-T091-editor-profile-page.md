@@ -1,7 +1,7 @@
 ---
 id: P1-T091
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T090"]
 specs: ["resume-import.md", "bridge.md"]
 track: editor
@@ -84,9 +84,19 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等 P1-T090 完成後讀必讀入口開工
-- Blocker：無（P1-T090 契約與 helper 已合入 main 545217e，審查中；協調者 2026-10-13 提前放行，若 T090 審查改動契約再同步）
+- 最後完成：個人資料頁實作＋測試（worker，2026-10-13）
+- 已通過驗證：`npm run verify` 綠（worktree）
+- 下一步：協調者合併、範圍稽核、對抗驗證（E3）與 codex review、手動驗證（開發入口匯入後改一欄、刪一段經歷、加一個技能，重新整理一致）後收官
+- Blocker：無
 
 ## 完成結果
+
+- 新頁 `apps/editor/src/pages/profile/`，導覽列「個人資料」排在「匯入」之後（`routes.ts`、`App.test.ts` 改為九頁）。
+- 讀 `profile.get`：沒有 Profile 顯示原因＋「到匯入頁」連結（不自動跳頁）；多份顯示固定原因、不讀不寫；讀取失敗只給「重新讀取」。
+- 逐欄編輯基本資料（含學歷列，可改欄位名）、經歷（公司、職稱、開始、結束／至今、描述）、技能；每欄出處原文預設兩行、可展開，截斷有標示；「已修改」＝helper 標過或畫面值與基準不同；新增列標「自行新增」；沒有出處標「沒有出處原文」。有未存修改顯示「尚未儲存」。
+- 儲存：只在按下時送 `profile.update`，帶畫面讀到的 `baseVersion`＋每列 `from`（基本資料原標籤、經歷與技能原位置、新增 null）；請求由欄位值重建，不帶出處文字。送前做與 `import.confirm` 相同的驗證（另擋欄位名空白／重複、結束未填又沒勾至今）。成功以回傳 Profile 重建畫面並顯示固定提示；儲存前一直顯示「不回溯已產生／已匯出／已投遞」提示。
+- 改公司／職稱／開始或刪整段經歷：儲存前列出受影響經歷與對不到提示，再按一次才送（表單一改確認失效）；刪經歷註明不刪任何匯出版本或 PDF（D30 (b)）。
+- `profile_conflict`：顯示固定訊息、重新讀取、未存修改捨棄、不重送（D30 (c)）；`profile_missing` 重讀後導向匯入；`multiple_profiles` 轉為不讀不寫；其他失敗顯示原因、保留畫面修改。
+- 競態：比照 useIntro／useBlockLock，單一請求鎖（請求中表單 fieldset 與按鈕鎖住、輸入不套用）、每操作 token（卸載或 StrictMode 重跑作廢）；有未存修改時「重新讀取」要再按一次、關閉／重新整理分頁觸發 beforeunload 確認。
+- 新測試：`profile-model.test.ts`、`ProfilePage.test.ts`、`ProfilePage.conflict.test.ts`（StrictMode＋記憶體假 bridge，合成資料）。
+- 殘餘：站內切換導覽（hash 換頁）有未存修改時不攔、直接捨棄——攔截要改 `app/router.ts`／`App.tsx`，不在 write_paths；單行欄位送出前去頭尾空白，若基準值本身帶頭尾空白，存其他欄時該欄也會被寫成去空白值並被 helper 判為「已修改」。

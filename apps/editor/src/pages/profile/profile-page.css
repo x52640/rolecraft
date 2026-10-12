@@ -1,0 +1,132 @@
+.pf-page {
+  max-width: 56rem;
+}
+
+.pf-form {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.pf-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.pf-section {
+  margin: 1.5rem 0;
+}
+
+.pf-section h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.5rem;
+}
+
+.pf-row,
+.pf-field {
+  display: grid;
+  grid-template-columns: minmax(6rem, 10rem) minmax(0, 1fr) auto;
+  gap: 0.25rem 0.5rem;
+  align-items: start;
+  padding: 0.25rem 0;
+}
+
+.pf-field textarea {
+  min-width: 0;
+  font: inherit;
+}
+
+.pf-source {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+  color: color-mix(in srgb, currentColor 70%, transparent);
+}
+
+.pf-source-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pf-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pf-tag {
+  display: inline-block;
+  padding: 0 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.8rem;
+  border: 1px solid currentColor;
+}
+
+.pf-tag-modified,
+.pf-tag-unsaved {
+  color: #a15c00;
+}
+
+.pf-tag-added {
+  color: #1f6f43;
+}
+
+.pf-card {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  border-radius: 0.5rem;
+}
+
+.pf-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+  color: inherit;
+}
+
+.pf-hint {
+  font-size: 0.9rem;
+  color: color-mix(in srgb, currentColor 75%, transparent);
+}
+
+.pf-warning {
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid #a15c00;
+}
+
+.pf-notice {
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid #1f6f43;
+}
+
+.pf-savebar {
+  position: sticky;
+  bottom: 0;
+  padding: 0.75rem 0;
+  background: Canvas;
+}
+
+.pf-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+@media (max-width: 48rem) {
+  .pf-row,
+  .pf-field {
+    grid-template-columns: 1fr;
+  }
+}

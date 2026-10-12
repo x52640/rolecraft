@@ -6,10 +6,11 @@
 ## 進行中
 
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本（`docs/tasks/P1-T017-spike-104-job.md`）
+- P1-T091 editor：個人資料頁（D30）（`docs/tasks/P1-T091-editor-profile-page.md`）
 
 ## ready
 
-- P1-T091 editor：個人資料頁（D30）
+- 無
 <!-- index:end -->
 
 ## 下一步（2026-10-11 codex 補審後）

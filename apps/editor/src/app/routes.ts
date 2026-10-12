@@ -5,6 +5,7 @@ import { ClaimsPage } from '../pages/claims/ClaimsPage.tsx';
 import { ImportPage } from '../pages/import/ImportPage.tsx';
 import { JobsPage } from '../pages/jobs/JobsPage.tsx';
 import { MessagesPage } from '../pages/messages/MessagesPage.tsx';
+import { ProfilePage } from '../pages/profile/ProfilePage.tsx';
 import { ProjectsPage } from '../pages/projects/ProjectsPage.tsx';
 import { ResumesPage } from '../pages/resumes/ResumesPage.tsx';
 import { SettingsPage } from '../pages/settings/SettingsPage.tsx';
@@ -20,6 +21,7 @@ export interface EditorRoute {
 /** 導覽列順序即此陣列順序；新增頁面在 src/pages/<名稱>/ 建資料夾後登記在這裡。 */
 export const ROUTES: readonly EditorRoute[] = [
   { path: 'import', label: '匯入', Page: ImportPage },
+  { path: 'profile', label: '個人資料', Page: ProfilePage },
   { path: 'projects', label: '專案', Page: ProjectsPage },
   { path: 'claims', label: '事實項', Page: ClaimsPage },
   { path: 'jobs', label: '職缺', Page: JobsPage },
