@@ -6,7 +6,7 @@ depends_on: ["P1-T065"]
 specs: ["resume-import.md", "bridge.md"]
 track: resume-import
 primary_repo: rolecraft
-write_paths: ["packages/resume-import/src/", "packages/contracts/src/bridge/editor/import.ts", "packages/contracts/src/bridge/__fixtures__/editor-requests.ts", "apps/helper/src/handlers/import/", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "apps/editor/src/pages/import/form-model.ts", "apps/editor/src/pages/import/form-model.test.ts", "docs/specs/resume-import.md", "docs/adr/0006-contracts-interim-fields.md"]
+write_paths: ["packages/resume-import/src/", "packages/contracts/src/bridge/editor/import.ts", "packages/contracts/src/bridge/__fixtures__/editor-requests.ts", "apps/helper/src/handlers/import/", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "apps/editor/src/pages/import/form-model.ts", "apps/editor/src/pages/import/form-model.test.ts", "apps/editor/src/pages/import/ParsePreview.tsx", "docs/specs/resume-import.md", "docs/adr/0006-contracts-interim-fields.md"]
 contract_change: additive
 expected_commit: "feat(P1-T066): 104 履歷 PDF 版面辨識，經歷整段帶入公司、職稱、日期與描述"
 ---
