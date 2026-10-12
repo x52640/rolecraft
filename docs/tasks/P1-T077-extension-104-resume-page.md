@@ -26,6 +26,8 @@ expected_commit: "feat(P1-T077): extension：登記 104 履歷頁並以真實 Ch
 - 預期區塊檔（放在本 Task 目錄）＋真實 Chrome 測試：載入 P1-T017 的履歷頁 fixture，抽出的區塊與預期逐項相符（與現有 Chrome 測試同一類，需環境變數）
 - 條款：照 D27（104 會員規約沒有明文禁止讀自己的履歷頁，擁有者裁定照常開放），在 ADR-0004 引用即可，不重查
 
+- 協調者附註（2026-10-12）：P1-T075 有數項判定只能在真實 Chrome 驗證（計算後樣式的 display:contents、visibility 繼承、content-visibility、white-space、封閉 shadow root 與 slot、未展開 details），本 Task 以真實 Chrome 跑 fixture 時一併驗證；履歷頁腳本每次注入只送一次，不得被頁面 DOM 事件反覆觸發（P1-T076 對抗驗證提醒）。
+
 ### 不包含
 
 - 改 fixture 本身或去識別化（P1-T017 負責）

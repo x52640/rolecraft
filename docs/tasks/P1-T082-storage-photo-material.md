@@ -1,7 +1,7 @@
 ---
 id: P1-T082
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T074"]
 specs: ["resume-output.md", "architecture.md"]
 track: storage
@@ -83,7 +83,7 @@ npm run verify
 - 最後完成：2026-10-12 「包含」各項已實作並 commit（工作者 worktree，未 push）
 - 已通過驗證：`npm run verify` 綠
 - 協調者 2026-10-12 擴充 write_paths：加 `packages/storage/src/migrate.test.ts`（新增 photos 表需同步寫死的資料表清單，前例 P1-T064）
-- 下一步：協調者收官；高風險 Task，收官前跑對抗驗證（E3）與 codex review（尚未跑）
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，修正 diff 的 codex review 無發現；main `npm run verify` 綠，Vitest 4014 通過）
 - Blocker：無
 - 審查待修（2026-10-12，51375eb 的對抗審查與 codex review 同一項，協調者寫入）：
   1. （D19）`INSERT OR REPLACE INTO photos`（同 ID 或 slot 衝突）在 recursive_triggers 關閉時繞過 `photos_no_update` 與 `photos_record_deleted`：舊照片沒有已刪紀錄，含舊照片的未投遞版本與 PDF 不會刪；同 ID 也能換內容。改法：新增 migration 0010（不改 0009），已有照片時 `BEFORE INSERT` 一律拒絕，加進 `IMMUTABILITY_TRIGGERS`；測試同 ID REPLACE、slot 衝突 REPLACE、replacePhoto 仍可、0009 升級到 0010。

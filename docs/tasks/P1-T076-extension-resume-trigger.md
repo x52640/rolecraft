@@ -1,7 +1,7 @@
 ---
 id: P1-T076
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T074"]
 specs: ["web-resume-capture.md", "bridge.md", "jobs-and-messages.md"]
 track: extension
@@ -87,9 +87,17 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：2026-10-12 「包含」各項已在 worktree 實作（未 commit）：registry 頁型、打包、點圖示／快捷鍵、注入失敗提示、操作×頁型授權、履歷擷取成功開編輯器、說明文字
-- 已通過驗證：format、lint、typecheck；extension 與 contracts 測試除下列 2 項外全過；extension 打包成功（104 尚無履歷頁規則，只產出 `sites/104.js`）
-- 下一步：協調者核准擴充 write_paths 後，改那 2 個測試、跑 `npm run verify`、commit
-- Blocker：`CONTENT_SCRIPT_OPERATIONS` 加 `submit_resume_capture` 必然讓 write_paths 外的兩個 contracts 測試失敗——`packages/contracts/src/bridge/editor-ops.test.ts`「content script 只能用職缺／訊息擷取」（期望清單兩項）、`packages/contracts/src/bridge/resume-capture.test.ts`「content script 白名單這裡不動（P1-T076 才加）」；需把這兩個檔加進 write_paths
+- 最後完成：2026-10-12 實作與協調者要求的收緊（f9692c5，main ce45e02）；完成結果由協調者依 worker 回報回填
+- 已通過驗證：`npm run verify` 綠（Vitest 3857 通過）；codex review 與對抗驗證皆無發現
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，修正 diff 的 codex review 無發現；main `npm run verify` 綠，Vitest 4014 通過）
+- Blocker：無
 
 ## 完成結果
+
+- `sites/registry.ts`：履歷頁規則 `ResumePageRule`（https、預設埠、主機與路徑完全相符）、`classifyUrl`（同時符合兩種規則回 null）、`rulesOverlap`、`siteBundles`／`siteResumeScriptFile`；`findSiteForUrl` 只回職缺頁。
+- `background/actions.ts`：`handleActionClick` 只有履歷頁注入、其他一律開編輯器；`triggerCapture` 依頁型注入；注入失敗只以 `showTabNotice` 提示、不開編輯器。
+- `relay/sender.ts`：`OPERATION_PAGE_TYPE` 操作×頁型授權；履歷擷取 url 必須等於發送頁 origin＋路徑；`CONTENT_SCRIPT_ONLY_OPERATIONS`：編輯器／擴充功能頁送 `submit_resume_capture` 一律拒絕（協調者要求收緊）。
+- `relay/handler.ts`：只有 content script 的履歷擷取、helper 回 ok 才開編輯器。`manifest.ts` 只改文字，權限不變（activeTab、scripting、nativeMessaging）。
+- contracts：`CONTENT_SCRIPT_OPERATIONS` 加 `submit_resume_capture`；協調者擴充 write_paths 同步 `editor-ops.test.ts`、`resume-capture.test.ts`。
+- 測試：`relay/resume-relay.test.ts`（頁型錯配、url 不符、子框架、平台不符、其他擴充功能、編輯器頁被拒、成功只開一個分頁）、`background/actions.test.ts`、`sites/registry.test.ts`。
+- 殘餘：正式 registry 尚無履歷頁規則（P1-T077 加），目前點圖示一律開編輯器；職缺頁也要求預設埠（比原本嚴）；履歷頁路徑只支援完全相符。P1-T077 寫履歷頁腳本時須確認每次注入只送一次（對抗驗證提醒）。

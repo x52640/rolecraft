@@ -1,7 +1,7 @@
 ---
 id: P1-T085
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T074"]
 specs: ["resume-output.md", "bridge.md"]
 track: editor
@@ -84,7 +84,7 @@ npm run verify
 
 - 最後完成：codex 審查 1 項已修（個人資料讀取失敗可重試）
 - 已通過驗證：`npm run verify` 綠（Vitest 3830 通過、13 略過）
-- 下一步：協調者收官（範圍稽核、codex review）
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，修正 diff 的 codex review 無發現；main `npm run verify` 綠，Vitest 4014 通過）
 - Blocker：無
 
 ## 完成結果

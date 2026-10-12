@@ -1,7 +1,7 @@
 ---
 id: P1-T084
 phase: 1
-status: blocked
+status: ready
 depends_on: ["P1-T082"]
 specs: ["resume-output.md"]
 track: pdf-export
@@ -80,6 +80,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：等 P1-T082 收官後改 ready
-- Blocker：相依 P1-T082 未完成
+- Blocker：無（相依已於 2026-10-12 收官）
 
 ## 完成結果

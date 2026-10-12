@@ -1,7 +1,7 @@
 ---
 id: P1-T081
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T074"]
 specs: ["resume-import.md", "bridge.md"]
 track: editor
@@ -84,7 +84,7 @@ npm run verify
 
 - 最後完成：2026-10-12 「包含」各項已實作並 commit（工作者 worktree，未 push）
 - 已通過驗證：`npm run verify` 全綠（Vitest 3821 通過、13 略過）；新測試 `ImportPage.web.test.ts` 10 項，另以「網頁來源 auto 改 true」突變確認計費測試會失敗
-- 下一步：codex 審查 2 項已修（另一個 commit）；協調者收官——E3 對抗驗證＋修正 diff 複審，再標 done
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，修正 diff 的 codex review 無發現；main `npm run verify` 綠，Vitest 4014 通過）
 - Blocker：無
 
 ## codex 審查待修（2026-10-12，main 119d202）

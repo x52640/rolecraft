@@ -82,16 +82,16 @@
 | [P1-T073](P1-T073-claims-page-usability.md) | 事實項頁實用性 | done | 1 | editor | P1-T063 |
 | [P1-T074](P1-T074-web-import-contracts.md) | contracts：網頁履歷匯入、照片、個人資料讀取的橋接契約 | done | 1 | contracts | P1-T041、P1-T069 |
 | [P1-T075](P1-T075-extension-resume-blocks.md) | extension：履歷頁區塊抽取與擷取共用流程 | in_progress | 1 | extension | P1-T074 |
-| [P1-T076](P1-T076-extension-resume-trigger.md) | extension：點圖示／快捷鍵依頁型觸發與發送者驗證 | in_progress | 1 | extension | P1-T074 |
+| [P1-T076](P1-T076-extension-resume-trigger.md) | extension：點圖示／快捷鍵依頁型觸發與發送者驗證 | done | 1 | extension | P1-T074 |
 | [P1-T077](P1-T077-extension-104-resume-page.md) | extension：104 履歷頁登記與 fixture 比對 | blocked | 1 | extension | P1-T017、P1-T075、P1-T076 |
 | [P1-T078](P1-T078-pipeline-web-resume-parse.md) | pipeline：網頁區塊來源的去個資、提示與照抄檢查 | in_progress | 1 | pipeline | P1-T074 |
-| [P1-T079](P1-T079-helper-import-session-web.md) | helper：網頁擷取與手動輸入的匯入工作階段、確認更新唯一 Profile、profile.get | in_progress | 1 | helper | P1-T074 |
+| [P1-T079](P1-T079-helper-import-session-web.md) | helper：網頁擷取與手動輸入的匯入工作階段、確認更新唯一 Profile、profile.get | done | 1 | helper | P1-T074 |
 | [P1-T080](P1-T080-helper-web-ai-parse.md) | helper：網頁來源的 AI 整理接線 | blocked | 1 | helper | P1-T078、P1-T079 |
-| [P1-T081](P1-T081-editor-web-import-page.md) | editor：匯入頁接網頁擷取與手動輸入 | in_progress | 1 | editor | P1-T074 |
-| [P1-T082](P1-T082-storage-photo-material.md) | storage：照片保存與照片素材的 D19 刪除 | in_progress | 1 | storage | P1-T074 |
-| [P1-T083](P1-T083-helper-photo-ops.md) | helper：照片選取與處理、photo.* 操作 | blocked | 1 | helper | P1-T082、P1-T079 |
-| [P1-T084](P1-T084-export-photo.md) | 匯出 PDF 加照片 | blocked | 1 | pdf-export | P1-T082 |
-| [P1-T085](P1-T085-editor-profile-copy-photo.md) | editor：履歷頁的個人資料複製與照片管理 | in_progress | 1 | editor | P1-T074 |
+| [P1-T081](P1-T081-editor-web-import-page.md) | editor：匯入頁接網頁擷取與手動輸入 | done | 1 | editor | P1-T074 |
+| [P1-T082](P1-T082-storage-photo-material.md) | storage：照片保存與照片素材的 D19 刪除 | done | 1 | storage | P1-T074 |
+| [P1-T083](P1-T083-helper-photo-ops.md) | helper：照片選取與處理、photo.* 操作 | ready | 1 | helper | P1-T082、P1-T079 |
+| [P1-T084](P1-T084-export-photo.md) | 匯出 PDF 加照片 | ready | 1 | pdf-export | P1-T082 |
+| [P1-T085](P1-T085-editor-profile-copy-photo.md) | editor：履歷頁的個人資料複製與照片管理 | done | 1 | editor | P1-T074 |
 | [P1-T086](P1-T086-editor-section-copy.md) | editor：客製履歷段落「複製」按鈕 | done | 1 | editor | P1-T025、P1-T064 |
 | [P1-T087](P1-T087-editor-hide-pdf-import.md) | editor：拿掉 PDF 匯入入口（Q10） | blocked | 1 | editor | P1-T077、P1-T080、P1-T081 |
 
