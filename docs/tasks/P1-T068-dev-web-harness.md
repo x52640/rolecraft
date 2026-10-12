@@ -84,7 +84,7 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：harness（scripts/dev）、helper `main({ pickers })` 注入點、編輯器 harness 通道、文件與測試
+- 最後完成：審查屬實 2 項已修（編碼路徑繞過頁面 token、錯誤 URL 讓伺服器結束），回歸測試換回舊實作會失敗 4 項
 - 已通過驗證：`npm run verify` 綠；實際啟動 harness 以 curl 確認沒 token 403、錯 Host 421、跨來源 403、帶 token 的 `providers.status` 由 helper 回覆；Chrome 分頁開設定頁與匯入頁正常顯示
 - 下一步：協調者以 harness 手動跑完整流程
 - Blocker：無
@@ -98,3 +98,4 @@ npm run verify
 - 編輯器：`createDefaultTransport()`：擴充功能頁一律用 `chrome.runtime`；否則頁面有 harness 注入的 `<meta name="rolecraft-harness">` 才用 HTTP（endpoint 只收同源絕對路徑、token 格式檢查）。
 - 字型唯讀使用 `~/Library/Application Support/RoleCraft-dev/fonts`；不寫家目錄。
 - 改了編輯器程式需重啟 harness 重新打包（token 會換）。
+- 審查修正：`resolveTarget` 先解碼再以 posix 規則正規化路徑，授權（`inspectRequest`）與送檔共用這一份；index.html 判斷不分大小寫（macOS 檔案系統不分）；解碼失敗、URL 解析失敗、含 NUL 或反斜線回 400；handler 另包 try/catch，任何檢查例外都回 400，不讓伺服器結束。編碼後的 `/bridge` 也套橋接端點規則。

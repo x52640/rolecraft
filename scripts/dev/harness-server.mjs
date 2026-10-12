@@ -37,34 +37,60 @@ function sameSecret(given, token) {
 }
 
 /**
- * 檢查請求是否可接受；回 null 表示通過，否則回 { status, message }。
- * Host 必須恰好是 127.0.0.1:<port>；橋接端點另外要求 POST、同源 Origin、token 標頭。
+ * 解析請求目標：解碼、正規化後的路徑（授權與送檔共用這一份，P1-T068 對抗驗證）。
+ * 解碼或解析失敗（例如 `//[`、`%E0`）、含 NUL 回 null。
+ * page：相對 webRoot 的檔案路徑，`/` 視為 index.html；isIndex 不分大小寫（macOS 檔案系統不分）。
  */
-export function checkRequest(req, { port, token }) {
-  const origin = `http://127.0.0.1:${port}`;
-  if (req.headers.host !== `127.0.0.1:${port}`) return { status: 421, message: 'Host 不符' };
-  const url = new URL(req.url ?? '/', origin);
-  if (url.pathname === BRIDGE_PATH) {
-    if (req.method !== 'POST') return { status: 405, message: '只接受 POST' };
-    if (req.headers.origin !== origin) return { status: 403, message: '拒絕跨來源請求' };
-    const site = req.headers['sec-fetch-site'];
-    if (site !== undefined && site !== 'same-origin') {
-      return { status: 403, message: '拒絕跨來源請求' };
-    }
-    if (!sameSecret(req.headers[TOKEN_HEADER], token))
-      return { status: 403, message: 'token 不符' };
-    if (!(req.headers['content-type'] ?? '').startsWith('application/json')) {
-      return { status: 415, message: '只接受 application/json' };
-    }
+export function resolveTarget(rawUrl) {
+  let url;
+  let decoded;
+  try {
+    url = new URL(rawUrl ?? '/', 'http://127.0.0.1');
+    decoded = decodeURIComponent(url.pathname);
+  } catch {
     return null;
   }
-  if (req.method !== 'GET' && req.method !== 'HEAD') return { status: 405, message: '只接受 GET' };
-  if (url.pathname === '/' || url.pathname === '/index.html') {
-    if (!sameSecret(url.searchParams.get('token'), token)) {
-      return { status: 403, message: 'token 不符' };
+  if (decoded.includes('\0') || decoded.includes('\\')) return null;
+  const pathname = path.posix.normalize(decoded);
+  const relative = pathname.replace(/^\/+/u, '');
+  const page = relative === '' ? 'index.html' : relative;
+  return {
+    pathname,
+    page,
+    isIndex: page.toLowerCase() === 'index.html',
+    token: url.searchParams.get('token'),
+  };
+}
+
+/**
+ * 檢查請求；回 { target } 表示通過，否則回 { rejected: { status, message } }。
+ * Host 必須恰好是 127.0.0.1:<port>；橋接端點另外要求 POST、同源 Origin、token 標頭；頁面要 ?token=。
+ */
+export function inspectRequest(req, { port, token }) {
+  const origin = `http://127.0.0.1:${port}`;
+  const reject = (status, message) => ({ rejected: { status, message } });
+  if (req.headers.host !== `127.0.0.1:${port}`) return reject(421, 'Host 不符');
+  const target = resolveTarget(req.url);
+  if (!target) return reject(400, '請求路徑格式錯誤');
+  if (target.pathname === BRIDGE_PATH) {
+    if (req.method !== 'POST') return reject(405, '只接受 POST');
+    if (req.headers.origin !== origin) return reject(403, '拒絕跨來源請求');
+    const site = req.headers['sec-fetch-site'];
+    if (site !== undefined && site !== 'same-origin') return reject(403, '拒絕跨來源請求');
+    if (!sameSecret(req.headers[TOKEN_HEADER], token)) return reject(403, 'token 不符');
+    if (!(req.headers['content-type'] ?? '').startsWith('application/json')) {
+      return reject(415, '只接受 application/json');
     }
+    return { target };
   }
-  return null;
+  if (req.method !== 'GET' && req.method !== 'HEAD') return reject(405, '只接受 GET');
+  if (target.isIndex && !sameSecret(target.token, token)) return reject(403, 'token 不符');
+  return { target };
+}
+
+/** inspectRequest 的簡化版：回 null 表示通過，否則回 { status, message }。 */
+export function checkRequest(req, options) {
+  return inspectRequest(req, options).rejected ?? null;
 }
 
 /** 把 harness 設定放進編輯器 index.html（meta，不是腳本）；同時禁止 Referer 外流 token。 */
@@ -114,10 +140,9 @@ async function serveBridge(req, res, { client, extensionId }) {
   send(res, 200, JSON.stringify(response), 'application/json; charset=utf-8');
 }
 
-async function serveStatic(req, res, { webRoot, token }) {
-  const { pathname } = new URL(req.url ?? '/', 'http://127.0.0.1');
-  const relative = pathname === '/' ? 'index.html' : decodeURIComponent(pathname.slice(1));
-  const file = path.resolve(webRoot, relative);
+/** 送靜態檔；target 是 inspectRequest 已授權的同一份解碼後路徑。 */
+async function serveStatic(res, { webRoot, token, target }) {
+  const file = path.resolve(webRoot, target.page);
   if (!file.startsWith(`${webRoot}${path.sep}`)) return send(res, 404, '找不到');
   let content;
   try {
@@ -125,8 +150,8 @@ async function serveStatic(req, res, { webRoot, token }) {
   } catch {
     return send(res, 404, '找不到');
   }
-  const type = CONTENT_TYPES[path.extname(file)] ?? 'application/octet-stream';
-  if (relative === 'index.html') {
+  const type = CONTENT_TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
+  if (target.isIndex) {
     return send(res, 200, injectHarnessMeta(content.toString('utf8'), token), type);
   }
   send(res, 200, content, type);
@@ -136,13 +161,18 @@ async function serveStatic(req, res, { webRoot, token }) {
 export function createHarnessHandler({ token, client, extensionId, webRoot, port }) {
   const root = path.resolve(webRoot);
   return (req, res) => {
-    const rejected = checkRequest(req, { port: port(), token });
+    let checked;
+    try {
+      checked = inspectRequest(req, { port: port(), token });
+    } catch {
+      checked = { rejected: { status: 400, message: '請求格式錯誤' } };
+    }
+    const { rejected, target } = checked;
     if (rejected) return send(res, rejected.status, rejected.message);
-    const { pathname } = new URL(req.url ?? '/', 'http://127.0.0.1');
     const work =
-      pathname === BRIDGE_PATH
+      target.pathname === BRIDGE_PATH
         ? serveBridge(req, res, { client, extensionId })
-        : serveStatic(req, res, { webRoot: root, token });
+        : serveStatic(res, { webRoot: root, token, target });
     work.catch(() => {
       if (!res.headersSent) send(res, 500, '伺服器錯誤');
       else res.destroy();

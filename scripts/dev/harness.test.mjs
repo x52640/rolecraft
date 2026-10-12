@@ -38,6 +38,8 @@ function call(port, { method = 'GET', pathname = '/', headers = {}, body } = {})
       },
     );
     req.on('error', reject);
+    // 伺服器若被請求打掛（例如錯誤 URL），測試要失敗而不是卡住
+    req.setTimeout(5000, () => req.destroy(new Error('請求逾時：harness 沒有回應')));
     if (body !== undefined) req.write(body);
     req.end();
   });
@@ -242,4 +244,53 @@ describe('startHarness（真 helper 子程序）', () => {
     });
     assert.equal(shape.status, 400);
   });
+
+  // 對抗驗證回歸：授權與送檔必須看同一份解碼、正規化後的路徑
+  const INDEX_ALIASES = [
+    '/%69ndex.html',
+    '/index%2Ehtml',
+    '/index%2ehtml',
+    '/%69%6E%64%65%78%2E%68%74%6D%6C',
+    '/./index.html',
+    '//index.html',
+    '/assets/../index.html',
+    '/assets/%2E%2E/index.html',
+    '/assets%2F..%2Findex.html',
+    '/INDEX.HTML',
+    '/Index.Html',
+    '/%2F',
+    '/.',
+  ];
+
+  test('index.html 的各種編碼／正規化別名不帶 token 一律 403，頁面內容不外流', async () => {
+    for (const pathname of INDEX_ALIASES) {
+      const res = await call(harness.port, { pathname });
+      assert.equal(res.status, 403, pathname);
+      assert.ok(!res.text.includes(harness.token), pathname);
+    }
+  });
+
+  test('同樣的別名帶 token 可取得頁面（授權與送檔同一份路徑）', async () => {
+    for (const pathname of ['/%69ndex.html', '/index%2Ehtml', '/assets/../index.html']) {
+      const res = await call(harness.port, { pathname: `${pathname}?token=${harness.token}` });
+      assert.equal(res.status, 200, pathname);
+      assert.match(res.text, /name="rolecraft-harness"/u);
+    }
+  });
+
+  test('編碼後的 /bridge 也套橋接端點規則', async () => {
+    assert.equal((await call(harness.port, { pathname: '/%62ridge' })).status, 405);
+  });
+
+  test('格式錯誤的請求目標回 400，伺服器繼續運作', async () => {
+    for (const pathname of ['//[', '/%E0', '/%', '/a%00b', '/a%5Cb']) {
+      assert.equal((await call(harness.port, { pathname })).status, 400, pathname);
+    }
+    assert.equal((await call(harness.port, { pathname: `/?token=${harness.token}` })).status, 200);
+  });
+});
+
+test('checkRequest：錯誤 URL 不丟例外、回 400', () => {
+  const req = { method: 'GET', url: '//[', headers: { host: '127.0.0.1:5000' } };
+  assert.equal(checkRequest(req, { port: 5000, token: 'a'.repeat(64) })?.status, 400);
 });
