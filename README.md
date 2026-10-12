@@ -102,6 +102,10 @@ npm run build      # 建置擴充功能（含編輯器頁）到 apps/extension/d
 移除：`npm run dev:uninstall -- --browser <同上> --yes`。只刪上面兩個檔，資料區保留；要清資料請自己刪資料區資料夾。
 若目錄裡已有不是開發腳本寫的同名檔（例如正式安裝），腳本會拒絕覆寫或刪除。
 
+### 開發用：在一般分頁測編輯器
+
+`npm run dev:harness -- --pdf <履歷.pdf> --folders <資料夾,...>`：編輯器跑在 `http://127.0.0.1:<port>/?token=...`，接真的 helper，選取器回傳指定路徑。只供自測、會呼叫真實 Claude；說明見 [docs/dev-harness.md](docs/dev-harness.md)。
+
 預設跳過、需要環境變數才跑的實測：
 
 | 環境變數 | 測試 | 需要 |

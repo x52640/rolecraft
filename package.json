@@ -24,6 +24,7 @@
     "test:scripts": "node --test \"scripts/dev/*.test.mjs\"",
     "dev:install": "node scripts/dev/install-helper.mjs",
     "dev:uninstall": "node scripts/dev/install-helper.mjs --uninstall",
+    "dev:harness": "node scripts/dev/harness.mjs",
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run test:docs && npm run test:scripts && npm run verify:docs"
   },
   "devDependencies": {

@@ -69,3 +69,28 @@ npm run verify
 ### 手動驗證
 
 - 協調者以 harness 跑完整流程（會呼叫真實 Claude，擁有者 2026-10-12 已同意自測用量）
+
+## 完成定義
+
+- [x] `npm run dev:harness` 可啟動：編輯器在一般分頁運作、接真的 helper、選取器回傳指定路徑
+- [x] token／Host／來源檢查、選取器注入只在 harness 入口生效、transport 選擇有測試（不呼叫真實 CLI）
+- [x] `docs/dev-harness.md`、bridge.md、README 已更新
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
+
+## 中斷／接手紀錄
+
+- 最後完成：harness（scripts/dev）、helper `main({ pickers })` 注入點、編輯器 harness 通道、文件與測試
+- 已通過驗證：`npm run verify` 綠；實際啟動 harness 以 curl 確認沒 token 403、錯 Host 421、跨來源 403、帶 token 的 `providers.status` 由 helper 回覆；Chrome 分頁開設定頁與匯入頁正常顯示
+- 下一步：協調者以 harness 手動跑完整流程
+- Blocker：無
+
+## 完成結果
+
+- `npm run dev:harness -- [--pdf <檔>] [--folders <資料夾,...>] [--port N] [--data-dir <資料夾>]`：打包編輯器到 `local-samples/harness-web/`，在 127.0.0.1 開伺服器（預設埠 5317），印出 `http://127.0.0.1:<port>/?token=<隨機 64 hex>`。
+- 轉送重用擴充功能程式：`isRelayMessage` → `handleRelay`（發送者視為編輯器頁）→ `createBridgeClient`；連線用子程序模擬 `connectNative`（一條連線一個 helper、同一套 framing），helper origin 是每次隨機的假擴充功能 origin。
+- 安全：只綁 127.0.0.1；Host 必須恰好 `127.0.0.1:<port>`；頁面要 `?token=`；`/bridge` 要 token 標頭、同源 Origin、Sec-Fetch-Site same-origin（有帶時）、JSON，不回 CORS 標頭；請求上限 1 MiB。
+- 選取器：`apps/helper/src/main.ts` 的 `main()` 新增 `options.pickers` 注入點（正式直接執行時一律 `nativePickers()`，不讀任何環境變數）；`scripts/dev/harness-helper.mjs` 以假 osascript 執行器建立 `createMacFolderPicker`／`createMacPdfPicker`，預設路徑仍經原本的輸出解析與 PDF 讀檔檢查；未指定等同取消。`packages/sources/src/picker/` 不需改動。
+- 編輯器：`createDefaultTransport()`：擴充功能頁一律用 `chrome.runtime`；否則頁面有 harness 注入的 `<meta name="rolecraft-harness">` 才用 HTTP（endpoint 只收同源絕對路徑、token 格式檢查）。
+- 字型唯讀使用 `~/Library/Application Support/RoleCraft-dev/fonts`；不寫家目錄。
+- 改了編輯器程式需重啟 harness 重新打包（token 會換）。

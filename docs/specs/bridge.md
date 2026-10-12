@@ -14,6 +14,8 @@
 - Q3 通訊方式與資料夾選取：依 `docs/adr/0003-bridge-transport.md`（Chrome 已實測；待擁有者手動驗證 Arc／Edge）。
 - host 註冊（P1-T059）：開發用 `npm run dev:install` 只給開發者自己的 Mac，包裝檔寫死本機 node 與 repo 內 helper 原始碼路徑、允許清單用「載入未封裝項目」當下的擴充功能 ID（未封裝擴充功能的 ID 隨資料夾位置而定，變了要重跑），只刪自己寫的檔；正式安裝（P1-T031）自帶 Node runtime、固定擴充功能 ID、使用者不需打終端指令（D10）。
 
+- 開發用網頁測試入口（P1-T068，`docs/dev-harness.md`）：只供開發者自測。編輯器跑在 `http://127.0.0.1:<port>`，經本機伺服器以 service worker 同一段驗證轉給 helper 子程序（隨機假擴充功能 origin、隨機 token、Host 與同源檢查）；選取器改回傳啟動參數指定的路徑，只在 harness 的 helper 入口生效，正式 helper 沒有任何環境變數或參數能開啟。擴充功能頁的通道不變。
+
 ## 操作清單與通訊協定（P1-T034 定案）
 
 欄位以 `packages/contracts/src/bridge/` 為準，這裡只寫語意。

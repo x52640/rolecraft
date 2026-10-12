@@ -89,7 +89,14 @@ export function createServices(
   };
 }
 
-export function main(): void {
+/** main 的注入點：只給開發用 harness（scripts/dev/harness-helper.mjs）以程式呼叫時使用。 */
+export interface MainOptions {
+  /** 預設 nativePickers()。正式入口直接執行本檔時一律用預設；沒有環境變數或參數能改它。 */
+  readonly pickers?: () => NativePickers;
+}
+
+export function main(options: MainOptions = {}): void {
+  const pickers = options.pickers ?? nativePickers;
   const logger = createLineLogger((line) => process.stderr.write(line));
   let allowedOrigins: readonly string[];
   try {
@@ -108,12 +115,12 @@ export function main(): void {
       ? connectDataDir(config, {
           assemble: (runtime: HelperRuntime, base?: HelperServices) => {
             pauseInterruptedJobs(runtime.db);
-            return createServices(runtime, nativePickers(), base);
+            return createServices(runtime, pickers(), base);
           },
-          withoutStorage: () => createServices(null),
+          withoutStorage: () => createServices(null, pickers()),
           notice: (event) => writeNotice((line) => process.stderr.write(line), event),
         })
-      : createServices(null);
+      : createServices(null, pickers());
   } catch {
     logger.log({ event: 'config_invalid' });
     process.exitCode = EXIT_CODES.config;
