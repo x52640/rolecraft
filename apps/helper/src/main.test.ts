@@ -22,6 +22,7 @@ import {
 } from './__fixtures__/requests.ts';
 import { claudeServiceOf } from './handlers/providers/providers-service.ts';
 import { ALLOWED_ORIGINS_ENV, dispatch, FrameDecoder, encodeFrame } from './index.ts';
+import { ENGLISH_RESUME, makeTextPdf } from './handlers/import/__fixtures__/pdf.ts';
 import { createServices, nativePickers, type NativePickers } from './main.ts';
 
 const MAIN = path.join(import.meta.dirname, 'main.ts');
@@ -176,6 +177,27 @@ describe('服務組裝（createServices，P1-T043）', () => {
     });
     expect(pickers.pdf).toHaveBeenCalledTimes(1);
     expect(await send(services, 'applications.list')).toEqual({ ok: true, applications: [] });
+  });
+
+  it('履歷 AI 整理（P1-T069）：已接上；未選定模型時 import.ai_parse 回原因（不是尚未支援）、不呼叫模型', async () => {
+    const pickers = {
+      pdf: vi.fn(() =>
+        Promise.resolve({ fileName: '履歷.pdf', bytes: makeTextPdf(ENGLISH_RESUME) }),
+      ),
+    } satisfies NativePickers;
+    const services = createServices(storage(), pickers);
+    const call = (request: object) =>
+      dispatch(request, services, recordingLogger()).then((r) => r.response);
+    const picked = (await call({ op: 'import.pick_pdf', payload: {} })) as {
+      selection: { importId: string };
+    };
+    const ref = { importId: picked.selection.importId };
+    expect(await call({ op: 'import.ai_status', payload: ref })).toEqual({ ok: true, parse: null });
+    expect(await call({ op: 'import.ai_parse', payload: ref })).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_request', message: expect.stringContaining('選定模型') as unknown },
+    });
+    expect(await call({ op: 'import.ai_status', payload: ref })).toEqual({ ok: true, parse: null });
   });
 
   it('分析（P1-T060）：有 storage 才接；未選定模型時不讀檔、不呼叫模型', async () => {

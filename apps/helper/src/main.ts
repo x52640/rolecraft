@@ -18,7 +18,8 @@ import { createAnalysisWithClaude } from './handlers/analysis/assemble.ts';
 import { createApplicationsService } from './handlers/applications/storage-service.ts';
 import { createClaimsService, type HelperStorage } from './handlers/claims/storage-service.ts';
 import { createExportService } from './handlers/export/export-service.ts';
-import { createResumeImportService, type PdfFilePicker } from './handlers/import/import-service.ts';
+import { createResumeImportWithClaude } from './handlers/import/assemble.ts';
+import type { PdfFilePicker } from './handlers/import/import-service.ts';
 import { createIntroWithClaude } from './handlers/intro/assemble.ts';
 import { createJobsService } from './handlers/jobs/storage-service.ts';
 import { createMessagesService } from './handlers/messages/assemble.ts';
@@ -70,10 +71,9 @@ export function createServices(
     providers,
     sources,
     ...(repositories && { jobs: createJobsService(repositories.jobSnapshots) }),
-    ...(repositories &&
-      pdf && {
-        resumeImport: createResumeImportService({ picker: pdf, profiles: repositories.profiles }),
-      }),
+    // 履歷匯入＋AI 整理（P1-T069）：選定的 Claude 模型、R6 紀錄存進資料區
+    ...(storage &&
+      pdf && { resumeImport: createResumeImportWithClaude(storage.db, pdf, providers) }),
     ...(storage && {
       applications: createApplicationsService({
         applications: createApplicationRecordRepository(storage.db, storage.fileStore),

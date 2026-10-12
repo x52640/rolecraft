@@ -72,16 +72,16 @@ npm run verify
 
 ## 完成定義
 
-- [x] 「包含」各項完成（正式 helper 的接線需改 `apps/helper/src/main.ts`，不在 write_paths，見完成結果）
+- [x] 「包含」各項完成
 - [x] `npm run verify` 綠
 - [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：首次實作（pipeline resume-parse、helper import.ai_parse／ai_status、編輯器自動整理與退路、規格）；協調者補充的頁首姓名去標語
+- 最後完成：首次實作（pipeline resume-parse、helper import.ai_parse／ai_status、編輯器自動整理與退路、規格）；頁首姓名去標語；main.ts 接上 AI 整理服務（協調者擴充 write_paths 後另一個 commit）
 - 已通過驗證：worktree `npm run verify` 綠（Vitest 3426 通過、13 略過；test:docs 15、test:scripts 30）；全程假 provider
-- 下一步：協調者在 `apps/helper/src/main.ts` 把 `createResumeImportService({ picker: pdf, profiles })` 換成 `createResumeImportWithClaude(storage.db, pdf, providers)`（`handlers/import/assemble.ts`），再收官（對抗驗證）
-- Blocker：無（main.ts 不在本 Task write_paths；未接線前 `import.ai_parse` 回「尚未支援」，編輯器退回規則預填）
+- 下一步：協調者收官（對抗驗證、以開發入口用擁有者 PDF 實跑）
+- Blocker：無
 
 ## 完成結果
 
@@ -96,4 +96,5 @@ npm run verify
 - 編輯器匯入頁：解析成功即自動整理；整理中鎖住表單與確認列；成功以 AI 結果預填並標「預填來源：AI 整理」，列出「AI 給的值與原文不符，已略過」的欄位與原因、其他段落（不寫入 Profile）；失敗或不可用顯示原因並保留 104／通用規則預填與來源；「重新用 AI 整理」在改過欄位時要再按一次確認。`useAiParse` 每次整理有自己的 token，換檔與卸載時作廢舊回應、取消輪詢；確認失敗回到核對畫面不會重跑 AI。
 - 測試（全用假 provider）：合格輸出採用；捏造公司、改寫職稱、編造日期、引用聯絡行、不連續行、非日期、空白各自丟棄；模型自己寫出姓名不收；聯絡資料不在提示；未選模型不呼叫；格式錯失敗；R6 不通過不送；同時要求兩次只送一次；編輯器鎖定、預填、退路、重新整理確認、換檔舊回應作廢。
 - 保守選擇（待擁有者裁定）：生日、性別、年齡、兵役、婚姻、個人網站也當個資不送；文中網址（非標籤行）照送；其他段落不寫入 Profile；擷取不到中文姓名時英文姓名不切標語；佔位字換回原文後回填（描述裡會出現原本的 email／電話）。
-- 手動驗證（擁有者 PDF 實跑）需協調者以開發入口進行，且需先完成 main.ts 接線。
+- 正式 helper 接線：`main.ts` 有資料區且有 PDF 選取器時改用 `createResumeImportWithClaude`（開發入口 harness 走同一個 `main()`）；`main.test.ts` 驗未選模型時 `import.ai_parse` 回原因、不是「尚未支援」。
+- 手動驗證（擁有者 PDF 實跑）需協調者以開發入口進行。
