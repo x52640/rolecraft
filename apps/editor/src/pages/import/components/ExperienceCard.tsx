@@ -1,6 +1,7 @@
 import { useId } from 'react';
 
-import type { ExperienceRow } from '../form-model.ts';
+import type { ExperienceKey, ExperienceRow } from '../form-model.ts';
+import { PersonalMark } from './PersonalMark.tsx';
 
 type TextKey = 'company' | 'title' | 'startDate';
 
@@ -16,10 +17,14 @@ export function ExperienceCard(props: {
   const { row, index, onChange, onRemove } = props;
   const id = useId();
   const n = String(index + 1);
+  const mark = (key: ExperienceKey) => (row.personal?.includes(key) ? <PersonalMark /> : null);
 
   const text = (key: TextKey, label: string) => (
     <div className="import-field">
-      <label htmlFor={`${id}-${key}`}>{label}</label>
+      <label htmlFor={`${id}-${key}`}>
+        {label}
+        {mark(key)}
+      </label>
       <input
         id={`${id}-${key}`}
         aria-label={`第 ${n} 段經歷${label}`}
@@ -51,7 +56,10 @@ export function ExperienceCard(props: {
         {text('title', '職稱')}
         {text('startDate', '開始日期')}
         <div className="import-field">
-          <label htmlFor={`${id}-endDate`}>結束日期</label>
+          <label htmlFor={`${id}-endDate`}>
+            結束日期
+            {mark('endDate')}
+          </label>
           <div className="import-end-date">
             <input
               id={`${id}-endDate`}
@@ -73,7 +81,10 @@ export function ExperienceCard(props: {
         </div>
       </div>
       <div className="import-field">
-        <label htmlFor={`${id}-description`}>描述</label>
+        <label htmlFor={`${id}-description`}>
+          描述
+          {mark('description')}
+        </label>
         <textarea
           id={`${id}-description`}
           aria-label={`第 ${n} 段經歷描述`}

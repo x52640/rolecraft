@@ -11,7 +11,12 @@ import {
 export interface InfoRow {
   label: string;
   value: string;
+  /** AI 草稿還原出姓名或聯絡資料（D28／W7）：該欄標示「含姓名或聯絡資料」；跟著這一列移動 */
+  personal?: boolean;
 }
+
+/** 經歷裡可能被標示「含姓名或聯絡資料」的欄位。 */
+export type ExperienceKey = 'company' | 'title' | 'startDate' | 'endDate' | 'description';
 
 export interface ExperienceRow {
   company: string;
@@ -21,12 +26,16 @@ export interface ExperienceRow {
   /** 至今（勾選時 endDate 不用填） */
   current: boolean;
   description: string;
+  /** 還原出姓名或聯絡資料的欄位（D28／W7）；跟著這一段移動 */
+  personal?: readonly ExperienceKey[];
 }
 
 export interface ProfileForm {
   info: InfoRow[];
   experiences: ExperienceRow[];
   skills: string[];
+  /** 還原出姓名或聯絡資料的技能值（技能只是字串，以值比對標示） */
+  personalSkills?: readonly string[];
 }
 
 export const EMPTY_EXPERIENCE: ExperienceRow = {

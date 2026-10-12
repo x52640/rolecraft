@@ -87,7 +87,7 @@
 | [P1-T078](P1-T078-pipeline-web-resume-parse.md) | pipeline：網頁區塊來源的去個資、提示與照抄檢查 | ready | 1 | pipeline | P1-T074 |
 | [P1-T079](P1-T079-helper-import-session-web.md) | helper：網頁擷取與手動輸入的匯入工作階段、確認更新唯一 Profile、profile.get | in_progress | 1 | helper | P1-T074 |
 | [P1-T080](P1-T080-helper-web-ai-parse.md) | helper：網頁來源的 AI 整理接線 | blocked | 1 | helper | P1-T078、P1-T079 |
-| [P1-T081](P1-T081-editor-web-import-page.md) | editor：匯入頁接網頁擷取與手動輸入 | ready | 1 | editor | P1-T074 |
+| [P1-T081](P1-T081-editor-web-import-page.md) | editor：匯入頁接網頁擷取與手動輸入 | in_progress | 1 | editor | P1-T074 |
 | [P1-T082](P1-T082-storage-photo-material.md) | storage：照片保存與照片素材的 D19 刪除 | in_progress | 1 | storage | P1-T074 |
 | [P1-T083](P1-T083-helper-photo-ops.md) | helper：照片選取與處理、photo.* 操作 | blocked | 1 | helper | P1-T082、P1-T079 |
 | [P1-T084](P1-T084-export-photo.md) | 匯出 PDF 加照片 | blocked | 1 | pdf-export | P1-T082 |

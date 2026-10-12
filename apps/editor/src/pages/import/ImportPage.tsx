@@ -3,19 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
 import { helperUnavailableText } from '../../bridge/helper-busy.ts';
-import {
-  emptyForm,
-  FAILURE_TEXT,
-  formFromDraft,
-  toProfileInput,
-  type ProfileForm,
-} from './form-model.ts';
+import { emptyForm, formFromDraft, toProfileInput, type ProfileForm } from './form-model.ts';
 import { formFromAiDraft, rulesSource, type PrefillSource } from './ai-form.ts';
-import { AiParsePanel } from './components/AiParsePanel.tsx';
-import { ConfirmBar } from './components/ConfirmBar.tsx';
-import { ParsePreview } from './ParsePreview.tsx';
-import { ProfileFormFields } from './ProfileForm.tsx';
-import { DEFAULT_AI_POLL, useAiParse, type AiPollOptions } from './useAiParse.ts';
+import { LatestCapturePanel } from './components/LatestCapturePanel.tsx';
+import { ImportReview } from './ImportReview.tsx';
+import { DEFAULT_AI_POLL, useAiParse, type AiPollOptions, type AiSession } from './useAiParse.ts';
+import { useLatestCapture } from './useLatestCapture.ts';
 
 import './import.css';
 
@@ -23,21 +16,30 @@ type Phase =
   | { kind: 'idle' }
   | { kind: 'busy'; what: string }
   | { kind: 'review'; importId: string; result: ImportResult }
-  | { kind: 'confirmed'; profileId: string; displayName: string };
+  | { kind: 'confirmed'; displayName: string };
 
-const failureText = (failure: BridgeFailure): string =>
-  failure.error.code === 'helper_unavailable'
-    ? helperUnavailableText(failure, '連不到本機輔助程式，請確認已安裝並啟動。')
-    : failure.error.message;
+const MULTIPLE_PROFILES_TEXT =
+  '資料區已有多份個人資料（舊資料），為了不覆蓋錯的那份，這次沒有寫入。請先整理資料區只留一份再確認。';
+
+const failureText = (failure: BridgeFailure): string => {
+  if (failure.error.code === 'helper_unavailable') {
+    return helperUnavailableText(failure, '連不到本機輔助程式，請確認已安裝並啟動。');
+  }
+  if (failure.error.reason === 'multiple_profiles') return MULTIPLE_PROFILES_TEXT;
+  return failure.error.message;
+};
 
 /**
- * 履歷 PDF 匯入（F02、R10、D18）：選檔 → 預覽原文與欄位草稿 → 逐欄校正 → 確認後才寫入個人資料。
- * 檔案由本機輔助程式開系統選取器選（R7）；解析失敗清楚提示並改手動輸入。
- * 解析成功後用 AI 整理（P1-T069）：104 版面用規則預填、按「用 AI 重新整理」才呼叫；其他格式自動開始。
- * 整理中鎖住表單；成功時以逐欄對照過原文的結果預填，失敗或不可用時保留規則的預填並標明來源。
+ * 履歷匯入（F02、R10、D18；D28 加網頁擷取與手動輸入）：開啟一份來源 → 核對原文與欄位草稿 → 逐欄校正
+ * → 確認後才寫入（取代目前那份個人資料）。
+ * - 網頁擷取：顯示最近一次擷取，按「使用這份」才開啟核對；一律按「用 AI 整理」才呼叫模型（Q4＝B），
+ *   擷取送達、查詢、開啟、切換都不會觸發。
+ * - PDF：檔案由本機輔助程式開系統選取器選（R7）；104 版面按鈕才整理，其他格式自動整理（P1-T069）。
+ * - 手動輸入一律提供（import.start_manual）。
  */
 export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOptions }) {
   const bridge = useBridge();
+  const latest = useLatestCapture();
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [form, setForm] = useState<ProfileForm>(emptyForm);
   const [checked, setChecked] = useState(false);
@@ -46,14 +48,14 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
   // 每次送出驗證失敗加一：把錯誤清單捲進畫面並聚焦（確認列在視窗底部，清單可能在畫面外）。
   const [failedAttempts, setFailedAttempts] = useState(0);
   const problemsRef = useRef<HTMLUListElement>(null);
-  // AI 整理（P1-T069）：解析成功、且不是 104 版面時自動開始（104 用規則預填，按鈕才呼叫，擁有者裁定 #16）；
-  // 確認失敗回到核對畫面不會重跑
-  const [aiImportId, setAiImportId] = useState<string | null>(null);
-  const [aiAuto, setAiAuto] = useState(false);
+  const sessionKey = useRef(0);
+  const [aiSession, setAiSession] = useState<AiSession | null>(null);
   const [source, setSource] = useState<PrefillSource>('manual');
   const [edited, setEdited] = useState(false);
   const [rerunArmed, setRerunArmed] = useState(false);
-  const ai = useAiParse(aiImportId, aiAuto, aiPoll, (draft) => {
+  // 使用者確認過的姓名（網頁來源 helper 回「需確認姓名」後才有）；重新整理時一併帶上
+  const [names, setNames] = useState<string[] | undefined>(undefined);
+  const ai = useAiParse(aiSession, aiPoll, (draft) => {
     setForm(formFromAiDraft(draft));
     setSource('ai');
     setEdited(false);
@@ -66,6 +68,30 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
     if (failedAttempts > 0) problemsRef.current?.focus();
   }, [failedAttempts]);
 
+  /** 開啟一次核對。只有 PDF 非 104 版面會自動 AI 整理；網頁、手動、解析失敗都不會。 */
+  function open(importId: string, result: ImportResult) {
+    const parsed = result.status === 'parsed' ? result : null;
+    setForm(parsed ? formFromDraft(parsed.draft) : emptyForm());
+    setSource(parsed ? rulesSource(parsed.draft) : 'manual');
+    setEdited(false);
+    setRerunArmed(false);
+    setChecked(false);
+    setProblems([]);
+    setNames(undefined);
+    setPhase({ kind: 'review', importId, result });
+    sessionKey.current += 1;
+    const key = sessionKey.current;
+    if (parsed) setAiSession({ key, importId, auto: parsed.draft.structured === undefined });
+    else if (result.status === 'web_capture') setAiSession({ key, importId, auto: false });
+    else setAiSession(null);
+  }
+
+  async function load(importId: string, previous: Phase) {
+    const got = await bridge.send({ op: 'import.get', payload: { importId } });
+    if (!got.ok) return fail(failureText(got), previous);
+    open(importId, got.result);
+  }
+
   async function pick() {
     setError(null);
     // 取消或失敗時回到原畫面（例如在核對畫面按「改選其他檔案」），不清掉進行中的核對。
@@ -74,20 +100,25 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
     const picked = await bridge.send({ op: 'import.pick_pdf', payload: {} });
     if (!picked.ok) return fail(failureText(picked), previous);
     if (picked.selection.status === 'cancelled') return setPhase(previous);
-    const { importId } = picked.selection;
     setPhase({ kind: 'busy', what: '讀取解析結果…' });
-    const got = await bridge.send({ op: 'import.get', payload: { importId } });
-    if (!got.ok) return fail(failureText(got), previous);
-    const parsed = got.result.status === 'parsed' ? got.result : null;
-    setForm(parsed ? formFromDraft(parsed.draft) : emptyForm());
-    setSource(parsed ? rulesSource(parsed.draft) : 'manual');
-    setEdited(false);
-    setRerunArmed(false);
-    setChecked(false);
-    setProblems([]);
-    setPhase({ kind: 'review', importId, result: got.result });
-    setAiAuto(parsed !== null && parsed.draft.structured === undefined);
-    setAiImportId(parsed ? importId : null);
+    await load(picked.selection.importId, previous);
+  }
+
+  /** 「使用這份」：只開啟核對（import.get），不送 AI。 */
+  async function openCapture(importId: string) {
+    setError(null);
+    const previous = phase;
+    setPhase({ kind: 'busy', what: '讀取擷取內容…' });
+    await load(importId, previous);
+  }
+
+  async function startManual() {
+    setError(null);
+    const previous = phase;
+    setPhase({ kind: 'busy', what: '建立手動輸入…' });
+    const started = await bridge.send({ op: 'import.start_manual', payload: {} });
+    if (!started.ok) return fail(failureText(started), previous);
+    open(started.importId, { status: 'manual', displayName: '手動輸入' });
   }
 
   function fail(message: string, next: Phase) {
@@ -98,7 +129,7 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
   function changeForm(next: ProfileForm) {
     if (ai.running) return; // AI 整理中鎖住表單
     setForm(next);
-    // 內容改了就要重新核對；重新用 AI 整理前要再確認一次。
+    // 內容改了就要重新核對；用 AI 整理（會覆蓋）前要再確認一次。
     setChecked(false);
     setEdited(true);
     setRerunArmed(false);
@@ -110,7 +141,13 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
       return;
     }
     setRerunArmed(false);
-    ai.restart();
+    ai.restart(names);
+  }
+
+  function confirmNames(list: string[]) {
+    setNames(list);
+    setRerunArmed(false);
+    ai.restart(list);
   }
 
   // 擁有者裁定 #12（P1-T051）：不提供「暫存校正」；只有確認後才寫入，存入前離開就丟掉修改。
@@ -128,22 +165,26 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
     setPhase({ kind: 'busy', what: '寫入個人資料…' });
     const done = await bridge.send({ op: 'import.confirm', payload });
     if (!done.ok) return fail(failureText(done), review);
-    setPhase({
-      kind: 'confirmed',
-      profileId: done.profileId,
-      displayName: review.result.displayName,
-    });
+    setPhase({ kind: 'confirmed', displayName: review.result.displayName });
   }
 
+  const busy = phase.kind === 'busy' || ai.running;
   return (
     <section className="page import-page">
       <header className="import-header">
         <h1>匯入</h1>
         <p className="import-hint">
-          匯入既有履歷 PDF（例如 104 下載的履歷），只在本機讀取文字層。掃描檔的文字辨識尚未實作，
-          遇到時請改用手動輸入。
+          在求職網站的履歷頁點 RoleCraft 圖示擷取後，在這裡核對；也可以匯入履歷
+          PDF（只在本機讀取文字層， 掃描檔請改用手動輸入），或直接手動輸入。
         </p>
       </header>
+
+      <LatestCapturePanel
+        state={latest.state}
+        onUse={(importId) => void openCapture(importId)}
+        onRefresh={latest.refresh}
+        disabled={busy}
+      />
 
       {error && (
         <p role="alert" className="import-error">
@@ -164,78 +205,43 @@ export function ImportPage({ aiPoll = DEFAULT_AI_POLL }: { aiPoll?: AiPollOption
               已確認並寫入個人資料（來源：{phase.displayName}）。之後產生履歷只會用已確認的內容。
             </p>
           )}
-          <button
-            type="button"
-            className="import-btn import-btn-primary"
-            onClick={() => void pick()}
-          >
-            {phase.kind === 'idle' ? '選擇履歷 PDF' : '再匯入一份'}
-          </button>
+          <p className="import-actions">
+            <button
+              type="button"
+              className="import-btn import-btn-primary"
+              onClick={() => void pick()}
+            >
+              {phase.kind === 'idle' ? '選擇履歷 PDF' : '再匯入一份'}
+            </button>
+            <button
+              type="button"
+              className="import-btn import-btn-secondary"
+              onClick={() => void startManual()}
+            >
+              手動輸入
+            </button>
+          </p>
         </div>
       )}
 
       {phase.kind === 'review' && (
-        <form
-          className="import-review"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submit(phase);
-          }}
-        >
-          <div className="import-file-bar">
-            <span>
-              檔案：<strong>{phase.result.displayName}</strong>
-            </span>
-            <button
-              type="button"
-              className="import-btn import-btn-secondary"
-              onClick={() => void pick()}
-            >
-              改選其他檔案
-            </button>
-          </div>
-          {phase.result.status === 'failed' && (
-            <div role="alert" aria-label="解析失敗" className="import-warning">
-              <p>無法可靠解析這份 PDF：{FAILURE_TEXT[phase.result.reason]}</p>
-              <p>解析結果不會被使用。請在下方手動輸入個人資料、經歷與技能。</p>
-            </div>
-          )}
-
-          <div className={phase.result.status === 'parsed' ? 'import-layout' : undefined}>
-            <div className="import-form-column">
-              {phase.result.status === 'parsed' && (
-                <AiParsePanel
-                  state={ai.state}
-                  source={source}
-                  confirmingRerun={rerunArmed}
-                  onRerun={rerun}
-                />
-              )}
-              <ProfileFormFields form={form} onChange={changeForm} disabled={ai.running} />
-              {problems.length > 0 && (
-                <ul
-                  ref={problemsRef}
-                  tabIndex={-1}
-                  role="alert"
-                  aria-label="需要修正"
-                  className="import-error"
-                >
-                  {problems.map((problem) => (
-                    <li key={problem}>{problem}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            {phase.result.status === 'parsed' && <ParsePreview result={phase.result} />}
-          </div>
-
-          <ConfirmBar
-            checked={checked}
-            onCheck={setChecked}
-            problemCount={problems.length}
-            locked={ai.running}
-          />
-        </form>
+        <ImportReview
+          result={phase.result}
+          form={form}
+          onFormChange={changeForm}
+          ai={ai}
+          source={source}
+          rerunArmed={rerunArmed}
+          onRerun={rerun}
+          onConfirmNames={confirmNames}
+          problems={problems}
+          problemsRef={problemsRef}
+          checked={checked}
+          onCheck={setChecked}
+          onSubmit={() => void submit(phase)}
+          onPick={() => void pick()}
+          onManual={() => void startManual()}
+        />
       )}
     </section>
   );

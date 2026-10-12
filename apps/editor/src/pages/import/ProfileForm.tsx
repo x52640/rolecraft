@@ -60,6 +60,7 @@ export function ProfileFormFields({ form, onChange, disabled = false }: ProfileF
 
       <SkillChips
         skills={form.skills}
+        personal={form.personalSkills}
         onChange={(i, value) => onChange({ ...form, skills: replaceAt(form.skills, i, value) })}
         onRemove={(i) => onChange({ ...form, skills: removeAt(form.skills, i) })}
         onAdd={() => onChange({ ...form, skills: [...form.skills, ''] })}

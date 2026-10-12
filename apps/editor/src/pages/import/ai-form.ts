@@ -1,13 +1,8 @@
 // AI 整理（P1-T069）的草稿 → 表單初值，與畫面文字。草稿裡每個值都已在 helper 逐欄對照過原文；
 // 這裡只搬進表單，一律未確認，由使用者逐欄核對後才寫入（R10）。
-import type {
-  ImportAiDiscardReason,
-  ImportAiDraft,
-  ImportAiFailure,
-  ImportDraft,
-} from '@rolecraft/contracts';
+import type { ImportAiDiscardReason, ImportAiFailure, ImportDraft } from '@rolecraft/contracts';
 
-import type { ProfileForm } from './form-model.ts';
+import type { ExperienceKey, ProfileForm } from './form-model.ts';
 
 /** 表單目前是用什麼預填的（畫面標明來源）。 */
 export type PrefillSource = 'ai' | 'layout104' | 'rules' | 'manual';
@@ -18,6 +13,9 @@ export const PREFILL_LABELS: Record<PrefillSource, string> = {
   rules: '通用規則',
   manual: '手動輸入',
 };
+
+/** 還原出姓名或聯絡資料的欄位標示文字（D28／W7）。 */
+export const PERSONAL_MARK = '含姓名或聯絡資料';
 
 export function rulesSource(draft: ImportDraft): PrefillSource {
   return draft.structured ? 'layout104' : 'rules';
@@ -39,19 +37,58 @@ export const DISCARD_TEXT: Record<ImportAiDiscardReason, string> = {
   empty: '空白',
 };
 
-/** AI 草稿 → 表單：姓名列固定第一；學歷併成一列「學歷」；其他段落不進表單（不寫入個人資料）。 */
-export function formFromAiDraft(draft: ImportAiDraft): ProfileForm {
+/** 草稿欄位的共同形狀：PDF（頁／行）與網頁（區塊編號）出處不同，表單只用值與個資旗標。 */
+export interface AiFieldLike {
+  readonly value: string;
+  readonly containsPersonalData?: boolean | undefined;
+}
+
+/** PDF 的 ImportAiDraft 與網頁的 ImportWebAiDraft 共同的形狀（D28：結構相同、出處不同）。 */
+export interface AiDraftLike {
+  readonly personalInfo: readonly { readonly label: string; readonly value: AiFieldLike }[];
+  readonly education: readonly AiFieldLike[];
+  readonly experiences: readonly {
+    readonly company: AiFieldLike | null;
+    readonly title: AiFieldLike | null;
+    readonly startDate: AiFieldLike | null;
+    readonly endDate: AiFieldLike | null;
+    readonly current: boolean;
+    readonly description: AiFieldLike | null;
+  }[];
+  readonly skills: readonly AiFieldLike[];
+  readonly otherSections: readonly { readonly heading: AiFieldLike; readonly body: AiFieldLike }[];
+  readonly discarded: readonly { readonly field: string; readonly reason: ImportAiDiscardReason }[];
+}
+
+const flagged = (field: AiFieldLike | null | undefined): boolean =>
+  field?.containsPersonalData === true;
+
+const EXPERIENCE_KEYS: readonly ExperienceKey[] = [
+  'company',
+  'title',
+  'startDate',
+  'endDate',
+  'description',
+];
+
+/**
+ * AI 草稿 → 表單：姓名列固定第一；學歷併成一列「學歷」；其他段落不進表單（不寫入個人資料）。
+ * 還原出姓名或聯絡資料的欄位（D28／W7）帶標示，提醒使用者確認前刪掉。
+ */
+export function formFromAiDraft(draft: AiDraftLike): ProfileForm {
   const name = draft.personalInfo.find((row) => row.label === '姓名');
   const others = draft.personalInfo
     .filter((row) => row.label !== '姓名')
-    .map((row) => ({ label: row.label, value: row.value.value }));
+    .map((row) => ({ label: row.label, value: row.value.value, personal: flagged(row.value) }));
   const education = draft.education.map((field) => field.value).join('\n');
   const hasEducation = others.some((row) => row.label === '學歷');
+  const educationRow = { label: '學歷', value: education, personal: draft.education.some(flagged) };
+  const skills = draft.skills.map((s) => ({ value: s.value.trim(), personal: flagged(s) }));
   return {
     info: [
-      { label: '姓名', value: name?.value.value ?? '' },
+      { label: '姓名', value: name?.value.value ?? '', personal: flagged(name?.value) },
       ...others,
-      ...(education !== '' && !hasEducation ? [{ label: '學歷', value: education }] : []),
+      ...(education !== '' && !hasEducation ? [educationRow] : []),
     ],
     experiences: draft.experiences.map((e) => ({
       company: e.company?.value ?? '',
@@ -60,7 +97,9 @@ export function formFromAiDraft(draft: ImportAiDraft): ProfileForm {
       endDate: e.current ? '' : (e.endDate?.value ?? ''),
       current: e.current,
       description: e.description?.value ?? '',
+      personal: EXPERIENCE_KEYS.filter((key) => flagged(e[key])),
     })),
-    skills: [...new Set(draft.skills.map((s) => s.value.trim()).filter((s) => s !== ''))],
+    skills: [...new Set(skills.map((s) => s.value).filter((s) => s !== ''))],
+    personalSkills: skills.filter((s) => s.personal && s.value !== '').map((s) => s.value),
   };
 }

@@ -1,9 +1,9 @@
-import type { BridgeFailure, ImportAiDraft, ImportAiParseView } from '@rolecraft/contracts';
+import type { BridgeFailure, ImportAiParseView } from '@rolecraft/contracts';
 import { useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
 import { helperUnavailableText } from '../../bridge/helper-busy.ts';
-import { AI_FAILURE_TEXT } from './ai-form.ts';
+import { AI_FAILURE_TEXT, type AiDraftLike } from './ai-form.ts';
 
 export interface AiPollOptions {
   /** 輪詢間隔（毫秒） */
@@ -14,10 +14,22 @@ export interface AiPollOptions {
 
 export const DEFAULT_AI_POLL: AiPollOptions = { intervalMs: 2000, maxPolls: 120 };
 
+/**
+ * 一次核對的 AI 整理設定。key 每開一次核對就換一個（同一份網頁擷取再按「使用這份」也是新的核對）。
+ * auto 只有 PDF 非 104 版面為 true；網頁來源一律 false（D28 Q4＝B：按「用 AI 整理」才呼叫模型）。
+ */
+export interface AiSession {
+  readonly key: number;
+  readonly importId: string;
+  readonly auto: boolean;
+}
+
 export type AiParseState =
   | { readonly kind: 'idle' }
   | { readonly kind: 'running' }
-  | { readonly kind: 'succeeded'; readonly draft: ImportAiDraft }
+  /** helper 回 name_required（網頁來源本次頁面姓名沒辨識出來）：要使用者確認姓名才送，模型沒被呼叫 */
+  | { readonly kind: 'needs_name' }
+  | { readonly kind: 'succeeded'; readonly draft: AiDraftLike }
   | { readonly kind: 'failed'; readonly message: string };
 
 export const AI_INTERRUPTED_TEXT = 'AI 整理中斷：本機輔助程式可能重新啟動，沒有拿到結果';
@@ -31,19 +43,22 @@ function bridgeFailureText(failure: BridgeFailure): string {
   return failure.error.message;
 }
 
+/** 成功時的草稿：網頁來源在 webDraft（出處是區塊編號），PDF 在 draft。 */
+const draftOf = (view: ImportAiParseView): AiDraftLike | null =>
+  view.source === 'web' ? (view.webDraft ?? null) : view.draft;
+
 /**
- * 選好 PDF 後自動開始 AI 整理（P1-T069），輪詢到結束。結構上避免競態（沿用 useIntro 的教訓）：
- * - 每次開始（含自動開始）有自己的 token；切換匯入、元件卸載、StrictMode 重跑 effect 都讓舊 token 作廢
+ * AI 整理（P1-T069；D28 加網頁來源），輪詢到結束。結構上避免競態（沿用 useIntro 的教訓）：
+ * - 每次開始有自己的 token；換一次核對、元件卸載、StrictMode 重跑 effect 都讓舊 token 作廢
  *   並取消輪詢計時，舊的回應一律不套用。
  * - 整理期間由畫面鎖住表單（running），所以成功時直接套用不會蓋掉使用者正在打的字。
- * importId 為 null（沒有解析成功的匯入）時不開始。auto 為 false（認出 104 版面，擁有者改裁定 #16）時
- * 不自動開始，只在使用者按「用 AI 重新整理」（restart）時才呼叫。
+ * session 為 null（沒有可整理的原文）時不開始。auto 為 false（104 版面、網頁來源）時不自動開始，
+ * 只在使用者按「用 AI 整理」（restart）時才呼叫。auto 是唯一不經使用者按鈕就送 import.ai_parse 的入口。
  */
 export function useAiParse(
-  importId: string | null,
-  auto: boolean,
+  session: AiSession | null,
   poll: AiPollOptions,
-  onDraft: (draft: ImportAiDraft) => void,
+  onDraft: (draft: AiDraftLike) => void,
 ) {
   const bridge = useBridge();
   const [state, setState] = useState<AiParseState>({ kind: 'idle' });
@@ -60,11 +75,12 @@ export function useAiParse(
 
   const finish = (token: number, view: ImportAiParseView | null) => {
     if (opRef.current !== token) return;
+    const draft = view === null ? null : draftOf(view);
     if (view === null) setState({ kind: 'failed', message: AI_INTERRUPTED_TEXT });
     else if (view.state === 'running') setState({ kind: 'failed', message: AI_STILL_RUNNING_TEXT });
-    else if (view.state === 'succeeded' && view.draft) {
-      onDraftRef.current(view.draft);
-      setState({ kind: 'succeeded', draft: view.draft });
+    else if (view.state === 'succeeded' && draft) {
+      onDraftRef.current(draft);
+      setState({ kind: 'succeeded', draft });
     } else {
       const reason = view.failure ? AI_FAILURE_TEXT[view.failure] : 'AI 整理失敗';
       setState({ kind: 'failed', message: reason });
@@ -86,35 +102,38 @@ export function useAiParse(
     }, poll.intervalMs);
   };
 
-  const start = (id: string) => {
+  const start = (id: string, names?: readonly string[]) => {
     cancel();
     const token = opRef.current;
     setState({ kind: 'running' });
-    void bridge.send({ op: 'import.ai_parse', payload: { importId: id } }).then((response) => {
+    const payload = names ? { importId: id, names: [...names] } : { importId: id };
+    void bridge.send({ op: 'import.ai_parse', payload }).then((response) => {
       if (opRef.current !== token) return;
-      if (!response.ok) setState({ kind: 'failed', message: bridgeFailureText(response) });
+      if (!response.ok && response.error.reason === 'name_required') {
+        setState({ kind: 'needs_name' });
+      } else if (!response.ok) setState({ kind: 'failed', message: bridgeFailureText(response) });
       else if (response.parse.state === 'running') waitFor(id, token, poll.maxPolls);
       else finish(token, response.parse);
     });
   };
 
   useEffect(() => {
-    if (importId === null || !auto) {
+    if (session === null || !session.auto) {
       cancel();
       setState({ kind: 'idle' });
       return cancel;
     }
-    start(importId);
+    start(session.importId);
     return cancel;
-    // 只在換一筆匯入時決定一次（auto 跟著匯入一起設定）
-  }, [importId]);
+    // 只在換一次核對時決定一次（auto 跟著核對一起設定）
+  }, [session?.key]);
 
   return {
     state,
     running: state.kind === 'running',
-    /** 「用 AI 重新整理」：整理中不重送 */
-    restart: () => {
-      if (importId !== null && state.kind !== 'running') start(importId);
+    /** 使用者按「用 AI 整理」／「用 AI 重新整理」或確認姓名：整理中不重送 */
+    restart: (names?: readonly string[]) => {
+      if (session !== null && state.kind !== 'running') start(session.importId, names);
     },
   };
 }

@@ -14,6 +14,9 @@ export function ConfirmBar(props: {
         {problemCount > 0 && (
           <p className="import-error">有 {problemCount} 項需要修正，請看表單下方的清單。</p>
         )}
+        <p role="note" aria-label="取代提醒" className="import-hint">
+          確認後會取代目前的個人資料（資料區只保留一份個人資料）。
+        </p>
         <p role="note" aria-label="尚未存入提醒" className="import-hint">
           存入前離開頁面，修改不會保留。
         </p>

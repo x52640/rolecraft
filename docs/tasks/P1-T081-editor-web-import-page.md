@@ -1,7 +1,7 @@
 ---
 id: P1-T081
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T074"]
 specs: ["resume-import.md", "bridge.md"]
 track: editor
@@ -82,9 +82,15 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等 P1-T074 收官後改 ready
-- Blocker：無（相依 P1-T074 已於 2026-10-12 收官）
+- 最後完成：2026-10-12 「包含」各項已實作並 commit（工作者 worktree，未 push）
+- 已通過驗證：`npm run verify` 全綠（Vitest 3821 通過、13 略過）；新測試 `ImportPage.web.test.ts` 10 項，另以「網頁來源 auto 改 true」突變確認計費測試會失敗
+- 下一步：協調者收官——高風險 E3 對抗驗證（上限 4）＋ codex review，再標 done
+- Blocker：無
 
 ## 完成結果
+
+- 計費（Q4＝B）：`useAiParse` 改吃 `AiSession { key, importId, auto }`，effect 只看 `key`；`ImportPage.open` 只有 PDF 非 104 版面 `auto: true`，網頁擷取一律 `auto: false`，手動與解析失敗 `null`。送 `import.ai_parse` 的路徑只剩 auto（PDF）與按鈕／確認姓名（`restart`）。`useLatestCapture` 只送 `import.latest_capture`；「使用這份」只送 `import.get`
+- 新檔：`useLatestCapture.ts`；`ImportReview.tsx`（核對畫面，從 ImportPage 拆出）；`components/LatestCapturePanel.tsx`（平台、時間、截斷、「使用這份」「重新查詢」）、`WebPreview.tsx`（「區塊 bN」＋種類，截斷持續顯示「內容不完整」）、`NameConfirm.tsx`（`profile.get` 預填、多寫法、`checkNames` 驗 1～8 個×64 字）、`PersonalMark.tsx`
+- 改檔：`useAiParse.ts`（`needs_name` 狀態對應 `reason: name_required`；成功草稿依 `source` 取 `webDraft`／`draft`；`restart(names?)`）；`ai-form.ts`（`AiDraftLike` 結構型別共用 PDF／網頁草稿；`formFromAiDraft` 帶個資旗標）；`form-model.ts`（`InfoRow.personal`、`ExperienceRow.personal`、`ProfileForm.personalSkills`，不進 `toProfileInput`）；`AiParsePanel.tsx`（`web` 時首按鈕「用 AI 整理」、失敗提示對照區塊手動輸入、其他段落個資標示）；`ConfirmBar.tsx`（「會取代目前的個人資料」）；`InfoRows`／`ExperienceCard`／`SkillChips`（「含姓名或聯絡資料」）；`ImportPage.tsx`（「手動輸入」入口在初始、完成、核對畫面都有；`multiple_profiles` 顯示原因）
+- 保守選擇：(1) 最近擷取只在開頁與按「重新查詢」時查，不輪詢；(2) 查不到擷取只在擷取區塊提示，不出錯誤警示；(3) 網頁來源使用者先改過欄位再按「用 AI 整理」也要再按一次確認（會覆蓋）；(4) 個資標示跟著列／欄位走、使用者改值後仍保留（技能以值比對）；(5) 姓名確認只在 helper 回 `name_required` 時顯示，確認過的姓名在同一次核對內重新整理時一併帶上
+- 殘餘：表單欄位不顯示各自的出處區塊編號（只在右側預覽列區塊）；編輯器已開著時新擷取送達要按「重新查詢」才看得到

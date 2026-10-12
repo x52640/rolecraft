@@ -238,3 +238,50 @@ html:has(.import-confirm-bar) {
 .import-pre {
   white-space: pre-wrap;
 }
+
+/* P1-T081：網頁擷取、手動輸入、姓名確認、「含姓名或聯絡資料」標示。 */
+.import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.5rem 0 0;
+}
+
+.import-capture {
+  margin-top: 1rem;
+}
+
+.import-capture p {
+  margin: 0.3rem 0;
+}
+
+.import-blocks {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.92em;
+}
+
+.import-blocks li {
+  overflow-wrap: anywhere;
+  padding: 0.15rem 0;
+}
+
+.import-names {
+  margin: 0.5rem 0;
+}
+
+.import-name-row input {
+  max-width: 16rem;
+}
+
+.import-info-value {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.import-personal-mark {
+  color: var(--import-danger);
+  font-size: 0.85em;
+  font-weight: 600;
+}

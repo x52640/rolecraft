@@ -1,16 +1,20 @@
 import { useId } from 'react';
 
+import { PersonalMark } from './PersonalMark.tsx';
+
 /** 輸入框寬度跟著字數，但有上限；更長的交給 CSS 限制在欄寬內。 */
 const chipSize = (skill: string): number => Math.min(24, Math.max(4, skill.length + 1));
 
 /** 技能：標籤（chip）樣式，可改、可刪單一個、可新增。 */
 export function SkillChips(props: {
   skills: readonly string[];
+  /** 還原出姓名或聯絡資料的技能值（D28／W7） */
+  personal?: readonly string[] | undefined;
   onChange: (index: number, value: string) => void;
   onRemove: (index: number) => void;
   onAdd: () => void;
 }) {
-  const { skills, onChange, onRemove, onAdd } = props;
+  const { skills, personal = [], onChange, onRemove, onAdd } = props;
   const id = useId();
   return (
     <section className="import-card" aria-labelledby={`${id}-title`}>
@@ -41,6 +45,7 @@ export function SkillChips(props: {
               >
                 ×
               </button>
+              {skill.trim() !== '' && personal.includes(skill.trim()) && <PersonalMark />}
             </li>
           );
         })}
