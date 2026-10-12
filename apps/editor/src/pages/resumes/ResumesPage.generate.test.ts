@@ -1,14 +1,21 @@
 // @vitest-environment jsdom
-// P1-T072：產生客製履歷後自動輪詢，出現新版本就自動顯示，不需手動重新整理；產生期間鎖住操作。
+// P1-T072：產生客製履歷後自動輪詢，出現新版本就自動顯示，不需手動重新整理。
+// 等待期間不鎖整頁、可停止等待；段落編輯中不允許產生，也不會被自動切版本丟掉（對抗＋codex）。
 import type { ResumeVersion } from '@rolecraft/contracts';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { BridgeProvider } from '../../bridge/BridgeProvider.tsx';
 import type { BridgeTransport } from '../../bridge/transport.ts';
 import { ResumesPage } from './ResumesPage.tsx';
-import { GENERATED_TEXT, STILL_RUNNING_TEXT } from './useGenerateResume.ts';
+import {
+  GENERATED_TEXT,
+  STILL_RUNNING_TEXT,
+  STOPPED_TEXT,
+  WAITING_TEXT,
+} from './useGenerateResume.ts';
+import { EDITING_BLOCKS_GENERATE_TEXT, NEW_VERSION_HELD_TEXT } from './useResumeEditor.ts';
 
 const T = '2026-10-10T08:00:00.000Z';
 const T2 = '2026-10-10T09:00:00.000Z';
@@ -37,11 +44,11 @@ const VERSIONS: Record<string, ResumeVersion> = {
   'v-2': versionOf('v-2', '新版本段落'),
 };
 
-/** 假 helper：送出 resume.generate 後，第 readyAfter 次列版本才出現 v-2（readyAfter 為 null 表示一直沒出現）。 */
-function fakeHelper(readyAfter: number | null) {
+/** 假 helper：送出 resume.generate 且測試呼叫 release() 之後，列版本才出現 v-2。 */
+function fakeHelper() {
   const ops: string[] = [];
   let generated = false;
-  let listsAfterGenerate = 0;
+  let released = false;
   const transport: BridgeTransport = {
     send(raw) {
       const req = raw as { op: string; payload: Record<string, unknown> };
@@ -65,9 +72,8 @@ function fakeHelper(readyAfter: number | null) {
             ],
           });
         case 'resume.list': {
-          if (generated) listsAfterGenerate += 1;
-          const ready = readyAfter !== null && generated && listsAfterGenerate > readyAfter;
           const old = { resumeVersionId: 'v-1', createdAt: T };
+          const ready = generated && released;
           return reply({
             ok: true,
             versions: ready ? [{ resumeVersionId: 'v-2', createdAt: T2 }, old] : [old],
@@ -89,10 +95,15 @@ function fakeHelper(readyAfter: number | null) {
       }
     },
   };
-  return { transport, ops };
+  return {
+    transport,
+    ops,
+    release: () => (released = true),
+    lists: () => ops.filter((op) => op === 'resume.list').length,
+  };
 }
 
-function renderPage(helper: ReturnType<typeof fakeHelper>, maxPolls = 10) {
+function renderPage(helper: ReturnType<typeof fakeHelper>, maxPolls = 1000) {
   render(
     createElement(BridgeProvider, {
       transport: helper.transport,
@@ -101,42 +112,90 @@ function renderPage(helper: ReturnType<typeof fakeHelper>, maxPolls = 10) {
   );
 }
 
+const button = (name: string) => screen.getByRole<HTMLButtonElement>('button', { name });
+const note = () => screen.getByRole('note').textContent;
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function startWaiting() {
+  await screen.findByText('舊版本段落');
+  fireEvent.click(button('產生客製履歷'));
+  await waitFor(() => expect(note()).toBe(WAITING_TEXT));
+}
+
 afterEach(cleanup);
 
 describe('<ResumesPage /> 產生後自動顯示（P1-T072）', () => {
-  it('產生完成後自動切到新版本，不用按重新整理；產生期間鎖住操作', async () => {
-    const helper = fakeHelper(2);
+  it('等待期間不鎖整頁、不說「正在產生」；新版本出現就自動切過去', async () => {
+    const helper = fakeHelper();
     renderPage(helper);
-    await screen.findByText('舊版本段落');
-    fireEvent.click(screen.getByRole('button', { name: '產生客製履歷' }));
+    await startWaiting();
+    expect(note()).not.toContain('正在產生');
+    expect(button('等待新版本…').disabled).toBe(true);
+    expect(button('重新整理').disabled).toBe(false);
+    expect(screen.getByRole<HTMLSelectElement>('combobox', { name: '職缺' }).disabled).toBe(false);
+    expect(button('接受措辭').disabled).toBe(false);
+    expect(button('停止等待')).toBeTruthy();
 
-    const generating = await screen.findByRole<HTMLButtonElement>('button', { name: '產生中…' });
-    expect(generating.disabled).toBe(true);
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: '重新整理' }).disabled).toBe(true);
-    expect(screen.getByRole<HTMLSelectElement>('combobox', { name: '職缺' }).disabled).toBe(true);
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: '接受措辭' }).disabled).toBe(true);
-
+    helper.release();
     await screen.findByText('新版本段落');
     expect(screen.queryByText('舊版本段落')).toBeNull();
-    expect(screen.getByRole('note').textContent).toBe(GENERATED_TEXT);
-    const button = screen.getByRole<HTMLButtonElement>('button', { name: '產生客製履歷' });
-    expect(button.disabled).toBe(false);
+    expect(note()).toBe(GENERATED_TEXT);
+    expect(button('產生客製履歷').disabled).toBe(false);
+    expect(screen.queryByRole('button', { name: '停止等待' })).toBeNull();
     expect(helper.ops.filter((op) => op === 'resume.generate')).toHaveLength(1);
   });
 
-  it('輪詢用完仍沒有新版本：停止並提示稍後重新整理，解除鎖定', async () => {
-    const helper = fakeHelper(null);
+  it('停止等待：不再輪詢、可以再產生', async () => {
+    const helper = fakeHelper();
+    renderPage(helper);
+    await startWaiting();
+    fireEvent.click(button('停止等待'));
+    expect(note()).toBe(STOPPED_TEXT);
+    expect(button('產生客製履歷').disabled).toBe(false);
+    const settled = helper.lists();
+    await pause(30);
+    expect(helper.lists()).toBe(settled);
+  });
+
+  it('輪詢用完仍沒有新版本：停止並提示稍後重新整理', async () => {
+    const helper = fakeHelper();
     renderPage(helper, 3);
     await screen.findByText('舊版本段落');
-    fireEvent.click(screen.getByRole('button', { name: '產生客製履歷' }));
-    await waitFor(() => expect(screen.getByRole('note').textContent).toBe(STILL_RUNNING_TEXT));
+    fireEvent.click(button('產生客製履歷'));
+    await waitFor(() => expect(note()).toBe(STILL_RUNNING_TEXT));
     expect(screen.getByText('舊版本段落')).toBeTruthy();
-    const button = screen.getByRole<HTMLButtonElement>('button', { name: '產生客製履歷' });
-    expect(button.disabled).toBe(false);
-    // 送出前一次＋最多 3 次輪詢；之後不再輪詢
-    const lists = () => helper.ops.filter((op) => op === 'resume.list').length;
-    const settled = lists();
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    expect(lists()).toBe(settled);
+    expect(button('產生客製履歷').disabled).toBe(false);
+    const settled = helper.lists();
+    await pause(30);
+    expect(helper.lists()).toBe(settled);
+  });
+
+  it('段落編輯中不能產生（codex）', async () => {
+    const helper = fakeHelper();
+    renderPage(helper);
+    await screen.findByText('舊版本段落');
+    fireEvent.click(button('改寫'));
+    expect(screen.getByRole('form', { name: '編輯段落' })).toBeTruthy();
+    expect(button('產生客製履歷').disabled).toBe(true);
+    expect(screen.getByText(EDITING_BLOCKS_GENERATE_TEXT)).toBeTruthy();
+    expect(helper.ops).not.toContain('resume.generate');
+  });
+
+  it('等待期間開始編輯：新版本出現時不自動切換，未存的編輯保留（codex）', async () => {
+    const helper = fakeHelper();
+    renderPage(helper);
+    await startWaiting();
+    fireEvent.click(button('改寫'));
+    const form = within(screen.getByRole('form', { name: '編輯段落' }));
+    const box = form.getByRole<HTMLTextAreaElement>('textbox');
+    fireEvent.change(box, { target: { value: '還沒存的改寫' } });
+
+    helper.release();
+    await waitFor(() => expect(note()).toBe(NEW_VERSION_HELD_TEXT));
+    expect(screen.getByRole<HTMLTextAreaElement>('textbox').value).toBe('還沒存的改寫');
+    expect(screen.queryByText('新版本段落')).toBeNull();
+    const versions = screen.getByRole<HTMLSelectElement>('combobox', { name: '版本' });
+    expect([...versions.options].map((o) => o.value)).toEqual(['v-2', 'v-1']);
+    expect(versions.value).toBe('v-1');
   });
 });

@@ -58,7 +58,7 @@ describe('resume.generate 經歷段落（P1-T072）', () => {
 
     expect(fake.modelCalls()).toHaveLength(1);
     const [call] = fake.modelCalls();
-    expect(call?.stdin).toContain('每一段既有經歷（E1、E2…）都要輸出');
+    expect(call?.stdin).toContain('每一段描述不是空白的既有經歷（E1、E2…）都要輸出');
 
     const [version] = db.repos.resumeVersions.listByJobSnapshot(JOB);
     const sections: ResumeSection[] = version?.sections ?? [];

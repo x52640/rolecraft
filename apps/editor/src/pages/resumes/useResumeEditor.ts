@@ -16,6 +16,13 @@ import {
   type VersionList,
 } from './useGenerateResume.ts';
 
+/** 有段落編輯中時不允許產生（產生完成會切版本，未存的編輯會不見）。 */
+export const EDITING_BLOCKS_GENERATE_TEXT =
+  '有段落正在編輯：請先儲存或取消，再產生客製履歷（產生完成會切到新版本）。';
+/** 等待期間開始編輯段落：新版本出現時不自動切換。 */
+export const NEW_VERSION_HELD_TEXT =
+  '新版本已產生，但你有段落正在編輯，所以沒有自動切換：儲存或取消後，從「版本」選單選新版本。';
+
 type JobsList = Extract<ResponseOf<'jobs.list'>, { ok: true }>['snapshots'];
 export type CheckResult = Extract<ResponseOf<'resume.check_export'>, { ok: true }>;
 
@@ -32,7 +39,9 @@ const errorOf = (failure: BridgeFailure) => failure.error.message;
 /**
  * 履歷頁的資料與動作：每次寫入後都從 helper 重新讀取版本與匯出前檢查，
  * 畫面只顯示 helper 回來的狀態；確認時間由 helper 決定（R1）。
- * 產生客製履歷後自動輪詢，出現新版本就自動顯示（P1-T072）；產生期間鎖住操作。
+ * 產生客製履歷後自動輪詢，出現新版本就自動顯示（P1-T072）；只有送出請求時鎖住操作，
+ * 等待期間頁面照常可用。段落編輯中（可能有未存修改）不允許產生；等待期間開始編輯的，
+ * 新版本出現時不自動切換，避免丟掉未存的編輯（codex）。
  */
 export function useResumeEditor(poll: ResumePollOptions = DEFAULT_RESUME_POLL) {
   const bridge = useBridge();
@@ -48,11 +57,22 @@ export function useResumeEditor(poll: ResumePollOptions = DEFAULT_RESUME_POLL) {
   const currentJob = useRef<string | null>(null);
   const currentVersion = useRef<string | null>(null);
   const viewSeq = useRef(0);
+  // 正在編輯的段落（編輯框開著就當成可能有未存修改）
+  const [editing, setEditingState] = useState<string | null>(null);
+  const editingRef = useRef<string | null>(null);
+  const setEditing = (sectionId: string | null) => {
+    editingRef.current = sectionId;
+    setEditingState(sectionId);
+  };
   const generation = useGenerateResume(poll, {
     setBusy,
     setNotice,
     onNewVersion: (list, id) => {
       setVersions(list);
+      if (editingRef.current !== null) {
+        setNotice(NEW_VERSION_HELD_TEXT);
+        return;
+      }
       setVersionId(id);
     },
   });
@@ -129,6 +149,8 @@ export function useResumeEditor(poll: ResumePollOptions = DEFAULT_RESUME_POLL) {
 
   useEffect(() => {
     currentVersion.current = versionId;
+    editingRef.current = null;
+    setEditingState(null);
     // 切換版本先清掉舊畫面，避免在新版本上操作到舊版本的段落
     setView(null);
     if (versionId !== null) void loadView(versionId);
@@ -136,7 +158,7 @@ export function useResumeEditor(poll: ResumePollOptions = DEFAULT_RESUME_POLL) {
 
   /** 執行一個寫入，成功時顯示 okText，之後重新讀取。 */
   async function write(action: () => Promise<{ ok: true } | BridgeFailure>, okText: string) {
-    if (versionId === null || generation.generating) return false;
+    if (versionId === null) return false;
     setBusy(true);
     setNotice(null);
     try {
@@ -169,9 +191,18 @@ export function useResumeEditor(poll: ResumePollOptions = DEFAULT_RESUME_POLL) {
       const next = await loadVersions(jobId);
       if (next !== undefined && next !== null && next === before) await loadView(next);
     },
-    generating: generation.generating,
+    editing,
+    setEditing,
+    sending: generation.sending,
+    waiting: generation.waiting,
+    stopWaiting: generation.stop,
     generate: async () => {
-      if (jobId !== null) await generation.generate(jobId);
+      if (jobId === null) return;
+      if (editingRef.current !== null) {
+        setNotice(EDITING_BLOCKS_GENERATE_TEXT);
+        return;
+      }
+      await generation.generate(jobId);
     },
     accept: (sectionId: string) =>
       write(

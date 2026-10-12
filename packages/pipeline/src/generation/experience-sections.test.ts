@@ -3,9 +3,17 @@ import { checkExportReadiness } from '@rolecraft/domain';
 import { describe, expect, it } from 'vitest';
 
 import { FALLBACK_RATIONALE } from './experience-fallback.ts';
-import { CLAIMS, T, idSource, output, profile, section } from './fixtures.test-helpers.ts';
+import {
+  CLAIMS,
+  T,
+  idSource,
+  output,
+  profile,
+  section,
+  snapshot,
+} from './fixtures.test-helpers.ts';
 import { parseGenerationOutput } from './output.ts';
-import { GENERATION_INSTRUCTIONS } from './prompt.ts';
+import { GENERATION_INSTRUCTIONS, assembleGenerationPrompt } from './prompt.ts';
 import { convertGeneration, type SectionConversion } from './sections.ts';
 
 const EXPERIENCES: WorkExperience[] = [
@@ -53,7 +61,7 @@ const project = section({ placement: 'project' });
 
 describe('經歷段落（P1-T072）', () => {
   it('提示要求每段經歷都輸出、專案只是補充，不再把經歷當成只作背景', () => {
-    expect(GENERATION_INSTRUCTIONS).toContain('每一段既有經歷（E1、E2…）都要輸出');
+    expect(GENERATION_INSTRUCTIONS).toContain('每一段描述不是空白的既有經歷（E1、E2…）都要輸出');
     expect(GENERATION_INSTRUCTIONS).toContain('專案段落是補充，不能取代經歷段落');
     expect(GENERATION_INSTRUCTIONS).toContain('可以不引用事實項');
     expect(GENERATION_INSTRUCTIONS).not.toContain('只作背景');
@@ -138,5 +146,28 @@ describe('經歷段落（P1-T072）', () => {
       createdAt: T,
     });
     expect(result.ok).toBe(false);
+  });
+
+  it('描述空白的經歷：提示標「不要輸出」且不要求一段不少，不放描述區塊（對抗驗證）', () => {
+    expect(GENERATION_INSTRUCTIONS).not.toContain('每一段既有經歷（E1、E2…）都要輸出');
+    const prompt = assembleGenerationPrompt(
+      { job: snapshot().fields, claims: CLAIMS, experiences: EXPERIENCES },
+      idSource('b'),
+    );
+    expect(prompt).toContain('E3（描述空白：不要輸出）：');
+    expect(prompt).not.toContain('E3_DESCRIPTION');
+    expect(prompt).toContain('E1_DESCRIPTION');
+    expect(prompt).not.toContain('E1（描述空白');
+  });
+
+  it('描述空白又沒有引用的經歷段丟棄；有引用事實項的保留（對抗驗證）', () => {
+    const blank = convert([
+      section({ placement: 'E3', text: '處理行政庶務', citations: [] }),
+      project,
+    ]);
+    expect(blank.droppedSections).toEqual([{ index: 0, reason: 'no_citation' }]);
+    expect(blank.resumeVersion.sections.map((s) => s.text)).not.toContain('處理行政庶務');
+    const cited = convert([section({ placement: 'E3' }), project]);
+    expect(cited.droppedSections).toEqual([]);
   });
 });

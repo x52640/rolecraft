@@ -21,6 +21,11 @@ export interface FallbackSection {
 
 const HAS_CONTENT = /\S/u;
 
+/** 經歷描述是否有內容；空白的經歷沒有原文可改寫，提示要求不輸出、也不補段。 */
+export function hasDescription(description: string): boolean {
+  return HAS_CONTENT.test(description);
+}
+
 /** 還沒有任何段落的經歷，依 Profile 順序各補一段沿用原文。 */
 export function fallbackExperienceSections(
   ctx: { readonly profile: Profile; readonly newId: () => Id },
@@ -32,7 +37,7 @@ export function fallbackExperienceSections(
     ),
   );
   return ctx.profile.experiences.flatMap((experience, index): FallbackSection[] => {
-    if (covered.has(index) || !HAS_CONTENT.test(experience.description)) return [];
+    if (covered.has(index) || !hasDescription(experience.description)) return [];
     return [
       {
         section: {

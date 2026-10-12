@@ -21,7 +21,7 @@ import {
 import { checkExportReadiness } from '@rolecraft/domain';
 
 import { completionCap, exceedsCap } from './completion.ts';
-import { fallbackExperienceSections } from './experience-fallback.ts';
+import { fallbackExperienceSections, hasDescription } from './experience-fallback.ts';
 import { groundingProblem, type JobIdentity } from './grounding.ts';
 import { claimLabel, experienceLabel } from './prompt.ts';
 import type {
@@ -107,7 +107,9 @@ function convertSection(
   const placement = placementOf(draft, ctx.profile);
   if (!placement) return 'unknown_placement';
   const experience = placement.kind === 'experience' ? placement : null;
-  const resolved = resolveCitations(draft, byLabel, experience !== null);
+  // 經歷段可不引用事實項，前提是有原文：描述空白又沒有引用 → 沒有任何依據，丟棄
+  const ownSource = experience !== null && hasDescription(experience.originalText);
+  const resolved = resolveCitations(draft, byLabel, ownSource);
   if (typeof resolved === 'string') return resolved;
   const own = experience === null ? [] : [experience.originalText];
   const problem = groundingProblem(draft.text, resolved.cited, ctx.job, own);

@@ -1,9 +1,12 @@
-import { useState } from 'react';
-
 import { SectionCard } from './SectionCard.tsx';
 import { SectionEditor } from './SectionEditor.tsx';
 import type { ResumePollOptions } from './useGenerateResume.ts';
-import { useResumeEditor, type ResumeEditor, type VersionView } from './useResumeEditor.ts';
+import {
+  EDITING_BLOCKS_GENERATE_TEXT,
+  useResumeEditor,
+  type ResumeEditor,
+  type VersionView,
+} from './useResumeEditor.ts';
 import './resumes.css';
 
 function ExportStatus({ view }: { view: VersionView }) {
@@ -22,7 +25,7 @@ function ExportStatus({ view }: { view: VersionView }) {
 }
 
 function Sections({ editor, view }: { editor: ResumeEditor; view: VersionView }) {
-  const [editing, setEditing] = useState<string | null>(null);
+  const { editing, setEditing } = editor;
   const { version, check } = view;
   if (version.sections.length === 0) return <p>這個版本沒有任何段落。</p>;
   return (
@@ -91,7 +94,7 @@ export function ResumesPage({ poll }: { readonly poll?: ResumePollOptions }) {
             職缺
             <select
               value={editor.jobId ?? ''}
-              disabled={editor.generating}
+              disabled={editor.busy}
               onChange={(e) => editor.setJobId(e.target.value)}
             >
               {editor.jobs.map((j) => (
@@ -104,11 +107,22 @@ export function ResumesPage({ poll }: { readonly poll?: ResumePollOptions }) {
           </label>
           <button
             type="button"
-            disabled={editor.busy || !job || job.confirmedAt === null}
+            disabled={
+              editor.busy ||
+              editor.waiting ||
+              editor.editing !== null ||
+              !job ||
+              job.confirmedAt === null
+            }
             onClick={() => void editor.generate()}
           >
-            {editor.generating ? '產生中…' : '產生客製履歷'}
+            {editor.sending ? '送出中…' : editor.waiting ? '等待新版本…' : '產生客製履歷'}
           </button>
+          {editor.waiting ? (
+            <button type="button" onClick={editor.stopWaiting}>
+              停止等待
+            </button>
+          ) : null}
           <button type="button" disabled={editor.busy} onClick={() => void editor.refresh()}>
             重新整理
           </button>
@@ -128,6 +142,9 @@ export function ResumesPage({ poll }: { readonly poll?: ResumePollOptions }) {
             </label>
           ) : null}
         </div>
+      ) : null}
+      {editor.editing !== null ? (
+        <p className="resume-hint">{EDITING_BLOCKS_GENERATE_TEXT}</p>
       ) : null}
       {job && job.confirmedAt === null ? (
         <p className="resume-hint">這個職缺快照尚未確認，確認後才能產生履歷。</p>

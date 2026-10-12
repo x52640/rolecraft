@@ -226,7 +226,7 @@ describe('<ResumesPage />', () => {
     renderPage(helper);
     await card('完成匯出 PDF，服務 7 個團隊');
     fireEvent.click(screen.getByRole('button', { name: '產生客製履歷' }));
-    await screen.findByText(/正在產生客製履歷/);
+    await screen.findByText(/已送出產生要求/);
     expect(helper.sent.find((s) => s.op === 'resume.generate')?.payload).toEqual({
       jobSnapshotId: 'job-1',
     });
