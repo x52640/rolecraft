@@ -29,6 +29,8 @@ expected_commit: "feat(P1-T093): 履歷匯入送模型前遮蔽網址與區級�
 - 新測試 `d31-redact.test.ts`：網址各形態（全形冒號後接網址、大小寫、`www.` 無協定、結尾接中文標點）；居住地各形態（「新北市中和區」「屏東縣屏東市」「臺北市 大安區」、接路名門牌、「高雄市苓雅區5~6年工作經驗」只遮地點）；不遮的（「高雄市」「高雄人」「苓雅區」「台北市立大學」；「台南市東區門市店長」只遮「台南市東區」）；PDF 路線（`personal.ts` 經同一遮蔽器）同樣遮到
 - 新測試 `d31-redact-104.test.ts`：區塊照 `apps/extension/src/sites/104/resume/expected-blocks.json` 抄成合成區塊（去識別化，不跨套件 import），經 `prepareWebResumeParse` 產生的提示不含任何 `http`、`www.`、「縣市＋鄉鎮市區」字樣；模型照抄佔位字的欄位換回原文後標「含姓名或聯絡資料」；本機預填的個人資料列值不變
 
+- 協調者裁定（2026-10-13，依 D31 原意）：無 http／www 的網域連結（例如 `github.com/帳號`、`linkedin.com/in/xxx`、`behance.net/xxx`：常見 TLD 的網域後接 `/路徑`）也要遮；只有縣市（「高雄市」）不遮。規格同步寫入 resume-import 的 D31 段（write_paths 若未含 docs/specs/resume-import.md，協調者已核准加入）。避免誤遮：不帶路徑的純網域名詞（例如單獨的「Node.js」「ASP.NET」）不算；補測試。
+
 ### 不包含
 
 - 契約、helper、編輯器（遮蔽只在 pipeline 本機做；畫面照常顯示原值，不需要改）
