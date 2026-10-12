@@ -70,10 +70,11 @@ describe('點工具列圖示', () => {
     expect(apis.injectScript).not.toHaveBeenCalled();
   });
 
-  it('正式 registry 還沒有履歷頁規則：104 履歷頁照舊開編輯器', async () => {
+  it('正式 registry（P1-T077 登記 104 履歷頁）：104 履歷頁注入履歷頁腳本、不開編輯器', async () => {
     const apis = fakeApis();
-    expect(await handleActionClick(RESUME_TAB, apis)).toBe('opened_editor');
-    expect(apis.injectScript).not.toHaveBeenCalled();
+    expect(await handleActionClick(RESUME_TAB, apis)).toBe('injected');
+    expect(apis.injectScript).toHaveBeenCalledExactlyOnceWith(7, 'sites/104-resume.js');
+    expect(apis.createTab).not.toHaveBeenCalled();
   });
 
   it('注入失敗：不開編輯器，在圖示上提示', async () => {

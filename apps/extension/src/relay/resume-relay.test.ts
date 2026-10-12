@@ -153,10 +153,19 @@ describe('履歷擷取：操作×頁型', () => {
     expect(opened).toBe(0);
   });
 
-  it('正式 registry 還沒有履歷頁規則：任何頁面的履歷擷取都被拒', async () => {
+  it('正式 registry（P1-T077 登記 104 履歷頁）：104 履歷頁的履歷擷取放行、轉送一次', async () => {
     const send = vi.fn<BridgeClient['send']>(() => Promise.resolve({ ok: true }));
     const client = { send, close: vi.fn() } satisfies BridgeClient;
     const res = await handleRelay(relayMessage(RESUME), RESUME_PAGE, EXT, client);
+    expect(res).toEqual({ ok: true });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('正式 registry：從 104 職缺頁送履歷擷取仍被拒', async () => {
+    const send = vi.fn<BridgeClient['send']>(() => Promise.resolve({ ok: true }));
+    const client = { send, close: vi.fn() } satisfies BridgeClient;
+    const request = withPayload({ url: 'https://www.104.com.tw/job/abc' });
+    const res = await handleRelay(relayMessage(request), JOB_PAGE, EXT, client);
     expect(res).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
     expect(send).not.toHaveBeenCalled();
   });

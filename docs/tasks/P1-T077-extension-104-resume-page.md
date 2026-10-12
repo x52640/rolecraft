@@ -1,12 +1,12 @@
 ---
 id: P1-T077
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T017", "P1-T075", "P1-T076"]
 specs: ["web-resume-capture.md"]
 track: extension
 primary_repo: rolecraft
-write_paths: ["apps/extension/src/sites/104/resume/", "apps/extension/src/sites/registry.ts", "apps/extension/src/sites/registry.test.ts", "docs/adr/0004-104-job-page.md"]
+write_paths: ["apps/extension/src/sites/104/resume/", "apps/extension/src/sites/registry.ts", "apps/extension/src/sites/registry.test.ts", "docs/adr/0004-104-job-page.md", "apps/extension/src/background/actions.test.ts", "apps/extension/src/relay/resume-relay.test.ts", "README.md"]
 contract_change: none
 expected_commit: "feat(P1-T077): extension：登記 104 履歷頁並以真實 Chrome 比對 fixture 區塊"
 ---
@@ -82,9 +82,24 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等相依完成後改 ready
-- Blocker：無（P1-T017 履歷頁樣本、P1-T075、P1-T076 已完成）
+- 最後完成（2026-10-12）：全部實作、測試、ADR-0004 5.4、README `RUN_CHROME` 那一列；單一 commit
+- 已通過驗證：`npm run verify` 綠；`RUN_CHROME=1` 下 `apps/extension/src/sites/104/resume` 16 項全過（Chrome 155）
+- 下一步：協調者收官（範圍稽核、codex review）
+- Blocker：無。write_paths 擴充（協調者 2026-10-12 核准）：`background/actions.test.ts`、`relay/resume-relay.test.ts` 是 P1-T076 留的「正式 registry 還沒有履歷頁規則」佔位測試，本 Task 登記規則後必須反轉；`README.md` 只改 `RUN_CHROME` 那一列（補上擴充功能 Chrome 測試）
 
 ## 完成結果
+
+- registry 登記 104 履歷頁（ADR-0004 5.2 原樣）：`https:`、主機 `pda.104.com.tw`、路徑完全等於 `/profile/edit`；根節點 `#app > .container-sidebar--rwd > .row > .col.main`；姓名元素 `.form-info .name__text`。正式 registry 測試：樣本網址符合、104 職缺頁仍是職缺頁、14 種 104 其他網址不符、打包清單含 `src/sites/104/resume/content.ts`
+- `src/sites/104/resume/content.ts`（入口，載入時呼叫一次 `startResumeCapture`，不掛任何頁面事件）＋`config.ts`（設定取自 registry）；打包產出 `sites/104-resume.js`
+- 只送一次（`content.test.ts`，jsdom）：注入一次只送 1 次，之後兩輪頁面事件與 DOM 變動仍 1 次；不在 document／window／body 掛監聽；再注入一次才送第 2 次；找不到根節點不送、之後補上根節點也不補送
+- 真實 Chrome（`RUN_CHROME=1`；拋棄式 profile、測試用暫存擴充功能在隔離環境跑正式 `createChromeOracle(chrome)`＋`buildResumeCapture`、頁面由 127.0.0.1 提供）：
+  - `fixture.chrome.test.ts`：fixture 214 個區塊與 `expected-blocks.json` 逐項相符（未截斷、`continues`、`nameText`）；「更多」收合區 14 個個資字串 0 筆；結構與 ADR 5.2 一致（8 個 h2、工作經驗 5 筆 28 li、專長 11 li、專案 4 個 h3、自傳全文、桌面／手機重複只一份、無標籤＋值）
+  - `render.chrome.test.ts`：display:contents、visibility 繼承＋子元素 visible（含姓名元素）、content-visibility:hidden／auto、white-space 保留換行、封閉 shadow root 與 slot（含不給 `chrome.dom` 的對照組）、shadow 內收合區的 slot、未展開 details、根節點在 display:none 下
+  - 故意弄壞 visibility／content-visibility 判定時對應測試會失敗（已還原）
+- 抽出的區塊交 `prepareWebResumeParse`（`pageNames`＝fixture 假姓名，暫存腳本、未進 repo）：提示中姓名、英文名（Ivy／Lin）、電話、email、地址皆 0；自傳的「林雨晴 Ivy Lin」遮成〔姓名〕〔姓名2〕
+- ADR-0004 新增 5.4 真實 Chrome 比對；README `RUN_CHROME` 列補上擴充功能測試
+- 殘餘：
+  - 個人連結（`https://example.com/portfolio`）與區級居住地（「高雄市苓雅區」）會原樣送模型，是否遮蔽待擁有者決定（協調者轉達），本 Task 不改
+  - fixture 無原站樣式，同一行的行內元素會黏在一起（如「高雄市苓雅區門市管理人員」「聽/略懂說/略懂讀/不會寫/不會」），真實頁結果待 P1-T087 擁有者實跑
+  - 「只送一次」只在 jsdom 驗，未以正式打包腳本＋service worker 在真實 Chrome 驗
+  - 履歷頁只有編輯頁、預設版型一份樣本

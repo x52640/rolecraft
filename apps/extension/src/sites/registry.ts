@@ -32,8 +32,19 @@ export interface SiteEntry {
 }
 
 export const SITE_REGISTRY: readonly SiteEntry[] = [
-  // 104：職缺擷取是佔位（P1-T018）；履歷頁規則由 P1-T077 加。
-  { platform: '104', hosts: ['www.104.com.tw'], jobPathPrefixes: ['/job/'] },
+  // 104：職缺擷取是佔位（P1-T018）。履歷頁讀編輯頁（ADR-0004 第 5 節，P1-T077）：
+  // 主機、路徑完全相符；根節點要用 `>`（進度卡裡另有一個空的 .container-sidebar--rwd）。
+  {
+    platform: '104',
+    hosts: ['www.104.com.tw'],
+    jobPathPrefixes: ['/job/'],
+    resumePage: {
+      hosts: ['pda.104.com.tw'],
+      paths: ['/profile/edit'],
+      rootSelector: '#app > .container-sidebar--rwd > .row > .col.main',
+      nameSelector: '.form-info .name__text',
+    },
+  },
 ];
 
 export type PageType = 'job' | 'resume';

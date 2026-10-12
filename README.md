@@ -111,7 +111,7 @@ npm run build      # 建置擴充功能（含編輯器頁）到 apps/extension/d
 | 環境變數 | 測試 | 需要 |
 |---|---|---|
 | `RUN_LIVE=1` | Claude CLI 注入測試與正式路徑（加 `RUN_LIVE_MODELS=1` 逐一驗證模型） | 已登入的 Claude Code CLI；**會消耗訂閱額度** |
-| `RUN_CHROME=1` | PDF 匯出用本機 Chrome 真的列印 | Google Chrome |
+| `RUN_CHROME=1` | PDF 匯出用本機 Chrome 真的列印；擴充功能履歷頁擷取在真實 Chrome 比對 fixture 與渲染判定（`apps/extension/src/sites/104/resume`） | Google Chrome |
 | `RUN_RACE=1` | 讀檔的真並行競態測試 | 無 |
 
 例：`RUN_CHROME=1 npx vitest run packages/pdf-export`。

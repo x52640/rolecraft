@@ -4,6 +4,7 @@ import {
   classifyUrl,
   findSiteForUrl,
   pageScriptFile,
+  resumePageRule,
   rulesOverlap,
   SITE_REGISTRY,
   siteBundles,
@@ -120,5 +121,49 @@ describe('同一站的職缺頁規則與履歷頁規則不得重疊', () => {
   it('同主機但路徑不在職缺頁前綴下：不重疊', () => {
     const resumePage = { ...FAKE.resumePage!, hosts: ['www.104.com.tw'], paths: ['/resume'] };
     expect(rulesOverlap({ ...FAKE, resumePage })).toBe(false);
+  });
+});
+
+describe('正式 registry：104 履歷頁（ADR-0004 第 5 節，P1-T077）', () => {
+  it('樣本網址（編輯頁，含 vno 查詢字串與 #）是 104 履歷頁', () => {
+    const match = classifyUrl('https://pda.104.com.tw/profile/edit?vno=abc123#form-component-bio');
+    expect(match).toMatchObject({ pageType: 'resume', site: { platform: '104' } });
+    expect(pageScriptFile(match!)).toBe('sites/104-resume.js');
+    expect(resumePageRule('104')).toEqual({
+      hosts: ['pda.104.com.tw'],
+      paths: ['/profile/edit'],
+      rootSelector: '#app > .container-sidebar--rwd > .row > .col.main',
+      nameSelector: '.form-info .name__text',
+    });
+  });
+
+  it('104 職缺頁仍是職缺頁、不是履歷頁', () => {
+    expect(classifyUrl('https://www.104.com.tw/job/8zywe?jobsource=x')?.pageType).toBe('job');
+  });
+
+  it.each([
+    'https://pda.104.com.tw/profile/edit/',
+    'https://pda.104.com.tw/profile/preview?vno=abc',
+    'https://pda.104.com.tw/profile',
+    'https://pda.104.com.tw/',
+    'https://pda.104.com.tw/profile/edit/basic',
+    'https://pda.104.com.tw/PROFILE/EDIT',
+    'http://pda.104.com.tw/profile/edit',
+    'https://pda.104.com.tw:8443/profile/edit',
+    'https://pda.104.com.tw.evil.com/profile/edit',
+    'https://evil.pda.104.com.tw/profile/edit',
+    'https://www.104.com.tw/profile/edit',
+    'https://www.104.com.tw/resumes/',
+    'https://www.104.com.tw/company/abc',
+    'https://www.104.com.tw/',
+  ])('%s 不是 104 履歷頁', (url) => {
+    expect(classifyUrl(url)?.pageType).not.toBe('resume');
+  });
+
+  it('打包清單含 104 履歷頁入口', () => {
+    expect(siteBundles().map((b) => b.entry)).toEqual([
+      'src/sites/104/content.ts',
+      'src/sites/104/resume/content.ts',
+    ]);
   });
 });
