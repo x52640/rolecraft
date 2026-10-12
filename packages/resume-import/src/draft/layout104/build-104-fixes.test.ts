@@ -2,7 +2,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { page104, r } from '../../__fixtures__/layout104.ts';
-import { mergedRowsRaw, realGeometry104 } from '../../__fixtures__/layout104-geometry.ts';
+import {
+  mergedRowsRaw,
+  mergedWrapRaw,
+  realGeometry104,
+} from '../../__fixtures__/layout104-geometry.ts';
 import { layoutPage } from '../../pdf/layout.ts';
 import type { ExtractedPage } from '../../types.ts';
 import { build104 } from './build-104.ts';
@@ -47,6 +51,15 @@ describe('layoutPage 退回單欄的合併行', () => {
     expect(exp?.company?.value).toBe('範例軟體有限公司');
     expect(exp?.startDate?.value).toBe('2020/1');
     expect(exp?.current).toBe(true);
+    expect(exp?.description?.value).toBe('• 開發內部工具。');
+  });
+
+  it('公司換行的續行「業 …人）⇥年資」也拆出年資，不接進公司名稱', () => {
+    const page = layoutPage(mergedWrapRaw());
+    expect(page.columns).toBe(1);
+    expect(page.lines.map((l) => l.text)).toContain('業 30~100人）\t2年3個月');
+    const [exp] = build104([page])?.experiences ?? [];
+    expect(exp?.company?.value).toBe('很長的範例國際股份有限公司');
     expect(exp?.description?.value).toBe('• 開發內部工具。');
   });
 });

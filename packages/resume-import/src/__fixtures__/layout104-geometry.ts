@@ -88,3 +88,27 @@ export function mergedRowsRaw(): RawPage {
     ],
   };
 }
+
+/** 同上，但公司換行：續行「業 30~100人）」與右欄年資併成一行。 */
+export function mergedWrapRaw(): RawPage {
+  return {
+    pageNumber: 1,
+    width: 595,
+    height: 842,
+    runs: [
+      run('測試員', 117, 800, 14.1),
+      run('學歷', 23, 760, HEAD),
+      run('示範大學', 23, 745, BODY),
+      run('工作經驗', 23, 720, HEAD),
+      run('資深工程師', 68, 700, HEAD),
+      run('2020/1~仍在職', 505, 701, SMALL),
+      run('很長的範例國際股份有限公司（電腦軟體服務', 68, 685, BODY),
+      run('業 30~100人）', 68, 672, BODY),
+      run('2年3個月', 528, 672, SMALL),
+      run('軟體開發 | 台北市', 68, 660, SMALL),
+      run('• 開發內部工具。', 77, 645, BODY),
+      run('自傳', 23, 620, HEAD),
+      run('虛構的自我介紹。', 23, 605, BODY),
+    ],
+  };
+}

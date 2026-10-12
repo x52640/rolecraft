@@ -132,7 +132,9 @@ function metadataSplit(at: Located, current: Entry | undefined): Located[] {
   if (!main || !side) return [at];
   if (isEntryTitle(main.line)) return pieces;
   const tenureOnly = metaRanges(side.line.text)?.length === 0;
-  if (current?.stage === 'company' && tenureOnly && companyShaped(current, main)) return pieces;
+  const atCompany = current?.stage === 'company' || current?.stage === 'company_wrap';
+  // 公司換行的續行（例如「業 30~100人）⇥2年3個月」）也只拆出年資。
+  if (current && atCompany && tenureOnly && companyShaped(current, main)) return pieces;
   return [at];
 }
 
