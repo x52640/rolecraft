@@ -13,6 +13,8 @@ export interface Row {
   column?: number;
   /** 與上一行的基線距離（預設 15）；負值表示比上一行高 */
   dy?: number;
+  /** 絕對基線 y（給了就不用 dy） */
+  y?: number;
 }
 
 export const r = (x: number, h: number, text: string, extra: Partial<Row> = {}): Row => ({
@@ -29,7 +31,8 @@ export const r = (x: number, h: number, text: string, extra: Partial<Row> = {}):
 export function page104(pageNumber: number, rows: Row[], order?: number[]): ExtractedPage {
   let y = 800;
   const placed: TextLine[] = rows.map((row, i) => {
-    if (i > 0) y -= row.dy ?? 15;
+    if (row.y !== undefined) y = row.y;
+    else if (i > 0) y -= row.dy ?? 15;
     return {
       pageNumber,
       column: row.column ?? 0,

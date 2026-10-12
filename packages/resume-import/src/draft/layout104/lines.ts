@@ -9,6 +9,8 @@ export interface Located {
   line: TextLine;
   pageNumber: number;
   lineIndex: number;
+  /** 從合併行拆出的右欄日期／年資：指向同一行拆下來的主體（例如職稱） */
+  splitOf?: Located;
 }
 
 export const BAND = {
@@ -79,6 +81,29 @@ export function metaRanges(text: string): DateRange[] | null {
   return meaningful ? ranges : null;
 }
 
+const isMetaSegment = (part: string): boolean => parseRange(part) !== null || TENURE.test(part);
+
+/**
+ * 右欄字少時 layoutPage 會退回單欄，產生「職稱⇥日期」「公司⇥年資」的合併行。
+ * 把行尾 Tab 後的日期／年資拆成另一行（指回主體），主體照常分類。
+ */
+export function splitMerged(at: Located): Located[] {
+  // 整行本身就是日期／年資行（可含單字圖示）就不拆。
+  if (metaRanges(at.line.text)) return [at];
+  const parts = at.line.text.split('\t').map((s) => s.trim());
+  let cut = parts.length;
+  while (cut > 0 && isMetaSegment(parts[cut - 1] ?? '')) cut -= 1;
+  const lead = parts.slice(0, cut).filter((s) => s !== '');
+  if (cut === parts.length || lead.length === 0) return [at];
+  const main: Located = { ...at, line: { ...at.line, text: lead.join('\t') } };
+  const side: Located = {
+    ...at,
+    line: { ...at.line, text: parts.slice(cut).join('\t'), x: at.line.x + at.line.width },
+    splitOf: main,
+  };
+  return [main, side];
+}
+
 /** 依版面由上到下（行頂）、由左到右排序；頁序不變。 */
 export function sortedLines(pages: readonly ExtractedPage[]): Located[] {
   return pages.flatMap((page) =>
@@ -107,10 +132,10 @@ export function joinWrapped(head: string, tail: string): string {
 /** 行內 Tab 換成空白（給人看的值）。 */
 export const plain = (text: string): string => text.replace(/\t+/gu, ' ').trim();
 
-/** 從 `#標籤` 行切出標籤（去 #）。 */
+/** 從 `#標籤` 行切出標籤（去 #）。只有行首或空白後的 # 算標籤開頭（`C#`、`C#.NET` 不切）。 */
 export function tagsIn(text: string): string[] {
   return plain(text)
-    .split('#')
+    .split(/(?:^|\s)#/u)
     .map((s) => s.trim())
     .filter((s) => s !== '');
 }

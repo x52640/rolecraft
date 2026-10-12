@@ -17,7 +17,13 @@ export class TagCollector {
     }
     const last = this.collected.at(-1);
     if (this.active && last && isSmall(line) && text !== '') {
-      last.value = joinWrapped(last.value, text.replace(/\t+/gu, ' '));
+      // 續行只併到下一個標籤前；同一行後面的標籤照常收。
+      const flat = text.replace(/\t+/gu, ' ');
+      const next = /\s#/u.exec(flat);
+      const head = next ? flat.slice(0, next.index) : flat;
+      last.value = joinWrapped(last.value, head);
+      if (next)
+        this.collected.push(...tagsIn(flat.slice(next.index)).map((tag) => fieldAt(tag, at)));
       return true;
     }
     this.active = false;

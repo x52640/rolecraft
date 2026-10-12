@@ -63,7 +63,8 @@ function personalInfo(lines: readonly Located[]): InfoRow[] {
   for (const at of lines) {
     const text = at.line.text.trim();
     const tabbed = /^([^\t]{1,10})\t(.+)$/u.exec(text);
-    const colon = /^([^：:\t]{1,10})[：:]\s*(\S.*)$/u.exec(text);
+    // 冒號後緊接 // 是網址（https://…），不是「標籤：值」。
+    const colon = /^([^：:\t]{1,10})[：:](?!\/\/)\s*(\S.*)$/u.exec(text);
     if (tabbed && at.line.x < 40) {
       previous = fieldAt(plain(tabbed[2] ?? ''), at);
       add((tabbed[1] ?? '').trim(), previous);
@@ -110,9 +111,11 @@ export function build104(pages: readonly ExtractedPage[]): StructuredDraft | nul
   const known = HEADINGS_104.filter((h) => sections.has(h));
   const work = sections.get('工作經驗');
   if (!work || known.length < MIN_HEADINGS) return null;
-  const { experiences, tags } = parseExperience(work);
-  // 經歷區塊樣式：至少一段有職稱與右欄日期。
+  const { experiences, tags, signals } = parseExperience(work);
+  // 經歷區塊樣式：至少一段有職稱與日期，且有 104 特有訊號（日期在右欄、職稱字高大於內文、
+  // 公司行「（…業 …人）」或「職務類別 | 地點」小字行）；一般中文履歷不算。
   if (!experiences.some((e) => e.title && e.startDate)) return null;
+  if (!signals.datesOnRight || !signals.titleTaller || !signals.companyStyle) return null;
   const info = personalInfo(sections.get(PERSONAL) ?? []);
   const school = education(sections.get('學歷') ?? []);
   if (school && !info.some((r) => r.label === '學歷')) info.push(school);

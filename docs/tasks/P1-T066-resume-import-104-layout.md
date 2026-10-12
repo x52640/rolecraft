@@ -98,8 +98,8 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：104 版面規則、contracts 相加欄位、helper 傳出、編輯器預填、spec 與 ADR-0006 #14（單一 commit）
-- 已通過驗證：worktree `npm run verify` 綠（Vitest 3342 通過、13 略過）
+- 最後完成：首次實作（07919bd）；實測＋對抗＋codex 屬實 7 項修正（fix commit）
+- 已通過驗證：worktree `npm run verify` 綠；7 項回歸測試（`build-104-fixes.test.ts`）換回舊實作全部失敗、新實作通過
 - 下一步：協調者收官（對抗驗證、codex review）
 - Blocker：無（手動驗證需擁有者，併 P1-T032）
 
@@ -109,4 +109,5 @@ npm run verify
 - 結構化草稿：姓名（頁首大字第一段）、「標籤 ⇥ 值」與「標籤：值」行（保留原標籤、值換行接回）、學歷整段；經歷公司（去最後一組含「人／業」的括號）／職稱／起訖（仍在職＝至今；多個區間取最早開始、最晚結束）／描述（條列續行併回、保留換行與 •，職務類別行與 #標籤不進描述）；技能＝專長段＋經歷 #標籤（去 #、去重、換行標籤接回）。
 - contracts：`ImportStructuredDraft`／`ImportStructuredExperience`、`ImportDraft.structured`（可選）；helper `to-result.ts` 帶出；`form-model.ts` 有結構化草稿就用它預填（姓名列固定第一）；`ParsePreview.tsx` 的 DRAFT_GROUPS 排除 `structured` 鍵。
 - 保守選擇（待擁有者裁定）：多日期區間合併方式、公司括號只去含人／業者、技能只收 #標籤、職務類別與求職條件等不進 Profile、頁首摘要只收姓名與「標籤：值」、日期保留原格式不補零。
-- 測試資料全為合成、去識別化（`__fixtures__/layout104.ts`）；擁有者真實 PDF 重新匯入需擁有者（併 P1-T032）。
+- 修正 7 項（`dates.ts` 新增）：日期改用幾何綁到同一列職稱（同頁、基線差小於職稱字高、在職稱右側 150pt 以上，取最近；都對不上才退回排序上的前一段且須在其職稱之下），實測座標（職稱 y=261／652／384／635、日期偏高 2～3pt、學歷日期 y=375）重現於 `__fixtures__/layout104-geometry.ts`；合併行（「職稱⇥日期」「公司⇥年資」）先拆出日期／年資並綁回同一行職稱，測試經過 `layoutPage`；公司括號未閉合接下一行（最多一行），公司後的「X | Y」小字行全略過；104 偵測加訊號（日期在右側、職稱字高比公司與內文大 0.8pt 以上、公司行「（…業 …人）」或職務類別小字行），一般同字高中文履歷回 null；冒號後緊接 `//` 不算標籤；`#` 只在行首或空白後切；標籤續行只併到下一個標籤前。
+- 測試資料全為合成、去識別化（`__fixtures__/layout104.ts`、`layout104-geometry.ts`）；擁有者真實 PDF 重新匯入需擁有者（併 P1-T032）。
