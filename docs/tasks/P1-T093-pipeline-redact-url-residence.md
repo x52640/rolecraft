@@ -1,12 +1,12 @@
 ---
 id: P1-T093
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T080"]
 specs: ["resume-import.md"]
 track: pipeline
 primary_repo: rolecraft
-write_paths: ["packages/pipeline/src/resume-parse/redact.ts", "packages/pipeline/src/resume-parse/redact-url.ts", "packages/pipeline/src/resume-parse/redact-residence.ts", "packages/pipeline/src/resume-parse/tw-districts.ts", "packages/pipeline/src/resume-parse/d31-redact.test.ts", "packages/pipeline/src/resume-parse/d31-redact-104.test.ts"]
+write_paths: ["packages/pipeline/src/resume-parse/redact.ts", "packages/pipeline/src/resume-parse/redact-url.ts", "packages/pipeline/src/resume-parse/redact-residence.ts", "packages/pipeline/src/resume-parse/tw-districts.ts", "packages/pipeline/src/resume-parse/d31-redact.test.ts", "packages/pipeline/src/resume-parse/d31-redact-104.test.ts", "docs/specs/resume-import.md"]
 contract_change: none
 expected_commit: "feat(P1-T093): 履歷匯入送模型前遮蔽網址與區級居住地（D31）"
 ---
@@ -36,7 +36,7 @@ expected_commit: "feat(P1-T093): 履歷匯入送模型前遮蔽網址與區級�
 - 契約、helper、編輯器（遮蔽只在 pipeline 本機做；畫面照常顯示原值，不需要改）
 - `check.ts`、`web-check.ts`、`types.ts`（P1-T090 會改；本 Task 不碰，若發現非改不可就停下回報）
 - 職缺頁分析、生成、自介的提示（D31 只管履歷匯入整理）
-- 只有縣市的遮蔽（待擁有者決定，見 CURRENT_TASK）、沒有協定也不是 `www.` 開頭的網域（例如 `github.com/xxx`）
+- 只有縣市的遮蔽（協調者裁定不遮）；沒有協定也不帶路徑的網域名詞（例如 `smalltown.tw`）
 
 ## 工作區與 Context
 
@@ -87,9 +87,16 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：遮蔽器加網址（http(s)、www.、無協定網域＋路徑）與縣市＋鄉鎮市區居住地；resume-import D31 段寫入協調者裁定；新測試兩檔
+- 已通過驗證：`npm run verify` 綠；防退步比對 1802 案例減少遮蔽 0
+- 下一步：協調者對抗驗證（E3）＋codex review、手動以 104 頁實跑一次
 - Blocker：無
 
 ## 完成結果
+
+- write_paths 補 `docs/specs/resume-import.md`：協調者核准（2026-10-13），D31 段要寫入「無協定網域＋路徑也遮」「只有縣市不遮」兩項裁定。
+- `redact.ts` 通用遮蔽加 `redact-url.ts`（`http(s)://`、`www.`、常見頂級網域＋`/路徑`）與 `redact-residence.ts`（縣市＋該縣市鄉鎮市區名本體＋區／市／鎮／鄉，連同其後路街大道、村里、含數字或 \* 的段巷弄號樓）；名單在 `tw-districts.ts`（22 縣市 368 鄉鎮市區，舊縣名沿用改制後名單）。佔位字、`unredact`／`restoresSecret`、照抄檢查未改。
+- 防退步比對：舊／新遮蔽器各跑 901 行（104 expected-blocks 全部區塊、resume-parse 既有測試字串、手寫常見履歷行）× 2 組已知值，共 1802 案例：新增遮蔽 55、減少遮蔽 0。104 expected-blocks 全部 188 區塊經 `prepareWebResumeParse` 的提示不含 `http`、`www.` 與區級地址。
+- 已知誤遮（寧可多遮）：`Socket.IO/Redis`（.io 網域＋斜線）；全形「，」「：」NFKC 後是 ASCII，網址會延伸吃進後面的 ASCII 字（「github.com/a，LinkedIn：linkedin.com/b」整段一個佔位字）；「桃園市中壢區中央大學」的地點也遮。
+- 已知不遮：不帶路徑的網域（`smalltown.tw`）、名單外頂級網域（`.company`）、縣市後不接鄉鎮市區字尾（「台北市內湖科技園區」）。
+- 殘餘：`plan.md` D31 仍寫「只有縣市待擁有者決定」、未提無協定網域；CURRENT_TASK 交接段同。兩者不在 write_paths，待協調者同步。

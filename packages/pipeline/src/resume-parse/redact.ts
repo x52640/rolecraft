@@ -1,8 +1,11 @@
 /**
  * 送模型前的片段遮蔽（P1-T069）：姓名、已抽出的個資值、email／電話／身分證字號換成佔位字（〔姓名〕、〔個資1〕…）。
+ * 〔D31〕網址（redact-url.ts）與區級居住地（redact-residence.ts）也換成〔個資N〕。
  * 比對在 NFKC 後的文字上做（全形數字電話、全形 ＠、「+886 (0)」都認得），找到的範圍對回原文再替換；
  * 佔位字對應的是原文片段，檢查通過的值換回時與原文一字不差。姓名另比一次去掉組合記號的版本（text.ts foldMarks）。
  */
+import { RESIDENCE } from './redact-residence.ts';
+import { URL_PATTERNS } from './redact-url.ts';
 import { foldMarks, nfkcMapped } from './text.ts';
 
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu;
@@ -108,7 +111,11 @@ export function createRedactor(secrets: readonly Secret[]) {
       .map((p) => ({ re: new RegExp(pattern(p.value, p.name), 'gu'), name: p.name, fold: p.fold })),
     ...caseless,
   ];
-  const generic = [EMAIL, PHONE, NATIONAL_ID].map((re) => ({ re, name: false, fold: false }));
+  const generic = [EMAIL, PHONE, NATIONAL_ID, ...URL_PATTERNS, RESIDENCE].map((re) => ({
+    re,
+    name: false,
+    fold: false,
+  }));
 
   function redact(original: string): string {
     const plain = nfkcMapped(original);
