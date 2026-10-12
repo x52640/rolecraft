@@ -1,7 +1,7 @@
 ---
 id: P1-T090
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T079"]
 specs: ["resume-import.md", "bridge.md", "architecture.md", "evidence-model.md", "resume-output.md"]
 track: contracts
@@ -97,7 +97,7 @@ npm run verify
   3. （低）草稿 512 KiB 上限改為量測時排除 `moreLines`／`moreBlockIds`，維持 T069／T078／T080 原判定；判定通過但連同額外出處超過上限時拿掉額外出處（保住 `import.ai_status` 低於 1 MiB）。量測在 `pipeline/resume-parse/run.ts`，不在原 write_paths，因協調者指定此項修正而加入（含新測試檔 `draft-limit-sources.test.ts`）。
   4. （協調者核准擴充 write_paths）`handlers/resume/list.ts`（與 `list.test.ts`）：`resume.list` 照實帶 `profileVersion`。
 - 已通過驗證：見完成結果
-- 下一步：協調者收官
+- 下一步：已收官（2026-10-13 協調者：審查屬實項皆已修，最後一輪 codex review 無發現；main `npm run verify` 綠）
 - Blocker：無
 
 ## 完成結果

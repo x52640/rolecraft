@@ -1,7 +1,7 @@
 ---
 id: P1-T092
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T090"]
 specs: ["resume-output.md", "bridge.md"]
 track: editor
@@ -83,7 +83,7 @@ npm run verify
 
 - 最後完成：stale/ hook＋提示元件＋測試，ResumesPage 掛載點（工作者 worktree，單一 commit）
 - 已通過驗證：`npm run verify` 綠
-- 下一步：協調者收官（範圍稽核、重跑 verify；手動驗證等 P1-T091 上線）
+- 下一步：已收官（2026-10-13 協調者：審查屬實項皆已修，最後一輪 codex review 無發現；main `npm run verify` 綠）
 - Blocker：無
 
 ## 完成結果
