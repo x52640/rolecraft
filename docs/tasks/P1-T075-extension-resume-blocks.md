@@ -1,7 +1,7 @@
 ---
 id: P1-T075
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T074"]
 specs: ["web-resume-capture.md", "bridge.md"]
 track: extension
@@ -84,7 +84,7 @@ npm run verify
 
 - 最後完成：審查待修 1–6、複審 2 項已修（2026-10-12）
 - 已通過驗證：`npm run verify` 綠（Vitest 3872 通過、13 略過）
-- 下一步：協調者複審修正 diff；標「需真實 Chrome」的項目由 P1-T077 驗證
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，修正 diff 的 codex review 無發現；main `npm run verify` 綠，Vitest 4108 通過）
 - Blocker：無
 
 ## 審查待修（2026-10-12 對抗審查＋codex review）

@@ -1,7 +1,7 @@
 ---
 id: P1-T077
 phase: 1
-status: blocked
+status: ready
 depends_on: ["P1-T017", "P1-T075", "P1-T076"]
 specs: ["web-resume-capture.md"]
 track: extension
@@ -85,6 +85,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：等相依完成後改 ready
-- Blocker：相依未完成。只依賴 P1-T017 的「履歷頁部分」（ADR-0004 第 5 節與履歷頁 fixture）；若 P1-T017 因 D20 投遞流程、條款頁 403 等其他項仍 in_progress，履歷頁部分完成後協調者可改 ready
+- Blocker：無（P1-T017 履歷頁樣本、P1-T075、P1-T076 已完成）
 
 ## 完成結果

@@ -1,7 +1,7 @@
 ---
 id: P1-T084
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T082"]
 specs: ["resume-output.md"]
 track: pdf-export
@@ -79,7 +79,7 @@ npm run verify
 
 - 最後完成：2026-10-12 worker 實作完成（pdf-export 頁首照片、helper 匯出帶照片並記照片 ID／雜湊、照片不送模型守門測試）
 - 已通過驗證：`npm run verify` 綠（Vitest 4039 通過、15 略過）；`RUN_CHROME=1` 跑 pdf-export 與 helper 匯出測試全過（含照版 1 頁、inspect 無問題）
-- 下一步：協調者收官（範圍稽核、目視確認含照版、codex review）
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，修正 diff 的 codex review 無發現；main `npm run verify` 綠，Vitest 4108 通過）
 - Blocker：無
 
 ## 完成結果
