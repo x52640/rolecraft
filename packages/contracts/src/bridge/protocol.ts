@@ -27,6 +27,7 @@ export const PICKER_DIALOG_TIMEOUT_MS = 5 * 60 * 1000;
 export const BRIDGE_PICKER_OPERATIONS: readonly BridgeOperation[] = [
   'import.pick_pdf',
   'sources.pick_folders',
+  'photo.pick', // D28：選照片後還要解碼、重新編碼（resume-output「照片」）
 ];
 
 /** 選取器操作的客戶端逾時：對話框上限加 60 秒讀檔／解析餘裕，必須大於 PICKER_DIALOG_TIMEOUT_MS。 */

@@ -30,8 +30,12 @@ describe('編輯器操作清單（P1-T041）', () => {
     expect(Object.keys(editorRequests).sort()).toEqual([...editorOps].sort());
   });
 
-  it('編輯器操作以「群組.動作」命名，群組只有既定十一組', () => {
-    const groups = new Set(Object.keys(editorRequests).map((op) => op.split('.')[0]));
+  it('編輯器操作以「群組.動作」命名，群組只有既定十三組（D28 加 profile、photo）', () => {
+    const dotted = Object.keys(editorRequests).filter((op) => op.includes('.'));
+    expect(Object.keys(editorRequests).filter((op) => !op.includes('.'))).toEqual([
+      'submit_resume_capture',
+    ]);
+    const groups = new Set(dotted.map((op) => op.split('.')[0]));
     expect([...groups].sort()).toEqual(
       [
         'analysis',
@@ -42,6 +46,8 @@ describe('編輯器操作清單（P1-T041）', () => {
         'intro',
         'jobs',
         'messages',
+        'photo',
+        'profile',
         'providers',
         'resume',
         'sources',

@@ -33,8 +33,11 @@ import { importAiParse } from './import/ai-parse.ts';
 import { importAiStatus } from './import/ai-status.ts';
 import { importConfirm } from './import/confirm.ts';
 import { importGet } from './import/get.ts';
+import { importLatestCapture } from './import/latest-capture.ts';
 import { importPickPdf } from './import/pick-pdf.ts';
 import { importSaveCorrections } from './import/save-corrections.ts';
+import { importStartManual } from './import/start-manual.ts';
+import { submitResumeCapture } from './import/submit-resume-capture.ts';
 import { introGenerate } from './intro/generate.ts';
 import { introGet } from './intro/get.ts';
 import { introUpdate } from './intro/update.ts';
@@ -48,6 +51,10 @@ import { messagesList } from './messages/list.ts';
 import { requestDraft } from './messages/request-draft.ts';
 import { submitMessageCapture } from './messages/submit-message-capture.ts';
 import { messagesUpdateDraft } from './messages/update-draft.ts';
+import { photoGet } from './photo/get.ts';
+import { photoPick } from './photo/pick.ts';
+import { photoRemove } from './photo/remove.ts';
+import { profileGet } from './profile/get.ts';
 import { providersListCandidates } from './providers/list-candidates.ts';
 import { providersRecheck } from './providers/recheck.ts';
 import { providersReverifyClaude } from './providers/reverify-claude.ts';
@@ -73,6 +80,7 @@ import type { HandlerTable, OpHandler } from './handler.ts';
 const RAW_HANDLERS: HandlerTable = {
   submit_job_capture: submitJobCapture,
   submit_message_capture: submitMessageCapture,
+  submit_resume_capture: submitResumeCapture,
   request_draft: requestDraft,
   'jobs.list': jobsList,
   'jobs.get': jobsGet,
@@ -84,6 +92,12 @@ const RAW_HANDLERS: HandlerTable = {
   'import.confirm': importConfirm,
   'import.ai_parse': importAiParse,
   'import.ai_status': importAiStatus,
+  'import.latest_capture': importLatestCapture,
+  'import.start_manual': importStartManual,
+  'profile.get': profileGet,
+  'photo.pick': photoPick,
+  'photo.get': photoGet,
+  'photo.remove': photoRemove,
   'sources.pick_folders': sourcesPickFolders,
   'sources.list_folders': sourcesListFolders,
   'sources.preview': sourcesPreview,

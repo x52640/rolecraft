@@ -11,6 +11,7 @@ export const BridgeOperation = z.enum([
   // 擷取（content script 也可呼叫；P1-T034）
   'submit_job_capture', // 送入職缺頁擷取內容；編輯器手動貼上職缺也用它
   'submit_message_capture', // 送入使用者選定的訊息；編輯器手動貼上訊息也用它
+  'submit_resume_capture', // 送入履歷頁擷取的區塊清單（D28）；content script 白名單由 P1-T076 加
   'request_draft', // 要求產生回覆草稿
   // jobs：職缺快照（P1-T019）
   'jobs.list',
@@ -24,6 +25,14 @@ export const BridgeOperation = z.enum([
   'import.confirm',
   'import.ai_parse', // 用選定的 Claude 模型整理已解析文字（P1-T069）；姓名與聯絡資料不送模型
   'import.ai_status',
+  'import.latest_capture', // 最近一次網頁擷取（D28）；查詢不觸發 AI 整理
+  'import.start_manual', // 建立沒有原文的匯入工作階段（D28，手動輸入）
+  // profile：唯讀已確認的 Profile，供複製按鈕比對（D28）
+  'profile.get',
+  // photo：匯出用的目前照片（D28）；照片不送模型
+  'photo.pick',
+  'photo.get',
+  'photo.remove',
   // sources：專案資料夾與授權集合（P1-T021）
   'sources.pick_folders',
   'sources.list_folders',
@@ -89,7 +98,8 @@ export type BridgeOperation = z.infer<typeof BridgeOperation>;
 
 /**
  * content script 可以呼叫的操作：只有職缺／訊息擷取（還要再過 relay 的網站、平台、自動擷取檢查）。
- * 其餘操作一律只限擴充功能頁（編輯器）。
+ * 其餘操作一律只限擴充功能頁（編輯器）。`submit_resume_capture` 要連同「操作×頁型」的 relay 檢查一起加
+ * （P1-T076），在那之前 content script 呼叫會被擋。
  */
 export const CONTENT_SCRIPT_OPERATIONS = [
   'submit_job_capture',
@@ -107,12 +117,26 @@ export const BridgeErrorCode = z.enum([
 ]);
 export type BridgeErrorCode = z.infer<typeof BridgeErrorCode>;
 
+/**
+ * 失敗的固定原因（D28，相加）：讓呼叫端不必比對訊息文字就能分辨要怎麼處理，只配 invalid_request。
+ * - name_required：import.ai_parse 網頁來源，本次頁面姓名沒辨識出來、請求也沒帶姓名（要使用者先確認姓名）
+ * - multiple_profiles：import.confirm／profile.get，資料區已有多份 Profile（舊資料），不寫入也不讀
+ */
+export const BridgeFailureReason = z.enum(['name_required', 'multiple_profiles']);
+export type BridgeFailureReason = z.infer<typeof BridgeFailureReason>;
+
 export const BridgeFailure = z.strictObject({
   ok: z.literal(false),
-  error: z.strictObject({
-    code: BridgeErrorCode,
-    message: z.string(),
-  }),
+  error: z
+    .strictObject({
+      code: BridgeErrorCode,
+      message: z.string(),
+      reason: BridgeFailureReason.optional(),
+    })
+    .refine((e) => e.reason === undefined || e.code === 'invalid_request', {
+      path: ['reason'],
+      message: '固定原因只配 invalid_request',
+    }),
 });
 export type BridgeFailure = z.infer<typeof BridgeFailure>;
 

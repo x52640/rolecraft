@@ -9,12 +9,15 @@ import { IMPORT_SCHEMAS } from './editor/import.ts';
 import { INTRO_SCHEMAS } from './editor/intro.ts';
 import { JOBS_SCHEMAS } from './editor/jobs.ts';
 import { MESSAGES_SCHEMAS } from './editor/messages.ts';
+import { PHOTO_SCHEMAS } from './editor/photo.ts';
+import { PROFILE_SCHEMAS } from './editor/profile.ts';
 import { PROVIDERS_SCHEMAS } from './editor/providers.ts';
 import { RESUME_SCHEMAS } from './editor/resume.ts';
 import { SOURCES_SCHEMAS } from './editor/sources.ts';
 import { SubmitJobCaptureRequest, SubmitJobCaptureResponse } from './job-capture.ts';
 import { SubmitMessageCaptureRequest, SubmitMessageCaptureResponse } from './message-capture.ts';
 import type { BridgeOperation } from './operations.ts';
+import { SubmitResumeCaptureRequest, SubmitResumeCaptureResponse } from './resume-capture.ts';
 
 /** 每個操作對應的 request／response schema。鍵必須與 BridgeOperation 完全一致（測試鎖住）。 */
 export const BRIDGE_SCHEMAS = {
@@ -22,6 +25,10 @@ export const BRIDGE_SCHEMAS = {
   submit_message_capture: {
     request: SubmitMessageCaptureRequest,
     response: SubmitMessageCaptureResponse,
+  },
+  submit_resume_capture: {
+    request: SubmitResumeCaptureRequest,
+    response: SubmitResumeCaptureResponse,
   },
   request_draft: { request: RequestDraftRequest, response: RequestDraftResponse },
   ...JOBS_SCHEMAS,
@@ -35,6 +42,8 @@ export const BRIDGE_SCHEMAS = {
   ...MESSAGES_SCHEMAS,
   ...ANALYSIS_SCHEMAS,
   ...INTRO_SCHEMAS,
+  ...PROFILE_SCHEMAS,
+  ...PHOTO_SCHEMAS,
 } as const satisfies Record<BridgeOperation, { request: z.ZodType; response: z.ZodType }>;
 
 type RequestSchemaOf<Op extends BridgeOperation> = (typeof BRIDGE_SCHEMAS)[Op]['request'];

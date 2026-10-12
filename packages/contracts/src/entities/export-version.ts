@@ -23,5 +23,10 @@ export const ExportVersion = z.strictObject({
    * 為維持 additive 設為選填。
    */
   sourceDocumentIds: z.array(Id).optional(),
+  /**
+   * 匯出時印進 PDF 的照片（D28，相加選填）：照片 ID 與雜湊。沒有照片時省略。
+   * 刪除或更換照片時據照片 ID 找出含它的版本（D19）。
+   */
+  photo: z.strictObject({ photoId: Id, sha256: ContentHash }).optional(),
 });
 export type ExportVersion = z.infer<typeof ExportVersion>;

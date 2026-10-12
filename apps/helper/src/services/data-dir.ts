@@ -22,7 +22,10 @@ export const STARTUP_LOCK_WAIT_MS = 2000;
 /** 不需要本機儲存的群組：沒有資料區時 createServices 也會接上（main.test.ts 驗一致）。 */
 export const STORAGE_FREE_GROUPS: readonly string[] = ['providers', 'sources'];
 
-/** 擷取三個操作（無群組前綴）都會寫入儲存；其餘看「群組.動作」的群組。 */
+/**
+ * 無群組前綴的擷取操作（含 D28 的 submit_resume_capture：匯入工作階段雖只在記憶體，但與 PDF 匯入共用、
+ * 確認時寫入 Profile）一律算需要儲存；其餘看「群組.動作」的群組（import、profile、photo 都需要）。
+ */
 export function needsStorage(op: BridgeOperation): boolean {
   const dot = op.indexOf('.');
   return dot < 0 || !STORAGE_FREE_GROUPS.includes(op.slice(0, dot));

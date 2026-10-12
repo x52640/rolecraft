@@ -12,6 +12,8 @@ import type { ResumeImportService } from './import/service.ts';
 import type { IntroService } from './intro/service.ts';
 import type { JobsService } from './jobs/service.ts';
 import type { MessagesService } from './messages/service.ts';
+import type { PhotoService } from './photo/service.ts';
+import type { ProfileService } from './profile/service.ts';
 import type { ProvidersService } from './providers/service.ts';
 import type { ResumeService } from './resume/service.ts';
 import type { SourcesService } from './sources/service.ts';
@@ -24,6 +26,8 @@ export type {
   IntroService,
   JobsService,
   MessagesService,
+  PhotoService,
+  ProfileService,
   ProvidersService,
   ResumeImportService,
   ResumeService,
@@ -43,6 +47,8 @@ export interface HelperServices {
   messages?: MessagesService;
   analysis?: AnalysisService;
   intro?: IntroService;
+  profile?: ProfileService;
+  photo?: PhotoService;
 }
 
 /** 服務尚未接上：回 not_implemented。 */

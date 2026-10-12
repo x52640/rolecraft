@@ -6,11 +6,12 @@
 ## 進行中
 
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本（`docs/tasks/P1-T017-spike-104-job.md`）
+- P1-T074 contracts：網頁履歷匯入、照片、個人資料讀取的橋接契約（`docs/tasks/P1-T074-web-import-contracts.md`）
 - P1-T086 editor：客製履歷段落「複製」按鈕（`docs/tasks/P1-T086-editor-section-copy.md`）
 
 ## ready
 
-- P1-T074 contracts：網頁履歷匯入、照片、個人資料讀取的橋接契約
+- 無
 <!-- index:end -->
 
 ## 下一步（2026-10-11 codex 補審後）

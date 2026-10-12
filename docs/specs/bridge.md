@@ -59,7 +59,7 @@
 | `import.ai_parse` | 用使用者選定的 Claude 模型整理已解析的文字（P1-T069，規則見 resume-import「AI 整理欄位」）：在背景執行、立即回狀態；同一筆匯入已有執行中的就不重送。姓名與聯絡資料在本機抽出、不送模型。〔D28，P1-T080〕網頁來源規則見 resume-import「網頁來源的 AI 整理」；相加選填使用者確認的姓名（可多個寫法，只用於本機遮蔽與預填），本次頁面姓名沒辨識出來又沒帶姓名時不呼叫模型。找不到匯入、解析失敗、移除後沒有文字、沒有選定且可用的模型、超過輸入預算回 `invalid_request`（固定訊息），不呼叫模型 |
 | `import.ai_status` | 最近一次 AI 整理：執行中／成功（逐欄照抄檢查過的草稿：本機抽出的個人資料、學歷、經歷、技能、其他段落、被丟棄的欄位與原因）／失敗（原因）；只在 helper 記憶體，沒有整理過為 null |
 | `profile.get` | 〔D28，P1-T079〕唯讀：資料區唯一那份已確認的 Profile（沒有回 null；多份時回固定原因）。供複製按鈕重新讀取比對（resume-output「內容回填到求職網站」） |
-| `photo.pick` | 〔D28，P1-T083〕helper 開系統選取器（只限 JPEG／PNG、10 MB 以下），重新編碼、去中繼資料後即設為目前照片；已有照片時是更換（同一交易刪舊加新，套 D19）。回照片資訊（格式、尺寸、雜湊）與縮圖；取消回 cancelled。選取器操作 |
+| `photo.pick` | 〔D28，P1-T083〕helper 開系統選取器（只限 JPEG／PNG、10 MB 以下），重新編碼、去中繼資料後即設為目前照片；已有照片時是更換（同一交易刪舊加新，套 D19）。回照片資訊（格式、尺寸、雜湊）與縮圖；取消回 cancelled；已有選取視窗開著回 busy（成功形狀 `{ok: true, selection: {status: 'busy'}}`，不是失敗）。選取器操作 |
 | `photo.get` | 〔D28，P1-T083〕目前照片資訊＋縮圖（回應低於 1 MiB）；沒有回 null |
 | `photo.remove` | 〔D28，P1-T083〕刪除目前照片，套 D19（含這張照片、未投遞的匯出版本整份刪除，已投遞的保留） |
 | `sources.pick_folders` | helper 開系統資料夾選取器（可連續新增），回資料夾 id 與名稱（P1-T021） |
@@ -132,7 +132,7 @@
 | `helper_unavailable` | service worker、helper | service worker：本機輔助程式未安裝、未啟動、連線中斷或送不出去。helper（P1-T052，擁有者裁定 #13）：資料區正由另一個 helper 使用時，需要本機儲存的操作（`providers.*`、`sources.*` 以外的全部操作）回固定訊息「RoleCraft 正在另一個瀏覽器使用中，請先關閉該瀏覽器的 RoleCraft」 |
 | `timeout` | service worker | 等待 helper 回覆逾時；不影響同一連線上的其他請求 |
 
-錯誤訊息是給人看的固定文字，不回填請求內容；程式判斷只看代碼。
+錯誤訊息是給人看的固定文字，不回填請求內容；程式判斷只看代碼。〔D28，P1-T074〕`invalid_request` 可帶選填 `reason`（固定原因：`name_required`＝`import.ai_parse` 網頁來源本次頁面姓名沒辨識出來又沒帶姓名；`multiple_profiles`＝`import.confirm`／`profile.get` 資料區已有多份 Profile），程式只看代碼與 `reason`，不比對文字。
 
 ### 共用常數
 

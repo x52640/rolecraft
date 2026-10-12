@@ -1,7 +1,16 @@
-// 履歷 PDF 匯入（import.*）handler 用的服務介面（P1-T020）。
+// 履歷匯入（import.*、submit_resume_capture）handler 用的服務介面（P1-T020；D28 加網頁與手動來源）。
 // 介面只收 schema 驗證過的 payload，不接受也不回傳路徑、指令或模型設定（R7）。
 // 方法皆可省略：沒接上的方法，handler 回 not_implemented，不偽造成功。
-import type { ImportAiParseView, ImportResult, ProfileInput } from '@rolecraft/contracts';
+import type {
+  ImportAiParseView,
+  ImportLatestCapture,
+  ImportResult,
+  ProfileInput,
+  SubmitResumeCaptureRequest,
+} from '@rolecraft/contracts';
+
+/** submit_resume_capture 的內容（schema 驗證過；區塊編號由服務依順序配發）。 */
+export type ResumeCapturePayload = SubmitResumeCaptureRequest['payload'];
 
 /** import.pick_pdf 的結果；busy＝已有一個選取視窗開著（同時只開一個）。 */
 export type PickPdfOutcome =
@@ -46,4 +55,10 @@ export interface ResumeImportService {
   aiParse?(importId: string): Promise<AiParseOutcome>;
   /** 最近一次 AI 整理的狀態與（成功時）草稿。 */
   aiStatus?(importId: string): AiStatusOutcome;
+  /** D28：建立網頁來源的匯入工作階段（只在記憶體），不呼叫模型。 */
+  submitResumeCapture?(capture: ResumeCapturePayload): void;
+  /** D28：最近一次網頁擷取；沒有回 null。不觸發 AI 整理。 */
+  latestCapture?(): ImportLatestCapture | null;
+  /** D28：建立沒有原文的工作階段（手動輸入）。 */
+  startManual?(): { importId: string };
 }

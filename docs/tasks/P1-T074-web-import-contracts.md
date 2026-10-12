@@ -1,12 +1,12 @@
 ---
 id: P1-T074
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T041", "P1-T069"]
 specs: ["bridge.md", "web-resume-capture.md", "resume-import.md", "resume-output.md", "architecture.md"]
 track: contracts
 primary_repo: rolecraft
-write_paths: ["packages/contracts/src/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/handlers/import/service.ts", "apps/helper/src/handlers/import/submit-resume-capture.ts", "apps/helper/src/handlers/import/latest-capture.ts", "apps/helper/src/handlers/import/start-manual.ts", "apps/helper/src/handlers/photo/", "apps/helper/src/handlers/profile/", "apps/helper/src/bridge/__fixtures__/", "apps/helper/src/services/data-dir.ts", "docs/adr/0006-contracts-interim-fields.md"]
+write_paths: ["packages/contracts/src/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/handlers/import/service.ts", "apps/helper/src/handlers/import/submit-resume-capture.ts", "apps/helper/src/handlers/import/latest-capture.ts", "apps/helper/src/handlers/import/start-manual.ts", "apps/helper/src/handlers/photo/", "apps/helper/src/handlers/profile/", "apps/helper/src/bridge/__fixtures__/", "apps/helper/src/services/data-dir.ts", "docs/adr/0006-contracts-interim-fields.md", "apps/extension/src/bridge/client.test.ts", "docs/specs/bridge.md"]
 contract_change: additive
 expected_commit: "feat(P1-T074): 網頁履歷匯入、照片、個人資料讀取的橋接契約一次定好（未接服務回 not_implemented）"
 ---
@@ -88,9 +88,16 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：2026-10-12 「包含」各項已實作（未 commit，在工作者 worktree）：contracts 7 個新操作、`resume-capture.ts`、`import-shapes.ts`（草稿積木搬移、形狀不變）、`import-web.ts`、`photo.ts`、`profile.ts`、`entities/photo.ts`、`ExportVersion.photo`、`BridgeFailure.error.reason`；helper 分派表與 7 個 handler、`photo`／`profile` 服務介面；兩份 fixture；ADR-0006 #17
+- 已通過驗證：`npm run verify` 全綠（擴充 write_paths 後）
+- 協調者 2026-10-12 擴充 write_paths：加 `apps/extension/src/bridge/client.test.ts`（BRIDGE_PICKER_OPERATIONS 加 photo.pick 需同步既有測試）與 `docs/specs/bridge.md`（reason 欄位與 photo.pick busy 需寫回權威規格）
+- 下一步：收官（協調者閘門＋codex review）
 - Blocker：無
 
 ## 完成結果
+
+- 契約：`BridgeOperation` 相加 `submit_resume_capture`、`import.latest_capture`、`import.start_manual`、`profile.get`、`photo.pick`、`photo.get`、`photo.remove`；`BRIDGE_PICKER_OPERATIONS` 加 `photo.pick`；`CONTENT_SCRIPT_OPERATIONS` 不變（P1-T076）。新檔 `bridge/resume-capture.ts`、`bridge/editor/import-shapes.ts`（草稿積木搬移、形狀不變）、`import-web.ts`、`photo.ts`、`profile.ts`、`entities/photo.ts`；`ExportVersion.photo`（選填 photoId＋sha256）；`BridgeFailure.error.reason`（選填 `name_required`／`multiple_profiles`，只配 invalid_request）。細節見 ADR-0006 #17
+- helper：分派表註冊 7 個 handler（`handlers/import/` 三個、`photo/`、`profile/`），服務缺席回 not_implemented；`services.ts` 加 `photo`、`profile`；`needsStorage` 讓新操作在資料區被占用時回 helper_unavailable（測試證明）
+- 上限常數（請協調者稽核）：區塊 2,000、文字含標籤 UTF-8 256 KiB、AI 草稿 512 KiB（以上為規格值）；`nameText` 200 字、url 2,048 字、確認姓名 8 個 × 64 字、縮圖 256 KiB（base64 後連信封 < 1 MiB）、照片原檔 10 MiB、照片最長邊 1,200 px（工作者暫定）。測試證明上限內最大的 `submit_resume_capture` 請求、對應的 `import.get` 回應、`photo.pick` 回應都低於 1 MiB
+- 保守選擇：(1) 需確認姓名／多份 Profile 用失敗回應的 `reason` 表示，不比對文字；(2) 網頁來源丟棄原因沿用 `unknown_line`、`lines_not_consecutive`（不加新值以免編輯器對照表失效）；(3) 新 ImportResult（`web_capture`、`manual`）都帶 `displayName`；(4) `photo.pick` 的 busy 是成功形狀；(5) `submit_resume_capture` 比規格嚴：至少一個區塊、續行須接同種類／層級／標籤、文字標籤與 nameText 只能一行不含控制字元（Tab 除外）、url 須為 `origin+pathname` 正規寫法、LinkedIn 拒收；(6) `import.get` 網頁結果不帶網址與 nameText；`profile.get` 只回已確認的 Profile；(7) `submit_resume_capture` 範例請求放在 editor-requests fixture
+- 殘餘：import 服務 `aiParse` 介面未加 `names`（P1-T080）

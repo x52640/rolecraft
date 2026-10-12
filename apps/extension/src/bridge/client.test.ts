@@ -353,7 +353,11 @@ describe('bridge client：選取器操作的逾時配合原生對話框（P1-T04
   }
 
   it('選取器逾時大於對話框上限，一般操作維持 30 秒', () => {
-    expect(BRIDGE_PICKER_OPERATIONS).toEqual(['import.pick_pdf', 'sources.pick_folders']);
+    expect(BRIDGE_PICKER_OPERATIONS).toEqual([
+      'import.pick_pdf',
+      'sources.pick_folders',
+      'photo.pick',
+    ]);
     expect(BRIDGE_PICKER_TIMEOUT_MS).toBeGreaterThan(PICKER_DIALOG_TIMEOUT_MS);
     expect(DEFAULT_TIMEOUT_MS).toBe(30_000);
   });

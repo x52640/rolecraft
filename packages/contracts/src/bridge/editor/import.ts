@@ -4,66 +4,33 @@ import { Id, NonEmptyText } from '../../entities/common.ts';
 import { Profile } from '../../entities/profile.ts';
 import { Ack, EmptyPayload, OpaqueId, bridgeOp } from '../common.ts';
 import { withFailure } from '../operations.ts';
+import {
+  ImportAiDraft,
+  ImportAiFailure,
+  ImportDraft,
+  ResumeImportFailureReason,
+} from './import-shapes.ts';
+import {
+  ImportAiParseNames,
+  ImportAiSource,
+  ImportLatestCapture,
+  ImportManualResult,
+  ImportWebAiDraft,
+  ImportWebCaptureResult,
+} from './import-web.ts';
 
 /**
- * import.*：履歷 PDF 匯入與校正（F02、R10、D18；P1-T020）。
+ * import.*：履歷匯入與校正（F02、R10、D18；P1-T020；D28 加網頁與手動來源）。
  * 檔案只能由 helper 開系統選取器選（R7、ADR-0003）：請求不帶任何路徑，回傳不透明 importId 與顯示名稱。
+ * 欄位草稿積木在 import-shapes.ts，網頁與手動來源在 import-web.ts。
  */
-
-/** 擷取失敗原因（對應 @rolecraft/resume-import ExtractFailureReason）。 */
-export const ResumeImportFailureReason = z.enum([
-  'invalid_pdf', // 不是 PDF 或檔案損壞
-  'encrypted', // 有密碼保護
-  'no_text_layer', // 沒有文字層（D18：手動輸入）
-  'garbled_text', // 亂碼比例過高
-  'reading_order_unreliable', // 讀取順序異常
-]);
-export type ResumeImportFailureReason = z.infer<typeof ResumeImportFailureReason>;
-
-/** 一個待校正欄位：值＋出處（頁碼、該頁第幾行）。一律未確認。 */
-export const ImportDraftField = z.strictObject({
-  value: z.string(),
-  pageNumber: z.int().min(1),
-  lineIndex: z.int().min(0),
-});
-export type ImportDraftField = z.infer<typeof ImportDraftField>;
-
-/** 結構化草稿裡的一段經歷（P1-T066）。找不到的欄位為 null；current＝仍在職（此時 endDate 為 null）。 */
-export const ImportStructuredExperience = z.strictObject({
-  company: ImportDraftField.nullable(),
-  title: ImportDraftField.nullable(),
-  startDate: ImportDraftField.nullable(),
-  endDate: ImportDraftField.nullable(),
-  current: z.boolean(),
-  description: ImportDraftField.nullable(),
-});
-export type ImportStructuredExperience = z.infer<typeof ImportStructuredExperience>;
 
 /**
- * 認出特定版面（目前只有 104）時的結構化草稿（P1-T066、ADR-0006 #14）。
- * personalInfo 保留原標籤（含「姓名」「學歷」）；每個值都帶出處。
+ * 解析結果（import.get）。依 status 分辨來源（D28／W4）：
+ * - parsed／failed：PDF（形狀不變）。成功時有原文（依閱讀順序的行）與欄位草稿；失敗只有原因，不當成功
+ * - web_capture：網頁擷取，原文是區塊清單（import-web.ts）
+ * - manual：手動輸入，沒有原文
  */
-export const ImportStructuredDraft = z.strictObject({
-  layout: z.literal('104'),
-  personalInfo: z.array(z.strictObject({ label: z.string().min(1), value: ImportDraftField })),
-  experiences: z.array(ImportStructuredExperience),
-  skills: z.array(ImportDraftField),
-});
-export type ImportStructuredDraft = z.infer<typeof ImportStructuredDraft>;
-
-/** 欄位草稿；找不到的欄位留空，不捏造。structured 只在認出特定版面時才有（相加欄位）。 */
-export const ImportDraft = z.strictObject({
-  name: ImportDraftField.nullable(),
-  dates: z.array(ImportDraftField),
-  companies: z.array(ImportDraftField),
-  titles: z.array(ImportDraftField),
-  experiences: z.array(ImportDraftField),
-  skills: z.array(ImportDraftField),
-  structured: ImportStructuredDraft.optional(),
-});
-export type ImportDraft = z.infer<typeof ImportDraft>;
-
-/** 解析結果：成功時有原文（依閱讀順序的行）與欄位草稿；失敗時只有原因，不當成成功。 */
 export const ImportResult = z.discriminatedUnion('status', [
   z.strictObject({
     status: z.literal('parsed'),
@@ -77,72 +44,44 @@ export const ImportResult = z.discriminatedUnion('status', [
     displayName: NonEmptyText,
     reason: ResumeImportFailureReason,
   }),
+  ImportWebCaptureResult,
+  ImportManualResult,
 ]);
 export type ImportResult = z.infer<typeof ImportResult>;
 
-/**
- * AI 整理（P1-T069）丟棄某個欄位的原因：
- * - unknown_line：引用的行號不存在，或是本機已移除（聯絡資料）的行
- * - lines_not_consecutive：非描述欄位引用的行不連續
- * - not_in_source：值去除空白與全半形差異後，不是引用行（依序接合）的子字串
- * - not_a_date：日期欄位的值看起來不是日期（也不是「至今」類字眼）
- * - empty：值是空白
- */
-export const ImportAiDiscardReason = z.enum([
-  'unknown_line',
-  'lines_not_consecutive',
-  'not_in_source',
-  'not_a_date',
-  'empty',
-]);
-export type ImportAiDiscardReason = z.infer<typeof ImportAiDiscardReason>;
+/** 匯入來源種類。 */
+export type ImportSourceKind = 'pdf' | 'web' | 'manual';
 
-/** 一個被丟棄的欄位：哪個欄位（給人看的位置，例如「第 2 段經歷職稱」）＋原因。不帶 AI 給的值。 */
-export const ImportAiDiscard = z.strictObject({
-  field: z.string().min(1),
-  reason: ImportAiDiscardReason,
-});
-export type ImportAiDiscard = z.infer<typeof ImportAiDiscard>;
+/** 解析結果的來源：parsed／failed 是 PDF。 */
+export function importSourceOf(result: ImportResult): ImportSourceKind {
+  if (result.status === 'web_capture') return 'web';
+  if (result.status === 'manual') return 'manual';
+  return 'pdf';
+}
 
 /**
- * AI 整理後、逐欄照抄檢查通過的草稿（P1-T069）。每個值都能在其出處行找到（出處＝第一個引用行）。
- * personalInfo 是本機抽出的姓名與聯絡資料（從未送給模型）；otherSections 是求職條件、自傳等段落
- * （標題原樣保留，不寫入 Profile，只給使用者參考）。
+ * 最近一次 AI 整理（只存在 helper 記憶體）。成功才有草稿，失敗才有 failure。
+ * D28 相加：source 分辨來源（省略＝PDF）；網頁來源的草稿放 webDraft（出處是區塊編號），draft 為 null。
  */
-export const ImportAiDraft = z.strictObject({
-  personalInfo: z.array(z.strictObject({ label: z.string().min(1), value: ImportDraftField })),
-  education: z.array(ImportDraftField),
-  experiences: z.array(ImportStructuredExperience),
-  skills: z.array(ImportDraftField),
-  otherSections: z.array(z.strictObject({ heading: ImportDraftField, body: ImportDraftField })),
-  discarded: z.array(ImportAiDiscard),
-});
-export type ImportAiDraft = z.infer<typeof ImportAiDraft>;
-
-/** AI 整理失敗原因：輸出格式不符（不自動重試）、R6 不通過、服務錯誤、額度用完、取消。 */
-export const ImportAiFailure = z.enum([
-  'invalid_output',
-  'run_check_failed',
-  'provider_error',
-  'quota_exhausted',
-  'cancelled',
-]);
-export type ImportAiFailure = z.infer<typeof ImportAiFailure>;
-
-/** 最近一次 AI 整理（只存在 helper 記憶體）。成功才有 draft，失敗才有 failure。 */
 export const ImportAiParseView = z
   .strictObject({
     state: z.enum(['running', 'succeeded', 'failed']),
     failure: ImportAiFailure.nullable(),
     draft: ImportAiDraft.nullable(),
+    source: ImportAiSource.optional(),
+    webDraft: ImportWebAiDraft.nullable().optional(),
   })
   .refine((v) => (v.state === 'failed') === (v.failure !== null), {
     path: ['failure'],
     message: '只有失敗有原因',
   })
-  .refine((v) => (v.state === 'succeeded') === (v.draft !== null), {
+  .refine((v) => (v.state === 'succeeded') === (v.draft !== null || v.webDraft != null), {
     path: ['draft'],
     message: '只有成功有草稿',
+  })
+  .refine((v) => (v.source === 'web' ? v.draft === null : v.webDraft == null), {
+    path: ['webDraft'],
+    message: '草稿出處與來源不符',
   });
 export type ImportAiParseView = z.infer<typeof ImportAiParseView>;
 
@@ -184,6 +123,8 @@ export const IMPORT_SCHEMAS = {
   /**
    * 使用者確認校正結果，寫入 Profile 並標為已確認（R10）。
    * 帶的是使用者確認當下看到的內容；解析失敗時也可確認手動輸入的內容（D18）。
+   * D28／Q8（網頁、PDF、手動共用）：已有一份 Profile 就更新那一份（保留 id），沒有才新增；
+   * 已有多份時不寫入，回 invalid_request＋固定原因 multiple_profiles。
    */
   'import.confirm': {
     request: bridgeOp('import.confirm', WithProfile),
@@ -193,9 +134,14 @@ export const IMPORT_SCHEMAS = {
    * 用使用者選定的 Claude 模型整理已解析的文字（P1-T069）：在背景執行、立即回狀態；已有執行中的就回同一個。
    * 姓名與聯絡資料在本機抽出、不送模型。找不到匯入、解析失敗、沒有選定且可用的模型、超過輸入預算回
    * invalid_request（固定訊息），不呼叫模型。
+   * D28 相加選填 names：使用者確認的姓名（可多個寫法；只用於本機遮蔽與預填，不送模型）。網頁來源本次頁面
+   * 姓名沒辨識出來又沒帶 names 時回 invalid_request＋固定原因 name_required，不呼叫模型。
    */
   'import.ai_parse': {
-    request: bridgeOp('import.ai_parse', ImportRef),
+    request: bridgeOp(
+      'import.ai_parse',
+      z.strictObject({ importId: OpaqueId, names: ImportAiParseNames.optional() }),
+    ),
     response: withFailure(z.strictObject({ ok: z.literal(true), parse: ImportAiParseView })),
   },
   /** 最近一次 AI 整理的狀態與（成功時）草稿；沒有整理過（或 helper 重開）為 null。 */
@@ -204,5 +150,17 @@ export const IMPORT_SCHEMAS = {
     response: withFailure(
       z.strictObject({ ok: z.literal(true), parse: ImportAiParseView.nullable() }),
     ),
+  },
+  /** 最近一次網頁擷取（D28）；沒有（或已被擠出記憶體）為 null。查詢不觸發 AI 整理。 */
+  'import.latest_capture': {
+    request: bridgeOp('import.latest_capture', EmptyPayload),
+    response: withFailure(
+      z.strictObject({ ok: z.literal(true), capture: ImportLatestCapture.nullable() }),
+    ),
+  },
+  /** 建立沒有原文的匯入工作階段（D28，手動輸入），回 importId。 */
+  'import.start_manual': {
+    request: bridgeOp('import.start_manual', EmptyPayload),
+    response: withFailure(z.strictObject({ ok: z.literal(true), importId: Id })),
   },
 } as const;
