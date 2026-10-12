@@ -2,7 +2,7 @@
 // P1-T064 投遞自介（D25、D7）：產生、失敗原因、編輯後重跑檢查與複製停用、重新產生前確認覆寫。
 import type { ApplicationIntro } from '@rolecraft/contracts';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { createElement } from 'react';
+import { StrictMode, createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BridgeProvider } from '../../bridge/BridgeProvider.tsx';
@@ -429,5 +429,46 @@ describe('codex 第三輪：請求期間一律鎖定、單一版本號', () => {
     for (const release of gate.releases) release();
     await screen.findByText(/已複製/);
     expect(ops(fake, 'intro.update')).toHaveLength(0);
+  });
+});
+
+describe('codex 第四輪：操作 token、取消舊輪詢、重檢更新中繼資料', () => {
+  it('StrictMode 下初次讀取跑兩次：只留一條輪詢（舊的作廢）', async () => {
+    const fake = fakeBridge([sampleSnapshot({ confirmedAt: '2026-10-11T01:02:03.000Z' })]);
+    fake.intro = saved();
+    fake.introCheck = passingCheck(TEXT);
+    fake.generation = { state: 'running', failure: null, problem: null };
+    render(
+      createElement(StrictMode, {
+        children: createElement(BridgeProvider, {
+          transport: { send: (request) => fake.transport.send(request) },
+          children: createElement(IntroPanel, {
+            jobSnapshotId: 'job-1',
+            confirmed: true,
+            poll: { intervalMs: 5, maxPolls: 3 },
+          }),
+        }),
+      }),
+    );
+    await screen.findByText(/還在產生中/);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // 初次讀取兩次（StrictMode）＋一條輪詢 3 次；兩條輪詢會是 2＋6
+    expect(ops(fake, 'intro.get')).toHaveLength(5);
+    expect(screen.getByLabelText('投遞自介（可編輯）')).toHaveProperty('disabled', false);
+  });
+
+  it('複製重檢文字相同但已變成「經使用者編輯」：更新中繼資料，重新產生要先確認', async () => {
+    const fake = setup(true, (f) => {
+      f.intro = saved();
+      f.introCheck = passingCheck(TEXT);
+    });
+    await screen.findByLabelText('投遞自介（可編輯）');
+    fake.intro = saved({ userEdited: true });
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(() => Promise.resolve()) } });
+    fireEvent.click(button('複製自介'));
+    await screen.findByText(/已複製/);
+    fireEvent.click(button('重新產生投遞自介'));
+    expect((await screen.findByRole('alert')).textContent).toContain('覆蓋你編輯過的自介');
+    expect(ops(fake, 'intro.generate')).toHaveLength(0);
   });
 });

@@ -48,6 +48,8 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
   const disposed = useRef(false);
   const busyRef = useRef<IntroBusy | null>('loading');
   const versionRef = useRef(0);
+  /** 目前操作的 token：只有目前操作的後續步驟能套用結果、解鎖（舊操作、舊輪詢一律作廢） */
+  const opRef = useRef(0);
 
   const setBusy = (next: IntroBusy | null) => {
     busyRef.current = next;
@@ -57,13 +59,18 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     versionRef.current += 1;
     setVersionState(versionRef.current);
   };
-  /** 開始一個請求；已有請求進行中就不開始。 */
-  const begin = (kind: IntroBusy): boolean => {
-    if (busyRef.current !== null) return false;
+  /** 開始一個請求，回傳它的 token；已有請求進行中就不開始（回 null）。 */
+  const begin = (kind: IntroBusy): number | null => {
+    if (busyRef.current !== null) return null;
     setBusy(kind);
     setNotice(null);
     setFailure(null);
-    return true;
+    return ++opRef.current;
+  };
+  const current = (token: number) => !disposed.current && opRef.current === token;
+  /** 只有目前操作能解鎖。 */
+  const end = (token: number) => {
+    if (current(token)) setBusy(null);
   };
 
   useEffect(() => {
@@ -100,13 +107,13 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     }
   };
 
-  const waitForResult = (remaining: number, sentAt: number) => {
+  const waitForResult = (remaining: number, sentAt: number, token: number) => {
     timer.current = setTimeout(() => {
       void fetchIntro().then((loaded) => {
-        if (disposed.current) return;
+        if (!current(token)) return;
         const { generation } = loaded ?? { generation: undefined };
         if (loaded && generation?.state === 'running' && remaining > 1) {
-          waitForResult(remaining - 1, sentAt);
+          waitForResult(remaining - 1, sentAt, token);
           return;
         }
         if (loaded && versionRef.current === sentAt) {
@@ -121,49 +128,59 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
             showFailure(generation ?? null);
           }
         }
-        setBusy(null);
+        end(token);
       });
     }, poll.intervalMs);
   };
 
   useEffect(() => {
+    // 初次讀取也是一個操作；cleanup（含 StrictMode 的重跑）讓它與其輪詢作廢
+    const token = ++opRef.current;
+    setBusy('loading');
     void fetchIntro().then((loaded) => {
-      if (disposed.current) return;
+      if (!current(token)) return;
       if (!loaded) {
-        setBusy(null);
+        end(token);
         return;
       }
       applyLoaded(loaded);
       if (loaded.generation?.state === 'running') {
         setBusy('generating');
-        waitForResult(poll.maxPolls, versionRef.current);
+        waitForResult(poll.maxPolls, versionRef.current, token);
         return;
       }
       // 離開期間已結束的失敗也要顯示原因
       showFailure(loaded.generation);
-      setBusy(null);
+      end(token);
     });
+    return () => {
+      opRef.current += 1;
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+    };
     // 只在切換職缺（fetchIntro 改變）時讀取一次
   }, [fetchIntro]);
 
   async function generate() {
-    if (!begin('generating')) return;
+    const token = begin('generating');
+    if (token === null) return;
     const sentAt = versionRef.current;
     const response = await bridge.send({ op: 'intro.generate', payload: { jobSnapshotId } });
-    if (disposed.current) return;
+    if (!current(token)) return;
     if (!response.ok) {
       setFailure(introFailureText(response));
-      setBusy(null);
+      end(token);
       return;
     }
-    waitForResult(poll.maxPolls, sentAt);
+    waitForResult(poll.maxPolls, sentAt, token);
   }
 
   async function save() {
-    if (!begin('saving')) return;
+    const token = begin('saving');
+    if (token === null) return;
     const sentAt = versionRef.current;
     const response = await bridge.send({ op: 'intro.update', payload: { jobSnapshotId, text } });
-    if (disposed.current) return;
+    if (!current(token)) return;
     if (!response.ok) {
       setFailure(introFailureText(response));
     } else if (versionRef.current === sentAt) {
@@ -173,30 +190,32 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
       bump(); // 儲存成功也是新版本：先前的確認（例如重新載入的警告）失效
       setNotice('已儲存（只存在本機，不會送出），並重新檢查。');
     }
-    setBusy(null);
+    end(token);
   }
 
   /** 重新載入已儲存的內容（放棄未儲存的修改；有未存修改時由畫面先確認）。 */
   async function reload() {
-    if (!begin('reloading')) return;
+    const token = begin('reloading');
+    if (token === null) return;
     const sentAt = versionRef.current;
     const loaded = await fetchIntro();
-    if (disposed.current) return;
+    if (!current(token)) return;
     if (loaded && versionRef.current === sentAt) {
       applyLoaded(loaded);
       setNotice('已重新載入已儲存的內容。');
     }
-    setBusy(null);
+    end(token);
   }
 
   /** 複製前重新讀取並重跑檢查；通過、版本沒變且已儲存內容與編輯框一致才寫入剪貼簿。 */
   async function copy() {
-    if (!begin('copying')) return;
+    const token = begin('copying');
+    if (token === null) return;
     const sentAt = versionRef.current;
     const shown = text;
     try {
       const loaded = await fetchIntro();
-      if (disposed.current || !loaded || versionRef.current !== sentAt) return;
+      if (!current(token) || !loaded || versionRef.current !== sentAt) return;
       const fresh = loaded.intro;
       if (!fresh || !loaded.check) {
         setFailure('找不到已儲存的自介：請重新產生。');
@@ -213,6 +232,11 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
         return;
       }
       setCheck(loaded.check);
+      // 文字相同也用回應更新中繼資料（例如別處儲存過而變成「經使用者編輯」）；有變就讓先前的確認失效
+      if (JSON.stringify(fresh) !== JSON.stringify(intro)) {
+        setIntro(fresh);
+        bump();
+      }
       if (loaded.check.problem) {
         setFailure(`重新檢查沒有通過，不能複製：${INTRO_PROBLEM_LABELS[loaded.check.problem]}。`);
         return;
@@ -224,7 +248,7 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
         setFailure('無法複製到剪貼簿：請手動選取文字複製。');
       }
     } finally {
-      if (!disposed.current) setBusy(null);
+      end(token);
     }
   }
 
