@@ -27,6 +27,10 @@ import {
 } from './provider-selection-repository.ts';
 import { createProfileRepository, type ProfileRepository } from './profile-repository.ts';
 import {
+  createProjectDocumentRepository,
+  type ProjectDocumentRepository,
+} from './project-document-repository.ts';
+import {
   createProjectEvidenceRepository,
   type ProjectEvidenceRepository,
 } from './project-evidence-repository.ts';
@@ -57,6 +61,7 @@ export interface Repositories {
   sourceDocuments: SourceDocumentRepository;
   claims: ClaimRepository;
   projectEvidence: ProjectEvidenceRepository;
+  projectDocuments: ProjectDocumentRepository;
   jobSnapshots: JobSnapshotRepository;
   resumeVersions: ResumeVersionRepository;
   messageDrafts: MessageDraftRepository;
@@ -81,6 +86,7 @@ export function createRepositories(db: DatabaseSync): Repositories {
     sourceDocuments: createSourceDocumentRepository(db),
     claims: createClaimRepository(db),
     projectEvidence: createProjectEvidenceRepository(db),
+    projectDocuments: createProjectDocumentRepository(db),
     jobSnapshots: createJobSnapshotRepository(db),
     resumeVersions: createResumeVersionRepository(db),
     messageDrafts: createMessageDraftRepository(db),
@@ -103,6 +109,7 @@ export type {
   JobSnapshotRepository,
   MessageDraftRepository,
   ProfileRepository,
+  ProjectDocumentRepository,
   ProjectEvidenceRepository,
   ProviderConnectionRepository,
   ProviderSelectionRepository,

@@ -7,6 +7,7 @@ import { escalateReviewStatus, type WrittenOutput } from '@rolecraft/domain';
 import {
   DOCUMENT_SUMMARY_MAX_CHARS,
   documentLabelOf,
+  projectForClaim,
   type AnalysisPlan,
   type UnitAnalysisResult,
 } from '@rolecraft/pipeline';
@@ -41,6 +42,23 @@ function applyUpdates(db: DatabaseSync, repos: Repositories, updates: readonly C
   return changed;
 }
 
+/**
+ * 重新分析自動歸入（D23、P1-T063）：這個單元新產生的事實項，所有來源文件都屬同一專案就加進該專案。
+ * 在呼叫端的交易內執行；已在任何專案裡的不動（新事實項本來就不會在）。
+ */
+function assignNewClaims(repos: Repositories, claims: readonly Claim[]): void {
+  if (claims.length === 0) return;
+  const projectOf = (docId: string) => repos.projectDocuments.projectOf(docId);
+  const assigned = new Set(repos.projectEvidence.list().flatMap((p) => p.claimIds));
+  for (const claim of claims) {
+    if (assigned.has(claim.id)) continue;
+    const projectId = projectForClaim(claim, projectOf);
+    const project = projectId === null ? null : repos.projectEvidence.get(projectId);
+    if (project)
+      repos.projectEvidence.save({ ...project, claimIds: [...project.claimIds, claim.id] });
+  }
+}
+
 export interface UnitCommit {
   readonly job: WorkJob;
   readonly written: WrittenOutput<UnitAnalysisResult>;
@@ -58,6 +76,8 @@ export function createUnitCommitter(db: DatabaseSync, repos: Repositories, plan:
     const docUnits = plan.units.filter((u) => u.sourceDocumentId === docId).map((u) => u.unitId);
     transaction(db, () => {
       for (const claim of result.claims) repos.claims.save(claim);
+      // D23（P1-T063）：新事實項依歸屬規則歸入其文件所屬專案；既有事實項不搬動
+      assignNewClaims(repos, result.claims);
       const updated = applyUpdates(db, repos, claimUpdates);
       repos.workJobs.save(job);
       repos.analysisState.addCounts(job.id, result.claims.length, updated);

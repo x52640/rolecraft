@@ -109,7 +109,7 @@ describe('<ClaimsPage />', () => {
     const feature = await screen.findByRole('article', { name: '支援 PDF 匯出' });
     const confirm = within(feature).getByRole('button', { name: '確認此項' });
     expect((confirm as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(within(feature).getByRole('combobox'), {
+    fireEvent.change(within(feature).getByRole('combobox', { name: '確認為' }), {
       target: { value: 'user_confirmed_done' },
     });
     fireEvent.click(confirm);
@@ -131,7 +131,7 @@ describe('<ClaimsPage />', () => {
     const helper = fakeHelper();
     renderPage(helper);
     const role = await screen.findByRole('article', { name: '負責後端' });
-    expect(within(role).queryByRole('combobox')).toBeNull();
+    expect(within(role).queryByRole('combobox', { name: '確認為' })).toBeNull();
     fireEvent.click(within(role).getByRole('button', { name: '確認此項' }));
     await screen.findByText('已確認。');
     expect(helper.writes()[0]?.payload).toEqual({
@@ -154,7 +154,7 @@ describe('<ClaimsPage />', () => {
     await screen.findByText(/要先選擇「確認為」/);
     expect(helper.writes()).toEqual([]);
 
-    fireEvent.change(within(card('支援 PDF 匯出')).getByRole('combobox'), {
+    fireEvent.change(within(card('支援 PDF 匯出')).getByRole('combobox', { name: '確認為' }), {
       target: { value: 'planned' },
     });
     fireEvent.click(screen.getByRole('button', { name: '批次確認所選（2）' }));
@@ -234,6 +234,7 @@ describe('<ClaimsPage />', () => {
           const claim = lists === 1 ? ROLE : { ...ROLE, reviewStatus: 'source_conflict' };
           return Promise.resolve({ ok: true, claims: [claim] });
         }
+        if (req.op === 'claims.list_unassigned') return Promise.resolve({ ok: true, claims: [] });
         return Promise.resolve({
           ok: false,
           error: { code: 'invalid_request', message: '事實項的複核狀態已改變，請重新讀取' },

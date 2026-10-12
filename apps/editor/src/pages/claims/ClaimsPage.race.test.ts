@@ -65,7 +65,7 @@ describe('<ClaimsPage /> 競態與失敗處理', () => {
       },
     };
     mount(transport);
-    const select = await screen.findByRole('combobox');
+    const select = await screen.findByRole('combobox', { name: '專案' });
     await waitFor(() => expect(p1Calls).toBe(1));
     fireEvent.change(select, { target: { value: 'p2' } });
     await screen.findByRole('article', { name: '乙的事實' });

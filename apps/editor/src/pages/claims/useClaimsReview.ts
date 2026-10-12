@@ -45,6 +45,9 @@ export function useClaimsReview() {
   const onAnalysisFinished = useCallback(() => setGeneration((g) => g + 1), []);
   useAnalysis(onAnalysisFinished);
 
+  // 使用者自己選過專案（P1-T063）：自動預設的選擇在重新整理時重算，使用者選的保留（專案還在的話）
+  const userPicked = useRef(false);
+
   useEffect(() => {
     let live = true;
     void Promise.all([
@@ -58,11 +61,17 @@ export function useClaimsReview() {
           : { state: 'error', message: errorOf(res) },
       );
       if (!res.ok) return;
-      // 還沒選：有未歸專案的事實項或沒有專案時顯示未歸專案，否則第一個專案（D23）
+      // 自動預設（D23）：有未歸專案的事實項、沒有專案，或未歸專案清單讀不到（停在未歸專案讓錯誤顯示出來，
+      // 不靜默選第一個專案）時顯示未歸專案，否則第一個專案
       const first = res.projects[0];
-      const hasUnassigned = unassigned.ok && unassigned.claims.length > 0;
+      const hasUnassigned = !unassigned.ok || unassigned.claims.length > 0;
       const fallback = hasUnassigned || !first ? UNASSIGNED : first.id;
-      setProjectId((current) => current ?? fallback);
+      setProjectId((current) => {
+        const exists = current === UNASSIGNED || res.projects.some((p) => p.id === current);
+        if (current !== null && userPicked.current && exists) return current;
+        userPicked.current = false;
+        return fallback;
+      });
     });
     return () => {
       live = false;
@@ -119,7 +128,13 @@ export function useClaimsReview() {
   return {
     projects,
     projectId,
-    setProjectId,
+    /** 使用者在選單上選的：之後重新整理時保留 */
+    setProjectId: (id: string) => {
+      userPicked.current = true;
+      setProjectId(id);
+    },
+    /** 專案改名、合併、刪除後：重新讀專案清單與目前清單（目前專案不在了就回到自動預設） */
+    projectsChanged: () => setGeneration((g) => g + 1),
     claims,
     busy,
     notice,
@@ -152,6 +167,22 @@ export function useClaimsReview() {
           ok: res.ok,
           notice: res.ok
             ? '已修改；原本的確認已失效，舊來源不再替新內容背書，請對照原文重新確認。'
+            : errorOf(res),
+        };
+      }),
+    /** 移到另一專案（projectId）或移回未歸專案（null）（D23）。 */
+    move: (claim: Claim, target: string | null) =>
+      run([claim.id], async () => {
+        const res = await bridge.send({
+          op: 'claims.move_claim',
+          payload: { claimId: claim.id, projectId: target },
+        });
+        return {
+          ok: res.ok,
+          notice: res.ok
+            ? target === null
+              ? '已移回未歸專案。'
+              : '已移到所選專案。'
             : errorOf(res),
         };
       }),

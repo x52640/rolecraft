@@ -1,6 +1,7 @@
 import type { Claim, ConfirmableCompletion } from '@rolecraft/contracts';
 import { useState } from 'react';
 
+import { ClaimMove, type MoveTarget } from './ClaimMove.tsx';
 import { ClaimSources } from './ClaimSources.tsx';
 import {
   COMPLETION_LABELS,
@@ -26,6 +27,9 @@ export interface ClaimCardProps {
   /** 回傳是否存檔成功；失敗時保留編輯框與草稿，讓使用者修正後再存。 */
   onUpdate: (text: string) => Promise<boolean>;
   onReject: () => void;
+  /** 可移到的專案（D23）；沒有就不顯示「移到專案…」 */
+  moveTargets?: readonly MoveTarget[];
+  onMove?: (projectId: string | null) => void;
 }
 
 function ConfirmationNote({ claim }: { claim: Claim }) {
@@ -153,6 +157,9 @@ export function ClaimCard(props: ClaimCardProps) {
               />
               加入批次確認
             </label>
+            {props.onMove && props.moveTargets ? (
+              <ClaimMove targets={props.moveTargets} busy={busy} onMove={props.onMove} />
+            ) : null}
           </div>
         )}
       </div>

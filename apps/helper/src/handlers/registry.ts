@@ -6,17 +6,24 @@ import type { BridgeOperation } from '@rolecraft/contracts';
 
 import { resolveServices } from '../services/data-dir.ts';
 import { analysisStart } from './analysis/start.ts';
+import { analysisProjectSuggestion } from './analysis/project-suggestion.ts';
 import { analysisStatus } from './analysis/status.ts';
+import { analysisSuggestProjects } from './analysis/suggest-projects.ts';
 import { applicationsCreate } from './applications/create.ts';
 import { applicationsDelete } from './applications/delete.ts';
 import { applicationsList } from './applications/list.ts';
 import { applicationsUpdate } from './applications/update.ts';
 import { claimsConfirm } from './claims/confirm.ts';
+import { claimsCreateProjects } from './claims/create-projects.ts';
+import { claimsDeleteProject } from './claims/delete-project.ts';
 import { claimsGet } from './claims/get.ts';
 import { claimsListProjects } from './claims/list-projects.ts';
 import { claimsList } from './claims/list.ts';
 import { claimsListUnassigned } from './claims/list-unassigned.ts';
+import { claimsMergeProjects } from './claims/merge-projects.ts';
+import { claimsMoveClaim } from './claims/move-claim.ts';
 import { claimsReject } from './claims/reject.ts';
+import { claimsRenameProject } from './claims/rename-project.ts';
 import { claimsUpdate } from './claims/update.ts';
 import { exportCreate } from './export/create.ts';
 import { exportGetVersion } from './export/get-version.ts';
@@ -96,6 +103,11 @@ const RAW_HANDLERS: HandlerTable = {
   'claims.update': claimsUpdate,
   'claims.reject': claimsReject,
   'claims.list_unassigned': claimsListUnassigned,
+  'claims.create_projects': claimsCreateProjects,
+  'claims.rename_project': claimsRenameProject,
+  'claims.merge_projects': claimsMergeProjects,
+  'claims.move_claim': claimsMoveClaim,
+  'claims.delete_project': claimsDeleteProject,
   'resume.generate': resumeGenerate,
   'resume.list': resumeList,
   'resume.get': resumeGet,
@@ -110,6 +122,8 @@ const RAW_HANDLERS: HandlerTable = {
   'messages.update_draft': messagesUpdateDraft,
   'analysis.start': analysisStart,
   'analysis.status': analysisStatus,
+  'analysis.suggest_projects': analysisSuggestProjects,
+  'analysis.project_suggestion': analysisProjectSuggestion,
 };
 
 function gated<Op extends BridgeOperation>(op: Op, handler: OpHandler<Op>): OpHandler<Op> {

@@ -75,9 +75,10 @@ describe('<ClaimsPage /> 未歸專案', () => {
     mount(transport);
     const role = await screen.findByRole('article', { name: '負責後端' });
     expect(screen.getByText(/還沒有任何專案/)).toBeTruthy();
-    expect(screen.getByRole<HTMLSelectElement>('combobox').selectedOptions[0]?.textContent).toBe(
-      '未歸專案',
-    );
+    expect(
+      screen.getByRole<HTMLSelectElement>('combobox', { name: '專案' }).selectedOptions[0]
+        ?.textContent,
+    ).toBe('未歸專案');
     fireEvent.click(within(role).getByRole('button', { name: '確認此項' }));
     await screen.findByText('已確認。');
     await waitFor(() =>
@@ -134,7 +135,7 @@ describe('<ClaimsPage /> 未歸專案', () => {
       },
     };
     mount(transport);
-    const select = await screen.findByRole('combobox');
+    const select = await screen.findByRole('combobox', { name: '專案' });
     await waitFor(() => expect(releaseUnassigned).not.toBeNull());
     fireEvent.change(select, { target: { value: 'p1' } });
     await screen.findByRole('article', { name: '甲的事實' });

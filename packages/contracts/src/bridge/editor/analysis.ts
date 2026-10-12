@@ -49,6 +49,45 @@ export const AnalysisStatusView = z
   .refine((v) => v.completedUnits <= v.totalUnits, { path: ['completedUnits'] });
 export type AnalysisStatusView = z.infer<typeof AnalysisStatusView>;
 
+/** 分組建議裡的一份文件：helper 配發的來源文件 ID＋在授權資料夾內的相對名稱（不含上層路徑）。 */
+export const SuggestedDocument = z.strictObject({ sourceDocumentId: Id, name: z.string() });
+export type SuggestedDocument = z.infer<typeof SuggestedDocument>;
+
+export const SuggestedGroup = z.strictObject({
+  name: z.string().min(1),
+  documents: z.array(SuggestedDocument).min(1),
+});
+export type SuggestedGroup = z.infer<typeof SuggestedGroup>;
+
+/** 分組建議失敗原因：R6 不通過、服務錯誤、輸出不合格（整份不採用）、額度用完、取消。 */
+export const ProjectSuggestionFailure = z.enum([
+  'run_check_failed',
+  'provider_error',
+  'invalid_output',
+  'quota_exhausted',
+  'cancelled',
+]);
+export type ProjectSuggestionFailure = z.infer<typeof ProjectSuggestionFailure>;
+
+/** 最近一次分組建議（D23、P1-T063）。建議本身不建立任何專案；只存在 helper 記憶體。 */
+export const ProjectSuggestionView = z
+  .strictObject({
+    suggestionId: Id,
+    state: z.enum(['running', 'ready', 'failed']),
+    /** 只有 failed 有值 */
+    failure: ProjectSuggestionFailure.nullable(),
+    /** 只有 ready 可能非空 */
+    groups: z.array(SuggestedGroup),
+    /** 沒被分到任何組的文件（ready 時）；執行中為送出的全部文件 */
+    ungrouped: z.array(SuggestedDocument),
+  })
+  .refine((v) => (v.state === 'failed') === (v.failure !== null), {
+    path: ['failure'],
+    message: '只有失敗有原因',
+  })
+  .refine((v) => v.state === 'ready' || v.groups.length === 0, { path: ['groups'] });
+export type ProjectSuggestionView = z.infer<typeof ProjectSuggestionView>;
+
 export const ANALYSIS_SCHEMAS = {
   /**
    * 對目前授權集合做增量分析；已有執行中的回同一個工作 id；已暫停就續跑（續跑前重做 R6，D21）。
@@ -63,6 +102,20 @@ export const ANALYSIS_SCHEMAS = {
     request: bridgeOp('analysis.status', EmptyPayload),
     response: withFailure(
       z.strictObject({ ok: z.literal(true), analysis: AnalysisStatusView.nullable() }),
+    ),
+  },
+  /** 使用者按下才觸發：在背景請 AI 建議專案分組，立即回最近一次建議（執行中）。不建立專案。 */
+  'analysis.suggest_projects': {
+    request: bridgeOp('analysis.suggest_projects', EmptyPayload),
+    response: withFailure(
+      z.strictObject({ ok: z.literal(true), suggestion: ProjectSuggestionView }),
+    ),
+  },
+  /** 最近一次分組建議；沒有建議過（或 helper 重開後）回 null。 */
+  'analysis.project_suggestion': {
+    request: bridgeOp('analysis.project_suggestion', EmptyPayload),
+    response: withFailure(
+      z.strictObject({ ok: z.literal(true), suggestion: ProjectSuggestionView.nullable() }),
     ),
   },
 } as const;

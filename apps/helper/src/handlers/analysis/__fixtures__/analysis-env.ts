@@ -14,10 +14,16 @@ import {
   type FakeStep,
 } from '@rolecraft/providers';
 import type { FolderAccess, RawEntry } from '@rolecraft/sources';
-import { createRepositories, openDatabase, type Repositories } from '@rolecraft/storage';
+import {
+  createLocalFileStore,
+  createRepositories,
+  openDatabase,
+  type Repositories,
+} from '@rolecraft/storage';
 
 import { recordingLogger } from '../../../__fixtures__/requests.ts';
 import { dispatch } from '../../../bridge/dispatch.ts';
+import { createClaimsService } from '../../claims/storage-service.ts';
 import { pauseInterruptedJobs } from '../../resume/assemble.ts';
 import { createSourcesService, type LocalSources } from '../../sources/local-sources.ts';
 import { createSourcesStore } from '../../sources/persistence.ts';
@@ -107,6 +113,8 @@ export interface HelperRun {
   readonly fake: FakeEngine;
   /** 等目前的背景分析結束 */
   settled(): Promise<string>;
+  /** 等目前的背景分組建議結束（P1-T063） */
+  suggestionSettled(): Promise<string>;
   call(op: BridgeOperation, payload?: unknown): Promise<Record<string, unknown>>;
 }
 
@@ -115,6 +123,25 @@ export interface TestDataDir {
   /** 開一個 helper（重開時先把執行中的工作改為已暫停，同 main.ts） */
   open(fake: FakeEngine, override?: (repos: Repositories) => Repositories): HelperRun;
   cleanup(): void;
+}
+
+/** 背景工作結束通知的佇列：先結束、後等待也拿得到。 */
+function settledQueue() {
+  const done: string[] = [];
+  const waiters: ((id: string) => void)[] = [];
+  return {
+    notify: (id: string) => {
+      const waiter = waiters.shift();
+      if (waiter) waiter(id);
+      else done.push(id);
+    },
+    wait: () =>
+      new Promise<string>((resolve) => {
+        const id = done.shift();
+        if (id === undefined) waiters.push(resolve);
+        else resolve(id);
+      }),
+  };
 }
 
 export function testDataDir(files: Record<string, string>): TestDataDir {
@@ -137,32 +164,30 @@ export function testDataDir(files: Record<string, string>): TestDataDir {
         store: createSourcesStore(db),
       });
       // 背景工作結束的通知排隊：先結束、後等待也拿得到
-      const done: string[] = [];
-      const waiters: ((id: string) => void)[] = [];
+      const jobs = settledQueue();
+      const suggestions = settledQueue();
       const analysis = createAnalysis({
         db,
         repos: override ? override(repos) : repos,
         registry: sources.registry,
         engine: fake.engine,
-        onSettled: (id) => {
-          const waiter = waiters.shift();
-          if (waiter) waiter(id);
-          else done.push(id);
-        },
+        onSettled: jobs.notify,
+        onSuggestionSettled: suggestions.notify,
+      });
+      const claims = createClaimsService({
+        db,
+        fileStore: createLocalFileStore(path.join(dir, 'files')),
       });
       return {
         db,
         repos,
         sources,
         fake,
-        settled: () =>
-          new Promise((resolve) => {
-            const id = done.shift();
-            if (id === undefined) waiters.push(resolve);
-            else resolve(id);
-          }),
+        settled: jobs.wait,
+        suggestionSettled: suggestions.wait,
         call: async (op, payload = {}) => {
-          const result = await dispatch({ op, payload }, { sources, analysis }, recordingLogger());
+          const services = { sources, analysis, claims };
+          const result = await dispatch({ op, payload }, services, recordingLogger());
           return result.response as Record<string, unknown>;
         },
       };

@@ -42,6 +42,8 @@ const CORE_TABLES = [
   'analysis_jobs',
   'analyzed_documents',
   'document_summaries',
+  // 0007（P1-T063）
+  'project_documents',
 ];
 
 /** 正式 migration 的全部版本與下一個可用版本（新增 migration 時測試不必跟著改）。 */

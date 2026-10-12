@@ -7,6 +7,7 @@ const MESSAGES: Record<AnalysisFailureReason, string> = {
   run_check_failed: '訂閱路線確認沒有通過，未續跑；請到設定頁重新檢查服務',
   folder_unreadable: '有資料夾無法讀取（可能已被移動或刪除），請移除後重新加入再分析',
   over_budget: '有文件超過模型的輸入上限，未送出',
+  no_documents: '沒有可分組的文件（需要已授權、已分析過、尚未屬於任何專案的文件），未送出',
 };
 
 /** 分析操作失敗：一律 invalid_request，訊息是固定文字。 */

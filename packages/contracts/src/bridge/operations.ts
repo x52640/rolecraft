@@ -53,6 +53,12 @@ export const BridgeOperation = z.enum([
   'claims.update',
   'claims.reject',
   'claims.list_unassigned', // 未歸專案的事實項（D23、P1-T061）
+  // 專案分組（D23、P1-T063）：使用者確認建立與整理；AI 建議在 analysis.suggest_projects
+  'claims.create_projects',
+  'claims.rename_project',
+  'claims.merge_projects',
+  'claims.move_claim',
+  'claims.delete_project',
   // resume：逐段對照與匯出前檢查（P1-T025）
   'resume.generate',
   'resume.list',
@@ -70,6 +76,8 @@ export const BridgeOperation = z.enum([
   // analysis：分析授權資料夾產生事實項、查詢進度與手動續跑（P1-T060）；續跑只由使用者觸發（D21）
   'analysis.start',
   'analysis.status',
+  'analysis.suggest_projects', // AI 建議專案分組，只由使用者觸發、不建立專案（D23、P1-T063）
+  'analysis.project_suggestion',
 ]);
 export type BridgeOperation = z.infer<typeof BridgeOperation>;
 

@@ -19,3 +19,4 @@ spec 只定語意，以下欄位細節由協調者暫定。改動要經對應 Ta
 | 9 | ResumeVersion | 段落 `origin`（generated／user_written）；修改理由與逐段接受狀態未建；原始履歷不是 ResumeVersion（由 Profile 表示） | P1-T024、P1-T025 |
 | 10 | JobSnapshot | 手動貼上 URL 可為 null；平台無「其他」 | P1-T019 |
 | 11 | ExportVersion | **定案（D19 部分）**：只存 `pdfHash`，PDF 由 storage 檔案區保存；新增選填 `sourceDocumentIds`（匯出當下引用事實項的依據來源文件，storage 新建時必填，供刪除來源文件時找出含其片段副本的版本）；不可變性由 storage 觸發器保證。D20（站內履歷外部版本）仍未建模 | P1-T007（D19 已定案）、P1-T027 |
+| 12 | ProjectEvidence 包含的文件 | **定案（D23）**：schema 不變（`summary` 維持空字串，不由 AI 填）；專案包含哪些文件存 storage `project_documents`（來源文件 ID 為主鍵＝每份文件至多屬一個專案，刪專案連帶移除），不放進 contracts。事實項歸屬規則見 evidence-model「專案分組與事實項歸屬」 | P1-T063 |

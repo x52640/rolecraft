@@ -1,6 +1,8 @@
 import type { Claim } from '@rolecraft/contracts';
 
 import { ClaimCard } from './ClaimCard.tsx';
+import type { MoveTarget } from './ClaimMove.tsx';
+import { ProjectTools } from './ProjectTools.tsx';
 import { UNASSIGNED, useClaimsReview } from './useClaimsReview.ts';
 import './claims.css';
 
@@ -12,6 +14,12 @@ function ClaimList({ review, claims }: { review: Review; claims: readonly Claim[
       <p>{review.projectId === UNASSIGNED ? '沒有未歸專案的事實項。' : '這個專案還沒有事實項。'}</p>
     );
   }
+  // 可移到的地方：其他專案，以及（目前不在未歸專案時）未歸專案（D23）
+  const projects = review.projects.state === 'ready' ? review.projects.value : [];
+  const moveTargets: MoveTarget[] = [
+    ...(review.projectId === UNASSIGNED ? [] : [{ id: null, name: '未歸專案' }]),
+    ...projects.filter((p) => p.id !== review.projectId).map((p) => ({ id: p.id, name: p.name })),
+  ];
   const selectedCount = claims.filter(
     (c) => review.selected.has(c.id) && c.reviewStatus === 'normal',
   ).length;
@@ -41,6 +49,8 @@ function ClaimList({ review, claims }: { review: Review; claims: readonly Claim[
           onConfirm={() => void review.confirm(claim)}
           onUpdate={(text) => review.update(claim, text)}
           onReject={() => void review.reject(claim)}
+          moveTargets={moveTargets}
+          onMove={(target) => void review.move(claim, target)}
         />
       ))}
     </>
@@ -51,6 +61,8 @@ function ClaimList({ review, claims }: { review: Review; claims: readonly Claim[
 export function ClaimsPage() {
   const review = useClaimsReview();
   const { projects, claims } = review;
+  const current =
+    projects.state === 'ready' ? projects.value.find((p) => p.id === review.projectId) : undefined;
 
   return (
     <section aria-labelledby="page-title" className="claims-page">
@@ -63,7 +75,7 @@ export function ClaimsPage() {
       {projects.state === 'error' ? <p role="alert">無法讀取專案：{projects.message}</p> : null}
       {projects.state === 'ready' && projects.value.length === 0 ? (
         <p>
-          還沒有任何專案。分析出的事實項會先列在「未歸專案」，一樣可以逐項確認；還沒分析的話，先到「匯入」加入專案資料夾並完成分析。
+          還沒有任何專案。分析出的事實項會先列在「未歸專案」，一樣可以逐項確認；要分專案，到「專案」頁按「建議專案分組」，確認後才會建立。
         </p>
       ) : null}
       {projects.state === 'ready' ? (
@@ -82,6 +94,15 @@ export function ClaimsPage() {
             ))}
           </select>
         </label>
+      ) : null}
+
+      {projects.state === 'ready' && current ? (
+        <ProjectTools
+          key={current.id}
+          project={current}
+          others={projects.value.filter((p) => p.id !== current.id)}
+          onChanged={review.projectsChanged}
+        />
       ) : null}
 
       {review.notice === null ? null : (

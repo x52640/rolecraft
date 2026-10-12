@@ -13,6 +13,7 @@ import {
   type FileStore,
 } from '@rolecraft/storage';
 
+import { createProjectOps } from './projects-service.ts';
 import type { ClaimsService, ClaimsWriteResult } from './service.ts';
 
 /** helper 的本機儲存：SQLite 連線＋檔案儲存區（刪除素材時清 PDF 用）。 */
@@ -82,6 +83,9 @@ export function createClaimsService(options: ClaimsServiceOptions): ClaimsServic
   }
 
   return {
+    // 專案建立與整理（P1-T063）
+    ...createProjectOps(db),
+
     listProjects: () => Promise.resolve(projects.list()),
 
     listClaims(projectId) {

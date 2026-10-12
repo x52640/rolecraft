@@ -80,6 +80,20 @@ export const editorRequests = {
   'claims.update': { op: 'claims.update', payload: { claimId: ID, text: '完成登入功能' } },
   'claims.reject': { op: 'claims.reject', payload: { claimId: ID } },
   'claims.list_unassigned': { op: 'claims.list_unassigned', payload: {} },
+  'claims.create_projects': {
+    op: 'claims.create_projects',
+    payload: { projects: [{ name: '專案甲', sourceDocumentIds: [ID] }] },
+  },
+  'claims.rename_project': {
+    op: 'claims.rename_project',
+    payload: { projectId: ID, name: '專案乙' },
+  },
+  'claims.merge_projects': {
+    op: 'claims.merge_projects',
+    payload: { projectId: ID, intoProjectId: ID2 },
+  },
+  'claims.move_claim': { op: 'claims.move_claim', payload: { claimId: ID, projectId: null } },
+  'claims.delete_project': { op: 'claims.delete_project', payload: { projectId: ID } },
   'resume.generate': { op: 'resume.generate', payload: { jobSnapshotId: ID } },
   'resume.list': { op: 'resume.list', payload: { jobSnapshotId: ID } },
   'resume.get': { op: 'resume.get', payload: { resumeVersionId: ID } },
@@ -117,4 +131,6 @@ export const editorRequests = {
   },
   'analysis.start': { op: 'analysis.start', payload: {} },
   'analysis.status': { op: 'analysis.status', payload: {} },
+  'analysis.suggest_projects': { op: 'analysis.suggest_projects', payload: {} },
+  'analysis.project_suggestion': { op: 'analysis.project_suggestion', payload: {} },
 } as const;

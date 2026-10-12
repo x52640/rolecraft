@@ -86,16 +86,25 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：
-- 已通過驗證：
-- 下一步：
-- Blocker：
+- 最後完成：規則（evidence-model、bridge.md、ADR-0006 #12）、contracts 相加、storage 0007、pipeline 分組建議與歸屬規則、helper 七個操作與 commitUnit 自動歸入、編輯器專案頁分組與事實項頁整理
+- 已通過驗證：worktree 內 `npm run verify` 綠（Vitest 3177 通過、13 略過）
+- 下一步：協調者收官（高風險：對抗驗證）
+- Blocker：無
 
 ## 完成結果
 
+- 規則先行：evidence-model 新增「專案分組與事實項歸屬」（D23）；bridge.md 新增 `claims.create_projects`／`rename_project`／`merge_projects`／`move_claim`／`delete_project` 與 `analysis.suggest_projects`／`project_suggestion`，並改寫分析段「事實項不歸專案」的舊句；ADR-0006 加 #12（文件歸屬存 storage、ProjectEvidence schema 不變）。
+- contracts（只相加）：`claims.ts` 五個操作與 `ProjectName`（≤100 字）、`ProjectGroupInput`；`analysis.ts` 建議兩個操作與 `ProjectSuggestionView`；`operations.ts` 列舉；contracts 與 helper 兩份請求 fixture。
+- storage：`0007_project_documents.sql`（來源文件 ID 為主鍵＝每份文件至多一個專案，刪專案 CASCADE）＋`projectDocuments` repository。
+- pipeline `projects/`：`prepareGrouping`（文件以本機編號 D1… 標示、名稱與摘要都在隨機界線資料區塊、名稱只取相對路徑並去開頭斜線與控制字元、超過預算或沒有文件不送出）、`runGrouping`（經呼叫端 execute＝訂閱檢查包裝，R6 紀錄交出；blocked→run_check_failed，額度、取消、其他錯誤各自對應）、`parseGroupingOutput`（未知編號、重複、多餘欄位、空組、空白或過長或含控制字元的組名、`__proto__` 都整份不採用）、`projectForClaim`（歸屬規則）。提示在 `prompts/project-prompt.ts`。
+- helper：`handlers/analysis/suggest-service.ts`（輸入＝授權集合與資料區都已授權、未屬專案、有摘要的文件；未選模型、無文件、超預算回 invalid_request 不呼叫模型；背景執行、同時按兩次共用一次；結果只在記憶體）；`handlers/claims/projects-service.ts`（建立：先驗證文件已授權、未屬專案、不重複，任一不符整批不建，同一交易建立專案、記文件歸屬、只把「目前未歸專案且依規則歸到這次新建專案」的事實項歸入；改名、合併（先搬文件再刪來源）、移動、刪除各一交易）；`commit.ts` 在 P1-T060 的同一交易把單元新事實項依規則歸入；分派表加七列。`main.ts`、`handlers/services.ts` 不需改（沿用既有 claims、analysis 服務組裝）。
+- 編輯器：專案頁新增「專案分組」區（`ProjectGrouping.tsx`、`useProjectSuggestion.ts`、`grouping-model.ts`）：按下才建議、執行中每 2 秒查、完成後可改名、取消某組、逐份文件移到別組或未分組，按「確認建立」才送 `claims.create_projects`。事實項頁：每項「移到專案…」、選中專案時的改名／併入／刪除（`ProjectTools.tsx`、`ClaimMove.tsx`）；自動預設與使用者選擇分開記，自動預設在分析結束或專案變動時重算，`claims.list_unassigned` 讀取失敗時預設停在未歸專案顯示錯誤。
+- 測試（一律假 provider）：helper `suggest.test.ts`（13：合法建議不建專案、只送摘要與相對名稱、不合法 6 種、注入文字只在資料區塊、未選模型不呼叫、撤銷授權的文件不進輸入、已屬專案的文件不進輸入、R6 不通過）、`project-assign.test.ts`（7：建立與歸屬、跨專案留未歸、不合法整批不建、已歸入不搬、整理後 list／list_unassigned、重新分析自動歸入且手動搬過的不動、文件不屬專案時留未歸、commitUnit 失敗整筆回滾）；pipeline `projects.test.ts`（20）；storage `project-documents.test.ts`（2）；編輯器 `ClaimsPage.projects.test.ts`（4）、`ProjectGrouping.test.tsx`（3）。既有編輯器測試因同頁多了「移到專案」選單，改以名稱指定下拉選單；一則測試的假 helper 補上 `claims.list_unassigned` 成功回應（新規則下讀取失敗會停在未歸專案）。
+- 保守選擇／待擁有者裁定：(1) 建議只存在 helper 記憶體，helper 重開後要再按一次；(2) 建議不自動重試；(3) 已屬專案的文件不再送進建議，新文件要歸入既有專案只能先建成新專案再合併（沒有「把文件加入既有專案」的操作）；(4) 事實項的來源只要有一份不屬任何專案就留未歸；(5) 確認建立以資料區的授權狀態判定（撤銷當下已寫入資料區，P1-T060）；(6) 手動移入專案不檢查事實項的來源文件是否屬該專案（使用者的選擇）；(7) 編輯器在頁面重新載入後仍會把 helper 記憶體裡上一次的建議顯示成草稿，再確認會因文件已屬專案被整批拒絕。
+- 手動驗證需擁有者（自己的資料夾跑一次，併 P1-T032），本次沒有做。

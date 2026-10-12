@@ -25,6 +25,7 @@ import { launchAnalysis } from './launch.ts';
 import { decodePlan } from './plan-codec.ts';
 import type { AnalysisFailureReason, AnalysisService, StartResult } from './service.ts';
 import { latestAnalysisStatus } from './status-view.ts';
+import { createProjectSuggester } from './suggest-service.ts';
 import { syncSources } from './sync.ts';
 
 export interface AnalysisDeps {
@@ -36,6 +37,8 @@ export interface AnalysisDeps {
   readonly now?: () => string;
   /** 測試用：背景工作結束時通知 */
   readonly onSettled?: (workJobId: string) => void;
+  /** 測試用：背景分組建議結束時通知（P1-T063） */
+  readonly onSuggestionSettled?: (suggestionId: string) => void;
 }
 
 const fail = (reason: AnalysisFailureReason): StartResult => ({ ok: false, reason });
@@ -185,7 +188,16 @@ export function createAnalysis(deps: AnalysisDeps): Required<AnalysisService> {
     return { ok: true, workJobId: plan.jobId };
   }
 
+  // 專案分組建議（P1-T063）：只讀摘要與相對名稱，不讀檔
+  const suggester = createProjectSuggester({
+    repos,
+    registry,
+    engine,
+    ...(deps.onSuggestionSettled && { onSuggestionSettled: deps.onSuggestionSettled }),
+  });
+
   return {
+    ...suggester,
     start() {
       // 同時按兩次：共用同一次啟動，不會建兩個工作
       starting ??= begin().finally(() => {

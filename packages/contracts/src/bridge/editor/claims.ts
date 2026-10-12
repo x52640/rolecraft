@@ -20,6 +20,23 @@ export type ConfirmableCompletion = z.infer<typeof ConfirmableCompletion>;
 
 const ClaimRef = z.strictObject({ claimId: OpaqueId });
 
+/** 專案名稱（使用者確認或修改的）：至少一個非空白字元、最多 100 字。 */
+export const PROJECT_NAME_MAX_CHARS = 100;
+export const ProjectName = NonEmptyText.max(PROJECT_NAME_MAX_CHARS);
+
+/** 一次確認建立的專案數與每專案文件數上限。 */
+export const MAX_PROJECTS_PER_REQUEST = 100;
+export const MAX_DOCUMENTS_PER_PROJECT = 1000;
+
+/** 使用者確認的一組專案：名稱＋文件（建議回過的來源文件不透明 ID）。 */
+export const ProjectGroupInput = z.strictObject({
+  name: ProjectName,
+  sourceDocumentIds: z.array(OpaqueId).min(1).max(MAX_DOCUMENTS_PER_PROJECT),
+});
+export type ProjectGroupInput = z.infer<typeof ProjectGroupInput>;
+
+const ProjectRef = z.strictObject({ projectId: OpaqueId });
+
 export const CLAIMS_SCHEMAS = {
   /** 列出專案（摘要不帶確認狀態，R1）。 */
   'claims.list_projects': {
@@ -68,6 +85,47 @@ export const CLAIMS_SCHEMAS = {
   /** 否決（刪除）事實項：之後不得用於生成。 */
   'claims.reject': {
     request: bridgeOp('claims.reject', ClaimRef),
+    response: withFailure(Ack),
+  },
+  /**
+   * 使用者確認分組後建立專案（D23）：文件須目前已授權、尚未屬於任何專案、不重複，任一不符整批不建立。
+   * 同一交易依歸屬規則把未歸專案的事實項歸入新專案（evidence-model「專案分組與事實項歸屬」）。
+   */
+  'claims.create_projects': {
+    request: bridgeOp(
+      'claims.create_projects',
+      z.strictObject({
+        projects: z.array(ProjectGroupInput).min(1).max(MAX_PROJECTS_PER_REQUEST),
+      }),
+    ),
+    response: withFailure(Ack),
+  },
+  'claims.rename_project': {
+    request: bridgeOp(
+      'claims.rename_project',
+      z.strictObject({ projectId: OpaqueId, name: ProjectName }),
+    ),
+    response: withFailure(Ack),
+  },
+  /** 把 projectId 併入 intoProjectId（事實項與文件移過去，來源專案刪除）。 */
+  'claims.merge_projects': {
+    request: bridgeOp(
+      'claims.merge_projects',
+      z.strictObject({ projectId: OpaqueId, intoProjectId: OpaqueId }),
+    ),
+    response: withFailure(Ack),
+  },
+  /** 把事實項移到另一專案；projectId 為 null 表示移回未歸專案。 */
+  'claims.move_claim': {
+    request: bridgeOp(
+      'claims.move_claim',
+      z.strictObject({ claimId: OpaqueId, projectId: OpaqueId.nullable() }),
+    ),
+    response: withFailure(Ack),
+  },
+  /** 刪除專案：事實項回到未歸專案，事實項本身不刪。 */
+  'claims.delete_project': {
+    request: bridgeOp('claims.delete_project', ProjectRef),
     response: withFailure(Ack),
   },
 } as const;
