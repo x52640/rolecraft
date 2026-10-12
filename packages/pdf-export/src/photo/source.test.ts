@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { PhotoProcessError } from './errors.ts';
-import { concat, makeJpeg, segment, smuggleFakeSof } from './jpeg.test-helpers.ts';
+import { concat, legacyJpegSize, makeJpeg, segment, smuggleFakeSof } from './jpeg.test-helpers.ts';
 import { createPhotoProcessor } from './process.ts';
 import type { PhotoRenderer } from './render.ts';
 import { inspectPhotoSource, PHOTO_SOURCE_MAX_PIXELS } from './source.ts';
@@ -24,17 +24,23 @@ describe('inspectPhotoSource：不帶長度的標記', () => {
   const huge = makeJpeg({ width: 20_000, height: 20_000 });
 
   it('RST 開頭、跳到的位置藏 16×16 假 SOF：讀到真的 20000×20000 並拒絕', () => {
-    expect(codeOf(smuggleFakeSof(huge, { width: 16, height: 16 }))).toBe('too_large');
+    const smuggled = smuggleFakeSof(huge, { width: 16, height: 16 });
+    // fixture 有效：修正前的邏輯真的會讀到假尺寸
+    expect(legacyJpegSize(smuggled)).toEqual({ width: 16, height: 16 });
+    expect(codeOf(smuggled)).toBe('too_large');
   });
 
   it('各個 RST（D0–D7）與 TEM（01）都只前進 2 位元組', () => {
     for (const marker of [0xd0, 0xd3, 0xd7, 0x01]) {
-      expect(codeOf(smuggleFakeSof(huge, { width: 16, height: 16 }, marker))).toBe('too_large');
+      const smuggled = smuggleFakeSof(huge, { width: 16, height: 16 }, marker);
+      expect(legacyJpegSize(smuggled)).toEqual({ width: 16, height: 16 });
+      expect(codeOf(smuggled)).toBe('too_large');
       const small = smuggleFakeSof(
         makeJpeg({ width: 300, height: 200 }),
         { width: 1, height: 1 },
         marker,
       );
+      expect(legacyJpegSize(small)).toEqual({ width: 1, height: 1 });
       expect(inspectPhotoSource(small)).toEqual({ format: 'jpeg', width: 300, height: 200 });
     }
   });

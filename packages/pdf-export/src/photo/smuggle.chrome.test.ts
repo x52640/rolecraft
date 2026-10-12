@@ -7,7 +7,7 @@ import puppeteer from 'puppeteer-core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { findChrome } from '../render/chrome.ts';
-import { makePng, smuggleFakeSof } from './jpeg.test-helpers.ts';
+import { legacyJpegSize, makePng, smuggleFakeSof } from './jpeg.test-helpers.ts';
 import { createPhotoProcessor } from './process.ts';
 import { createChromePhotoRenderer, type RenderRequest } from './render.ts';
 import { PHOTO_SOURCE_MAX_PIXELS } from './source.ts';
@@ -53,6 +53,9 @@ describe.runIf(process.env.RUN_CHROME === '1')('假 SOF 夾帶（RUN_CHROME=1）
     if (!chrome) throw new Error('找不到 Chrome');
     // 9000×9000＝8,100 萬像素，剛超過上限 8,000 萬
     huge = smuggleFakeSof(await realJpeg(chrome, 9000, 9000), { width: 16, height: 16 });
+    // fixture 有效：修正前的檔頭檢查讀到假的 16×16（真 JPEG 再大，假 SOF 都在舊邏輯的落點）
+    expect(huge.length).toBeGreaterThan(70_000);
+    expect(legacyJpegSize(huge)).toEqual({ width: 16, height: 16 });
   }, TIMEOUT);
   const signal = new AbortController().signal;
 
@@ -101,6 +104,7 @@ describe.runIf(process.env.RUN_CHROME === '1')('假 SOF 夾帶（RUN_CHROME=1）
     '上限內的夾帶檔：處理結果是真實尺寸（不是假 SOF 的 16×16）',
     async () => {
       const real = smuggleFakeSof(await realJpeg(chrome, 900, 1200), { width: 16, height: 16 });
+      expect(legacyJpegSize(real)).toEqual({ width: 16, height: 16 });
       const out = await createPhotoProcessor().process(real, { timeoutMs: 45_000 });
       expect(out).toMatchObject({ width: 900, height: 1200 });
     },

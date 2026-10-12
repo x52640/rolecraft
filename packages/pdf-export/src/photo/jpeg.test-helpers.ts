@@ -90,17 +90,23 @@ export function makeJpeg(options: JpegOptions): Uint8Array {
 }
 
 /**
- * 對抗審查重現（P1-T083）：SOI 後插一個不帶長度的標記（RST0 `FFD0` 或 TEM `FF01`），
- * 誤把它當帶長度段落的解析器會讀下一段的標記當長度往後跳；在跳到的位置（真 EOI 之後）放假的 SOF。
- * 解碼器（libjpeg／Chrome）只把它當 2 位元組標記，看到的是真的 SOF。
+ * APP1 當載體：舊解析器把 `FF E1` 讀成長度 0xFFE1，跳到 2＋2＋0xFFE1＝65509。
+ * 段落長度上限 65535，落點＋假 SOF 要放得進同一段的 payload（APP15 的落點太遠放不下）。
+ */
+const CARRIER_APP = 0xe1;
+const LEGACY_LANDING = 4 + ((0xff << 8) | CARRIER_APP);
+
+/**
+ * 對抗審查重現（P1-T083，codex 複審改）：SOI 後插一個不帶長度的標記（RST0 `FFD0` 或 TEM `FF01`），
+ * 接一個 APP1 段當載體：舊解析器把 `FF E1` 當長度往後跳到 65509，正好落在 APP1 的 payload 裡的假 SOF；
+ * 解碼器（libjpeg／Chrome）只把 RST／TEM 當 2 位元組標記、整段跳過 APP1，看到的是後面真的 SOF。
+ * 不論真 JPEG 多大，假 SOF 都在舊解析器的實際落點。
  */
 export function smuggleFakeSof(
   real: Uint8Array,
   fake: { width: number; height: number },
   standalone = 0xd0,
 ): Uint8Array {
-  const head = concat(Uint8Array.from([0xff, 0xd8, 0xff, standalone]), real.subarray(2));
-  const landing = 4 + (((head[4] ?? 0) << 8) | (head[5] ?? 0));
   const { width, height } = fake;
   const sof = segment(0xc0, [
     8,
@@ -113,12 +119,39 @@ export function smuggleFakeSof(
     0x11,
     0,
   ]);
+  // 載體段從位移 4 開始：FF E1＋2 位元組長度＋payload；payload 第 0 位元組在位移 8
+  const payload = new Uint8Array(LEGACY_LANDING - 8 + sof.length + 4);
+  payload.set(sof, LEGACY_LANDING - 8);
   return concat(
-    head,
-    new Uint8Array(Math.max(0, landing - head.length)),
-    sof,
-    Uint8Array.from([0xff, 0xd9]),
+    Uint8Array.from([0xff, 0xd8, 0xff, standalone]),
+    segment(CARRIER_APP, payload),
+    real.subarray(2),
   );
+}
+
+/**
+ * 修正前的 `jpegSize`（P1-T083 第一版 source.ts 原樣保留，只供測試）：用來證明夾帶 fixture 真的能騙過舊邏輯。
+ */
+export function legacyJpegSize(bytes: Uint8Array): { width: number; height: number } | null {
+  const u16 = (b: Uint8Array, i: number): number => ((b[i] ?? 0) << 8) | (b[i + 1] ?? 0);
+  let i = 2;
+  while (i + 3 < bytes.length) {
+    if (bytes[i] !== 0xff) break;
+    const marker = bytes[i + 1] ?? 0;
+    if (marker === 0xff) {
+      i += 1;
+      continue;
+    }
+    const length = u16(bytes, i + 2);
+    if (length < 2) break;
+    const isSof =
+      marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    if (isSof && i + 8 < bytes.length)
+      return { height: u16(bytes, i + 5), width: u16(bytes, i + 7) };
+    if (marker === 0xda || marker === 0xd9) break;
+    i += 2 + length;
+  }
+  return null;
 }
 
 /** 位元組裡是否出現某段文字（latin1 比對）。 */
