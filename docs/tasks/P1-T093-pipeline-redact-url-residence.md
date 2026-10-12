@@ -1,7 +1,7 @@
 ---
 id: P1-T093
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T080"]
 specs: ["resume-import.md"]
 track: pipeline
@@ -89,7 +89,7 @@ npm run verify
 
 - 最後完成：codex 審查 3 項已修（數字路名、之／- 門牌、.NET 例外只限獨立詞）；先前：遮蔽器加網址（http(s)、www.、無協定網域＋路徑）與縣市＋鄉鎮市區居住地；resume-import D31 段寫入協調者裁定；新測試兩檔
 - 已通過驗證：`npm run verify` 綠；codex 3 項修正後防退步比對 1864 案例減少遮蔽 0
-- 下一步：協調者對抗驗證（E3）＋codex review、手動以 104 頁實跑一次
+- 下一步：已收官（2026-10-13 協調者：codex 3 項已修、修正 diff 無發現；防退步比對 1864 案例減少遮蔽 0；對抗驗證未跑（協調者判斷：只增不減的遮蔽由防退步比對覆蓋）；main `npm run verify` 綠）
 - Blocker：無
 
 ## 完成結果

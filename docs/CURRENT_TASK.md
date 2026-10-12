@@ -7,7 +7,6 @@
 
 - P1-T017 驗證：104 職缺頁條款與 DOM 樣本（`docs/tasks/P1-T017-spike-104-job.md`）
 - P1-T090 contracts＋helper：profile.update、Profile 版本號與各欄出處（D30）（`docs/tasks/P1-T090-profile-update-contract-helper.md`）
-- P1-T093 pipeline：送模型前遮蔽網址與區級居住地（D31）（`docs/tasks/P1-T093-pipeline-redact-url-residence.md`）
 
 ## ready
 
