@@ -7,6 +7,7 @@ import {
   INJECTION,
   UNUSABLE,
   budget,
+  claim,
   idSource,
   profile,
   snapshot,
@@ -162,6 +163,39 @@ describe('公司名稱、職稱裡的數字（P1-T071）', () => {
     for (const text of ['應徵3M，傳輸 3MB，載入時間縮短 40%。', '應徵X3M，載入時間縮短 40%。']) {
       expect(checkIntro(text, cite, ctx(names))).toBe('number_not_grounded');
     }
+  });
+
+  it('名稱是較大數字或代號的一部分時不算名稱：104.40% 等不放行（對抗審查）', () => {
+    expect(checkIntro('載入時間縮短 40%，轉換率提升 104.40%。', cite, ctx(['104']))).toBe(
+      'number_not_grounded',
+    );
+    const loose = [
+      claim('claim-m', {
+        type: 'outcome_metric',
+        text: '縮短 40%、2 組、3 人、5% 與 10 個',
+        completionStatus: null,
+      }),
+    ];
+    const at = (names: string[]) => ({ claims: loose, profile: null, jobNames: names });
+    const m = [{ claimId: 'claim-m' }];
+    for (const [text, name] of [
+      ['營收成長到 2.3M，縮短 40%。', '3M'],
+      ['轉換率 104.5%，縮短 40%。', '104'],
+      ['服務 10,104 名，縮短 40%。', '104'],
+      ['服務１０，１０４名，縮短 40%。', '104'],
+      ['取得 AWS-3，縮短 40%。', 'AWS'],
+    ] as const) {
+      expect(checkIntro(text, m, at([name]))).toBe('number_not_grounded');
+    }
+    expect(checkIntro('應徵104，縮短 40%。', m, at(['104']))).toBeNull();
+  });
+
+  it('名稱前後緊鄰「分隔符號＋英數字」時不拿掉，只拿掉獨立出現的名稱', () => {
+    const same = (text: string, names: string[]) => expect(withoutJobNames(text, names)).toBe(text);
+    same('轉換率提升 104.40%、104.5%, 服務 10,104 名', ['104']);
+    same('營收 2.3M, 用 3M.X', ['3M']);
+    same('通過 AWS-3、AWS_3 與 3-AWS', ['AWS']);
+    expect(withoutJobNames('應徵104，在 104. 104-前端', ['104'])).toBe('應徵 ,在  .  -前端');
   });
 
   it('全形數字的名稱也照正規化後比對', () => {

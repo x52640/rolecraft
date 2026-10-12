@@ -50,18 +50,30 @@ export interface IntroCheckContext {
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
+ * 名稱邊界：前後緊鄰英數字，或緊鄰「分隔符號＋英數字」（104.40%、2.3M、AWS-3、AWS_3）的不算名稱，
+ * 否則名稱被拿掉後剩下半截數字可能剛好有出處而放行（對抗審查）。逗號只在兩邊都是數字時才算
+ * 千分位（10,104）；「3M，3MB」的逗號正規化後也是「,」，但那是標點，名稱照樣拿掉。
+ */
+function boundedName(name: string): RegExp {
+  const alnum = '[A-Za-z0-9]';
+  const before = `(?<!${alnum})(?<!${alnum}[._\\-])${/^[0-9]/.test(name) ? '(?<![0-9],)' : ''}`;
+  const after = `(?!${alnum})(?![._\\-]${alnum})${/[0-9]$/.test(name) ? '(?!,[0-9])' : ''}`;
+  return new RegExp(`${before}${escapeRegExp(name)}${after}`, 'gu');
+}
+
+/**
  * 把自介中出現的公司名稱、職稱整段換成空白（正規化後比對，長的先換）；只用於數字檢查。
- * 要有邊界：前後緊鄰英數字的不算名稱（名稱「3M」不會豁免「13M」「3MB」裡的 3M），只豁免名稱本身。
+ * 要有邊界（boundedName）：名稱「3M」不會豁免「13M」「3MB」「2.3M」裡的 3M，只豁免名稱本身。
  */
 export function withoutJobNames(text: string, names: readonly string[] = []): string {
   const normalized = names
     .map((name) => normalizeForGrounding(name).trim())
     .filter((name) => name.length > 0)
     .sort((a, b) => b.length - a.length);
-  return normalized.reduce((out, name) => {
-    const bounded = new RegExp(`(?<![A-Za-z0-9])${escapeRegExp(name)}(?![A-Za-z0-9])`, 'gu');
-    return out.replace(bounded, ' ');
-  }, normalizeForGrounding(text));
+  return normalized.reduce(
+    (out, name) => out.replace(boundedName(name), ' '),
+    normalizeForGrounding(text),
+  );
 }
 
 export type IntroLabelResolution =
