@@ -1,7 +1,8 @@
 import { RESUME_BLOCK_MAX_LEVEL } from '@rolecraft/contracts';
 
-import { controlValue, findPairs, isControl, isSkipped, type Pairs } from './dom.ts';
-import { joinLines, splitLines, textNodeContent } from './text.ts';
+import { controlValue, findPairs, isControl, type Pairs } from './dom.ts';
+import { isChildRendered, isSkipped, renderedChildNodes, textOf } from './render.ts';
+import { joinLines, splitLines } from './text.ts';
 import type { RenderOracle, ResumeBlock } from './types.ts';
 
 /**
@@ -26,6 +27,11 @@ const PARAGRAPH: Shape = { kind: 'paragraph', level: null, label: null };
 const HEADING = /^h([1-6])$/u;
 const LIST_TAGS = new Set(['ul', 'ol', 'menu']);
 
+/** 逐一附加（不用 push(...大陣列)，避免超過引數上限）。 */
+function append(out: ResumeBlock[], blocks: readonly ResumeBlock[]): void {
+  for (const block of blocks) out.push(block);
+}
+
 /** 一段文字切行成區塊：第二個以後標 continues（規則 3、W18）。 */
 function toBlocks(text: string, shape: Shape): ResumeBlock[] {
   return splitLines(text).map((line, i) => ({ ...shape, text: line, continues: i > 0 }));
@@ -40,17 +46,18 @@ function flush(items: Item[], shape: Shape): ResumeBlock[] {
       buffer += item.text;
       continue;
     }
-    out.push(...toBlocks(buffer, shape), ...item.blocks);
+    append(out, toBlocks(buffer, shape));
+    append(out, item.blocks);
     buffer = '';
   }
-  out.push(...toBlocks(buffer, shape));
+  append(out, toBlocks(buffer, shape));
   return out;
 }
 
 /** 清單項的層級＝根節點內（含根節點）外層清單的數目，超過 6 一律記 6。 */
 function listLevel(li: Element, root: Element): number {
   let depth = 0;
-  for (let cur = li.parentElement; cur; cur = cur.parentElement) {
+  for (let cur = li === root ? null : li.parentElement; cur; cur = cur.parentElement) {
     if (LIST_TAGS.has(cur.localName)) depth += 1;
     if (cur === root) break;
   }
@@ -68,8 +75,8 @@ function unitShape(el: Element, ctx: Ctx): Shape | null {
 }
 
 function scanChildren(el: Element, ctx: Ctx, mode: Mode, out: Item[]): void {
-  for (const child of Array.from(el.childNodes)) {
-    if (child.nodeType === 3) out.push({ text: textNodeContent((child as Text).data) });
+  for (const child of renderedChildNodes(el, ctx.oracle)) {
+    if (child.nodeType === 3) out.push({ text: textOf(child as Text, el, ctx.oracle) });
     else if (child.nodeType === 1) scanElement(child as Element, ctx, mode, out);
   }
 }
@@ -80,8 +87,8 @@ function collect(el: Element, ctx: Ctx, mode: Mode): Item[] {
   return items;
 }
 
-function pairBlocks(label: string, control: Element): ResumeBlock[] {
-  const value = controlValue(control) ?? '';
+function pairBlocks(label: string, control: Element, ctx: Ctx): ResumeBlock[] {
+  const value = controlValue(control, ctx.oracle) ?? '';
   return toBlocks(value, { kind: 'label_value', level: null, label });
 }
 
@@ -91,17 +98,17 @@ function scanFormPart(el: Element, ctx: Ctx, out: Item[]): boolean {
   if (pairedControl) {
     if (el.contains(pairedControl)) {
       const text = ctx.pairs.controlLabels.get(pairedControl)?.text ?? '';
-      out.push({ blocks: pairBlocks(text, pairedControl) });
+      out.push({ blocks: pairBlocks(text, pairedControl, ctx) });
     }
     return true;
   }
   if (!isControl(el)) return false;
   const paired = ctx.pairs.controlLabels.get(el);
   if (paired) {
-    if (!paired.label.contains(el)) out.push({ blocks: pairBlocks(paired.text, el) });
+    if (!paired.label.contains(el)) out.push({ blocks: pairBlocks(paired.text, el, ctx) });
     return true;
   }
-  const value = controlValue(el);
+  const value = controlValue(el, ctx.oracle);
   if (value !== null) out.push({ text: ` ${value} ` });
   return true;
 }
@@ -123,7 +130,7 @@ function scanElement(el: Element, ctx: Ctx, mode: Mode, out: Item[]): void {
     out.push({ blocks: flush(collect(el, ctx, 'unit'), shape) });
     return;
   }
-  if (!ctx.oracle.breaksLine(el)) {
+  if (ctx.oracle.display(el) !== 'block') {
     scanChildren(el, ctx, mode, out);
     return;
   }
@@ -150,7 +157,10 @@ function nestedBlocks(items: Item[]): ResumeBlock[] {
  */
 function rowBlocks(tr: Element, ctx: Ctx): ResumeBlock[] {
   const cells = Array.from(tr.children).filter(
-    (cell) => (cell.localName === 'td' || cell.localName === 'th') && !isSkipped(cell, ctx.oracle),
+    (cell) =>
+      (cell.localName === 'td' || cell.localName === 'th') &&
+      !isSkipped(cell, ctx.oracle) &&
+      isChildRendered(tr, cell, ctx.oracle),
   );
   const scanned = cells.map((cell) => collect(cell, ctx, 'unit'));
   const [first, second] = cells;
@@ -158,18 +168,23 @@ function rowBlocks(tr: Element, ctx: Ctx): ResumeBlock[] {
     const label = joinLines(itemsText(scanned[0] ?? []));
     if (label !== '') {
       const shape: Shape = { kind: 'label_value', level: null, label };
-      return [...nestedBlocks(scanned[0] ?? []), ...flush(scanned[1] ?? [], shape)];
+      return nestedBlocks(scanned[0] ?? []).concat(flush(scanned[1] ?? [], shape));
     }
   }
   const texts = scanned.map((items) => joinLines(itemsText(items)));
   const row: ResumeBlock[] = texts.some((text) => text !== '')
     ? [{ kind: 'table_row', level: null, label: null, text: texts.join('\t'), continues: false }]
     : [];
-  return [...row, ...scanned.flatMap(nestedBlocks)];
+  return row.concat(scanned.flatMap(nestedBlocks));
 }
 
-/** 從根節點抽出區塊（未套上限）。根節點本身是否可見由呼叫端判定。 */
+/**
+ * 從根節點抽出區塊（未套上限）。根節點本身走同一套分類（標題、清單項、表格列、控制項…）；
+ * 根節點的祖先是否可見由呼叫端判定。
+ */
 export function extractBlocks(root: Element, oracle: RenderOracle): ResumeBlock[] {
   const ctx: Ctx = { oracle, root, pairs: findPairs(root, oracle) };
-  return flush(collect(root, ctx, 'paragraph'), PARAGRAPH);
+  const items: Item[] = [];
+  scanElement(root, ctx, 'paragraph', items);
+  return flush(items, PARAGRAPH);
 }

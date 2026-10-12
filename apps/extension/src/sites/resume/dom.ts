@@ -1,27 +1,6 @@
-import { joinLines, textNodeContent } from './text.ts';
+import { isReadableChain, isSkipped, renderedChildNodes, textOf } from './render.ts';
+import { joinLines } from './text.ts';
 import type { RenderOracle } from './types.ts';
-
-/**
- * 不讀的元素（區塊抽取規則 1）：腳本、樣式、樣板、svg、圖片（含 alt）與其他嵌入內容。
- * 嵌入框架也不讀（只讀主框架）。
- */
-const SKIP_TAGS = new Set([
-  'audio',
-  'canvas',
-  'datalist',
-  'embed',
-  'iframe',
-  'img',
-  'map',
-  'noscript',
-  'object',
-  'picture',
-  'script',
-  'style',
-  'svg',
-  'template',
-  'video',
-]);
 
 /** 只讀目前值的 input 種類；其餘（密碼、隱藏、檔案、按鈕、勾選框等）一律不讀（規則 4）。 */
 const READABLE_INPUT_TYPES = new Set([
@@ -38,27 +17,15 @@ const READABLE_INPUT_TYPES = new Set([
   'datetime-local',
 ]);
 
-/** 元素本身不讀（不含祖先判定）。 */
-export function isSkipped(el: Element, oracle: RenderOracle): boolean {
-  if (SKIP_TAGS.has(el.localName)) return true;
-  if (el.hasAttribute('hidden') || el.getAttribute('aria-hidden') === 'true') return true;
-  return !oracle.isRendered(el);
-}
-
-/** 元素與它到 `stop`（不含）之間的祖先都要讀得到。`stop` 為 null 時一路看到文件根。 */
-export function isReadableChain(el: Element, oracle: RenderOracle, stop: Element | null): boolean {
-  for (let cur: Element | null = el; cur && cur !== stop; cur = cur.parentElement) {
-    if (isSkipped(cur, oracle)) return false;
-  }
-  return true;
-}
-
 export function isControl(el: Element): boolean {
   return el.localName === 'input' || el.localName === 'select' || el.localName === 'textarea';
 }
 
-/** 表單控制項的目前值；不讀或沒有值回 null（select 取選中項的文字）。 */
-export function controlValue(el: Element): string | null {
+/**
+ * 表單控制項的目前值；不讀、看不到（visibility:hidden）或沒有值回 null（select 取選中項的文字）。
+ */
+export function controlValue(el: Element, oracle: RenderOracle): string | null {
+  if (!oracle.textVisible(el)) return null;
   const value = rawControlValue(el);
   return value !== null && /\S/u.test(value) ? value : null;
 }
@@ -83,8 +50,8 @@ function rawControlValue(el: Element): string | null {
 export function flatText(el: Element, oracle: RenderOracle): string {
   let out = '';
   const walk = (node: Element): void => {
-    for (const child of Array.from(node.childNodes)) {
-      if (child.nodeType === 3) out += textNodeContent((child as Text).data);
+    for (const child of renderedChildNodes(node, oracle)) {
+      if (child.nodeType === 3) out += textOf(child as Text, node, oracle);
       if (child.nodeType !== 1) continue;
       const element = child as Element;
       if (isSkipped(element, oracle) || isControl(element)) continue;
@@ -92,7 +59,7 @@ export function flatText(el: Element, oracle: RenderOracle): string {
         out += '\n';
         continue;
       }
-      const breaks = oracle.breaksLine(element);
+      const breaks = oracle.display(element) === 'block';
       if (breaks) out += '\n';
       walk(element);
       if (breaks) out += '\n';
@@ -123,28 +90,33 @@ function dlItems(dl: Element): Element[] {
   return items;
 }
 
+/**
+ * dt＋dd 配對。讀不到的 dt（隱藏等）不貢獻文字、而且切斷配對：後面的 dd 不繼承前一個標籤，
+ * 改當一般段落（dd 本身看得到，照讀；不會把隱藏的標籤或錯的標籤套上去）。
+ */
 function pairDl(dl: Element, root: Element, oracle: RenderOracle, pairs: Pairs): void {
   let dts: Element[] = [];
   let label = '';
   let afterDd = false;
   for (const item of dlItems(dl)) {
-    if (!isReadableChain(item, oracle, root)) continue;
+    if (item.localName !== 'dt' && item.localName !== 'dd') continue;
+    const readable = isReadableChain(item, oracle, root);
     if (item.localName === 'dt') {
-      if (afterDd) dts = [];
+      if (afterDd || !readable) dts = [];
       afterDd = false;
-      dts.push(item);
-      label = joinLines(dts.map((dt) => flatText(dt, oracle)).join('\n'));
-    } else if (item.localName === 'dd') {
-      afterDd = true;
-      if (label === '') continue;
-      pairs.ddLabels.set(item, label);
-      for (const dt of dts) pairs.consumedDts.add(dt);
+      if (readable) dts.push(item);
+      label = readable ? joinLines(dts.map((dt) => flatText(dt, oracle)).join('\n')) : '';
+      continue;
     }
+    afterDd = true;
+    if (!readable || label === '') continue;
+    pairs.ddLabels.set(item, label);
+    for (const dt of dts) pairs.consumedDts.add(dt);
   }
 }
 
 function pairControl(control: Element, root: Element, oracle: RenderOracle, pairs: Pairs): void {
-  if (controlValue(control) === null || !isReadableChain(control, oracle, root)) return;
+  if (controlValue(control, oracle) === null || !isReadableChain(control, oracle, root)) return;
   const labels = (control as HTMLInputElement).labels;
   for (const label of Array.from(labels ?? [])) {
     if (pairs.labelControls.has(label) || !root.contains(label)) continue;

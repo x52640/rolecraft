@@ -25,8 +25,3 @@ export function splitLines(text: string): string[] {
 export function joinLines(text: string): string {
   return splitLines(text).join(' ');
 }
-
-/** 文字節點的原始內容：換行與其他空白一律當一格空白（換行只由 br 與區塊元素產生）。 */
-export function textNodeContent(data: string): string {
-  return data.replace(/[\r\n]+/gu, ' ');
-}

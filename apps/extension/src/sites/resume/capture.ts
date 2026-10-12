@@ -5,10 +5,11 @@ import {
 } from '@rolecraft/contracts';
 
 import { relayMessage } from '../../relay/messages.ts';
-import { flatText, isReadableChain } from './dom.ts';
+import { flatText } from './dom.ts';
 import { extractBlocks } from './extract.ts';
 import { applyLimits } from './limits.ts';
 import { RESUME_FAILED_MESSAGE, RESUME_NOT_FOUND_MESSAGE } from './notice.ts';
+import { isReadableChain } from './render.ts';
 import { joinLines } from './text.ts';
 import type { RenderOracle, ResumeSiteConfig } from './types.ts';
 

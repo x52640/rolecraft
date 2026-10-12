@@ -1,5 +1,5 @@
 import { resumeNoticeText, runResumeCapture } from './capture.ts';
-import { chromeOracle } from './chrome-oracle.ts';
+import { createChromeOracle } from './chrome-oracle.ts';
 import { showResumeNotice } from './notice.ts';
 import type { ResumeSiteConfig } from './types.ts';
 
@@ -11,7 +11,7 @@ export async function startResumeCapture(config: ResumeSiteConfig): Promise<void
   const outcome = await runResumeCapture(config, {
     doc: document,
     pageUrl: location.href,
-    oracle: chromeOracle,
+    oracle: createChromeOracle(chrome),
     now: () => new Date(),
     sendToWorker: (message) => chrome.runtime.sendMessage(message),
   });

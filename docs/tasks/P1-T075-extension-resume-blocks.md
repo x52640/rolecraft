@@ -82,14 +82,36 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：工作者實作與單元測試（2026-10-12）
-- 已通過驗證：`npm run verify` 綠（Vitest 3849 通過、13 略過）
-- 下一步：協調者收官（對抗驗證 E3＋codex review）
+- 最後完成：審查待修 1–6 已修（2026-10-12）
+- 已通過驗證：`npm run verify` 綠（Vitest 3863 通過、13 略過）
+- 下一步：協調者複審修正 diff；標「需真實 Chrome」的項目由 P1-T077 驗證
 - Blocker：無
+
+## 審查待修（2026-10-12 對抗審查＋codex review）
+
+對抗審查（真實 Chrome 重現）：
+
+1. （個資）隱藏容器裡的直接文字節點會被送出：未展開 `<details>` 裡 summary 以外的直接文字、有 shadow root 的元素底下沒被分配到 slot 的文字、`content-visibility:hidden` 容器的直接文字、`<progress>`／`<meter>` 的後備文字。
+2. （漏讀）`display:contents` 的子樹被整棵丟掉（`checkVisibility` 回 false），根節點本身是 contents 會變成找不到；`visibility:hidden` 父元素下 `visibility:visible` 的子元素被略過。
+3. （規格偏差）`white-space: pre`／`pre-wrap` 裡的換行被併成空白。
+
+codex review：
+
+4. `dom.ts` dl 配對：隱藏的 dt 被跳過後，後面的 dd 繼承前一個標籤（`<dt>Skills</dt><dd>JS</dd><dt hidden>Salary</dt><dd>100</dd>` 把 100 當 Skills 的值）。
+5. `extract.ts` 根節點本身是標題、li、tr、表單控制項時只讀子節點，沒走元素分類。
+6. `extract.ts` 用 `push(...blocks)` 展開大陣列，超過引數上限丟 RangeError（擷取失敗而不是截斷到 2,000 塊）。
 
 ## 完成結果
 
 - 程式（`apps/extension/src/sites/resume/`）：`extract.ts` `extractBlocks`（抽取規則 1–6）、`dom.ts`（`isSkipped`、`controlValue`、`flatText`、`findPairs` 標籤＋值配對）、`text.ts`（正規化）、`limits.ts` `applyLimits`、`capture.ts`（`buildResumeCapture`、`runResumeCapture`、`resumeNoticeText`）、`start.ts` `startResumeCapture`（各站腳本入口，P1-T077 用）、`notice.ts`（提示文字與 `showResumeNotice`）、`chrome-oracle.ts`／`simple-oracle.ts`（N6 判定分開）。
 - 測試：`extract.test.ts`、`capture.test.ts`、`notice.test.ts`（38 案例，合成 DOM、假資料）。
 - 保守選擇：根節點有找到但抽不出任何區塊（schema 要至少 1 個）視同找不到根節點；送出前先用 contracts schema 驗，不符就不送、提示失敗；只有回應通過 schema 且 `ok: true` 才算成功；input 只讀文字類（text、search、email、tel、url、number、日期時間類），勾選框、單選、按鈕、range、color 不讀；姓名文字空白或超過 200 字給 null；失敗提示多加「（在其他分頁點 RoleCraft 圖示開啟）」與找不到提示一致；表格一般列的儲存格內換行併成空白（th＋td 列的值才切續行）。
-- 殘餘：換行判定用計算後 display 近似 innerText（`white-space: pre` 文字內的換行當空白、CSS 產生內容不讀）；真實 Chrome 的 fixture 比對在 P1-T077。
+- 殘餘：換行判定用計算後 display 近似 innerText（CSS 產生內容不讀）；shadow tree 內部內容不讀（只讀被分配到 slot 的 light DOM 子節點，不依 slot 順序重排）；真實 Chrome 的 fixture 比對在 P1-T077。
+- 審查待修修正（`review-fixes.test.ts` 逐項重現）：判定介面改成 `display`／`textVisible`／`hidesChildren`／`preservesNewlines`／`slottedChildren`（`types.ts`），`render.ts` 集中「讀得到」判定，抽取與 `flatText` 共用 `renderedChildNodes`／`textOf`。
+  1. 未展開 details 只讀第一個 summary；有 shadow root 只讀被分配到（可見）slot 的子節點（Chrome 用 `chrome.dom.openOrClosedShadowRoot`，含封閉 shadow root）；content-visibility:hidden 不讀子節點；progress、meter 加入不讀清單。
+  2. 不再用 `checkVisibility`：Chrome 判定改用計算後樣式（`createChromeOracle`，每次擷取快取），display:contents 直接往下讀、不換行；visibility 只影響元素自己的文字節點與控制項值，子元素各自判斷。
+  3. white-space 保留換行（pre、pre-wrap、pre-line、break-spaces，或 white-space-collapse preserve 類）時照換行切、第二行起標 continues。
+  4. 讀不到的 dt 切斷配對，後面的 dd 不繼承標籤、當無標籤段落：dd 本身看得到，照讀不漏內容，也不會套上隱藏或錯的標籤（不讀 dd 反而丟掉使用者看得到的內容）。
+  5. 根節點本身走 `scanElement` 同一套分類；清單項根節點層級記 1。
+  6. 改成逐一附加（`append`、`concat`），15 萬行 textarea 截斷到 2,000 塊。
+- 需 P1-T077 在真實 Chrome 驗證：`createChromeOracle` 的計算後樣式判定（display:contents、visibility 繼承與子元素 visible、content-visibility:hidden、white-space／white-space-collapse）、封閉 shadow root 與 slot 分配（含藏起來的 slot）、未展開 details。
