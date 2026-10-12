@@ -5,7 +5,7 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T065 104 履歷 PDF 匯入：多頁誤判讀取順序、部首相似字（`docs/tasks/P1-T065-multipage-disorder-check.md`）
+- 無
 
 ## ready
 
