@@ -92,7 +92,22 @@ function compact(label: string): string {
   return headingKey(label).replace(/[-_.]/gu, '');
 }
 
+/**
+ * 括號修飾（「地址（戶籍）」「住址(住家)」「Address (Permanent)」；codex 複審 1）：NFKC 後去掉成對的括號段，
+ * 剩下的部分非空才回傳。辨識時原樣與去括號後任一個認得就算，不會比原本少認。
+ */
+const PAREN = /\([^()]*\)/gu;
+function withoutParens(label: string): string | null {
+  const stripped = label.normalize('NFKC').replace(PAREN, ' ').trim();
+  return stripped !== '' && stripped !== label.normalize('NFKC').trim() ? stripped : null;
+}
+
 export function isPersonalLabel(label: string): boolean {
+  const bare = withoutParens(label);
+  return looseLabel(label) || (bare !== null && looseLabel(bare));
+}
+
+function looseLabel(label: string): boolean {
   const key = compact(label);
   if (key === '' || [...key].length > 24) return false;
   if (ASCII_EXACT.has(key)) return true;
@@ -153,6 +168,11 @@ function asciiVocabulary(label: string): boolean | null {
 }
 
 export function isStrictPersonalLabel(label: string): boolean {
+  const bare = withoutParens(label);
+  return strictLabel(label) || (bare !== null && strictLabel(bare));
+}
+
+function strictLabel(label: string): boolean {
   const key = compact(label);
   if (key === '') return false;
   if (ASCII_EXACT.has(key) || NAME_EXACT.has(key)) return true;

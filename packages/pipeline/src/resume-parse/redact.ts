@@ -26,6 +26,25 @@ function escape(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
+/**
+ * 重疊的範圍合併成一段（不論誰先比對到；codex 複審 2）：姓名「Jose」與 email「Jose.Sample@example.org」
+ * 重疊時整段 email 一起遮掉。合併的每一段都是姓名才用姓名佔位字。
+ */
+function mergeSpans(found: readonly Span[]): Span[] {
+  const merged: Span[] = [];
+  for (const span of [...found].sort((a, b) => a.from - b.from || b.to - a.to)) {
+    const last = merged[merged.length - 1];
+    if (last && span.from < last.to) {
+      merged[merged.length - 1] = {
+        from: last.from,
+        to: Math.max(last.to, span.to),
+        name: last.name && span.name,
+      };
+    } else merged.push(span);
+  }
+  return merged;
+}
+
 export function createRedactor(secrets: readonly Secret[]) {
   const tokens = new Map<string, string>();
   const byValue = new Map<string, string>();
@@ -58,18 +77,17 @@ export function createRedactor(secrets: readonly Secret[]) {
   function redact(original: string): string {
     const plain = nfkcMapped(original);
     const marksFolded = nfkcMapped(original, true);
-    const spans: Span[] = [];
-    const taken = (from: number, to: number) => spans.some((s) => from < s.to && to > s.from);
+    const found: Span[] = [];
     for (const { re, name, fold } of [...all, ...generic]) {
       const mapped = fold ? marksFolded : plain;
       for (const match of mapped.text.matchAll(re)) {
         const at = match.index;
         const from = mapped.start[at] ?? 0;
         const to = mapped.end[at + match[0].length - 1] ?? from;
-        if (!taken(from, to)) spans.push({ from, to, name });
+        found.push({ from, to, name });
       }
     }
-    spans.sort((a, b) => a.from - b.from);
+    const spans = mergeSpans(found);
     let out = '';
     let at = 0;
     for (const span of spans) {
