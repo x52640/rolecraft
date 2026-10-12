@@ -76,10 +76,10 @@
 | [P1-T067](P1-T067-import-page-layout.md) | 匯入頁版面重整 | done | 1 | editor | P1-T020 |
 | [P1-T068](P1-T068-dev-web-harness.md) | 開發用網頁測試入口（協調者自測用） | done | 1 | dev-tooling | P1-T059 |
 | [P1-T069](P1-T069-resume-import-ai-parse.md) | 履歷 PDF 用 AI 整理欄位 | in_progress | 1 | resume-import | P1-T066、P1-T064 |
-| [P1-T070](P1-T070-claude-state-after-restart.md) | helper 重開後 Claude 狀態歸零 | in_progress | 1 | providers | P1-T062 |
-| [P1-T071](P1-T071-intro-failed-draft-visible.md) | 自介沒通過檢查時看不到草稿 | in_progress | 1 | pipeline | P1-T064 |
-| [P1-T072](P1-T072-resume-experience-tailoring.md) | 客製履歷沒有改寫工作經歷 | in_progress | 1 | pipeline | P1-T025 |
-| [P1-T073](P1-T073-claims-page-usability.md) | 事實項頁實用性 | in_progress | 1 | editor | P1-T063 |
+| [P1-T070](P1-T070-claude-state-after-restart.md) | helper 重開後 Claude 狀態歸零 | done | 1 | providers | P1-T062 |
+| [P1-T071](P1-T071-intro-failed-draft-visible.md) | 自介沒通過檢查時看不到草稿 | done | 1 | pipeline | P1-T064 |
+| [P1-T072](P1-T072-resume-experience-tailoring.md) | 客製履歷沒有改寫工作經歷 | done | 1 | pipeline | P1-T025 |
+| [P1-T073](P1-T073-claims-page-usability.md) | 事實項頁實用性 | done | 1 | editor | P1-T063 |
 
 ## 依賴清單
 

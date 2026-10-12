@@ -1,7 +1,7 @@
 ---
 id: P1-T070
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T062"]
 specs: ["providers.md", "bridge.md"]
 track: providers
@@ -89,7 +89,7 @@ npm run verify
 - 最後完成：「修正 cde0ddb 的審查待修」3 項（手動檢查中共用、額度用完指示、rescue 只限純版本問題），每項先寫重現測試再修
 - 已通過驗證：worktree `npm run verify` 綠（Vitest 3551 通過、13 略過）
 - 前一輪：「審查屬實待修」4 項（並行檢查結果、失敗後重試、等待上限、未選模型不檢查）
-- 下一步：協調者稽核、對抗驗證＋codex review；手動以 harness 重開後直接產生自介
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，修正 diff 的 codex review 無發現；main `npm run verify` 綠，Vitest 3551 通過）。harness 手動實跑未做，併入擁有者 P1-T032 端到端驗收
 - Blocker：無
 - 第 3 項（重新驗證可能超過橋接 30 秒逾時）的選擇：helper 端給 `prepareRun` 加等待上限（`CLAUDE_PREPARE_RUN_WAIT_MS` 20 秒），等不到就回既有的失敗碼（no_model／no_service）加具體原因「正在檢查…請稍後再試」，檢查在背景繼續、下次發起接著等同一次。理由：改動最小，不動 contracts、bridge 規格與 extension 逾時；延長單一請求逾時要改 extension／contracts（超出 write_paths），回「檢查中」狀態讓前端輪詢要新增回應欄位（contract 變更）。代價：使用者第一次要再按一次。
 
@@ -103,7 +103,7 @@ npm run verify
 - `ProvidersService.prepareRun`（選填）：`messages/claude-engine.ts` 解析模型前呼叫。解析不到模型時，記下具體原因（`providers/unavailable-reason.ts`，由狀態欄位組成、不含路徑）。analysis、resume 的 `no_model` 和 intro、messages 的 `no_service` 失敗訊息都帶這個原因。
 - `createServices` 新增第 4 個參數 `providerOptions`，只給測試用。`main.test.ts` 全部改用假 probe，並補上斷言：重開後第一次查狀態自動檢查一次、分析失敗回具體原因、不呼叫模型。
 - 設定頁不需要另送請求：開頁讀狀態時由 helper 自動檢查，載入文字改成「讀取並檢查服務狀態中…」。
-- 測試：`providers/auto-check.test.ts`（重開後直接生成、未登入、D24 新版本／未完成會重跑、停用版本不重試、設定頁並行讀取共用一次、檢查出錯下次再試、選定前也自動檢查）；`claude/observe-version.test.ts`；SettingsPage 1 案；既有 providers 測試依新行為更新。
+- 測試：`providers/auto-check.test.ts`（重開後直接生成、未登入、D24 新版本／驗證中途中斷的版本會重跑、停用版本不重試、設定頁並行讀取共用一次、檢查出錯下次再試、選定前也自動檢查）；`claude/observe-version.test.ts`；SettingsPage 1 案；既有 providers 測試依新行為更新。
 - 殘餘：
   - 具體原因靠模組層的「最近一次解析結果」傳給失敗訊息，前提是 helper 單一程序、單一使用者。
   - 履歷匯入的 AI 整理（`import/`，P1-T069）的 `no_service` 文字沒有接具體原因，不在範圍內。

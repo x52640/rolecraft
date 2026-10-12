@@ -1,7 +1,7 @@
 ---
 id: P1-T071
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T064"]
 specs: ["jobs-and-messages.md", "evidence-model.md", "bridge.md"]
 track: pipeline
@@ -82,8 +82,8 @@ npm run verify
 
 - 最後完成：對抗審查待修 R1（名稱豁免不切開較大數字：`withoutJobNames` 邊界加「分隔符號＋英數字」）與測試
 - 已通過驗證：worktree 內 `npm run verify` 綠；全程假 provider
-- 下一步：協調者收官（對抗驗證＋codex review、harness 實跑）
-- Blocker：無（手動驗證以 harness 實跑，需協調者）
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，修正 diff 的 codex review 無發現；main `npm run verify` 綠，Vitest 3551 通過）。harness 手動實跑未做，併入擁有者 P1-T032 端到端驗收
+- Blocker：無
 
 ## 完成結果
 

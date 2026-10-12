@@ -1,7 +1,7 @@
 ---
 id: P1-T073
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T063"]
 specs: ["evidence-model.md", "bridge.md"]
 track: editor
@@ -81,7 +81,7 @@ npm run verify
 - 最後完成：codex 複審 1 項（授權資料夾是根目錄 `/` 時所有文件被判成資料夾外、同名檔撞名）；先寫測試重現屬實後修正
 - 先前完成：codex 審查 1 項（source-names.ts 先用正規化、未截斷的完整路徑判斷是否在資料夾內，再清理顯示名）；先寫測試重現三種輸入皆屬實
 - 已通過驗證：`npm run verify` 綠（工作者 worktree）
-- 下一步：協調者 codex review 本修正 diff
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，修正 diff 的 codex review 無發現；main `npm run verify` 綠，Vitest 3551 通過）。harness 手動實跑未做，併入擁有者 P1-T032 端到端驗收
 - Blocker：無
 
 ## 完成結果

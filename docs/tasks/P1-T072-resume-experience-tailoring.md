@@ -1,7 +1,7 @@
 ---
 id: P1-T072
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T025"]
 specs: ["evidence-model.md", "runtime-and-budget.md", "bridge.md"]
 track: pipeline
@@ -87,7 +87,7 @@ npm run verify
 
 - 最後完成：「codex 審查待修」2 項（重新整理保護未存編輯、讀取失敗清編輯狀態），兩項都先以測試重現再修
 - 已通過驗證：worktree 內 `npm run verify` 綠
-- 下一步：協調者 codex review 這次修正的 diff
+- 下一步：已收官（2026-10-12 協調者：審查屬實項皆已修，修正 diff 的 codex review 無發現；main `npm run verify` 綠，Vitest 3551 通過）。harness 手動實跑未做，併入擁有者 P1-T032 端到端驗收
 - Blocker：無
 
 ## 完成結果

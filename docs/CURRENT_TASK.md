@@ -6,10 +6,6 @@
 ## 進行中
 
 - P1-T069 履歷 PDF 用 AI 整理欄位（`docs/tasks/P1-T069-resume-import-ai-parse.md`）
-- P1-T070 helper 重開後 Claude 狀態歸零（`docs/tasks/P1-T070-claude-state-after-restart.md`）
-- P1-T071 自介沒通過檢查時看不到草稿（`docs/tasks/P1-T071-intro-failed-draft-visible.md`）
-- P1-T072 客製履歷沒有改寫工作經歷（`docs/tasks/P1-T072-resume-experience-tailoring.md`）
-- P1-T073 事實項頁實用性（`docs/tasks/P1-T073-claims-page-usability.md`）
 
 ## ready
 
@@ -30,18 +26,14 @@
 ## 交接（2026-10-12 擁有者要求清空對話後重開）
 
 - 方向變更：匯入改走「擴充功能讀求職網站履歷頁 HTML」，PDF 只負責輸出（加照片、匯出）。規格草稿 `docs/spec-discussions/web-resume-import/spec.md`（v0，擁有者已看過、同意送討論），尚未跑 Codex 往返。
-- 進行中 Task（皆已合進 main，未收官）：
-  - P1-T069 AI 履歷解析：第二輪修正 2024faa 已合入；未跑修正 diff 的 codex review。
-  - P1-T070 helper 重開後自動檢查：489d6a6 已合入；對抗＋codex 屬實 4 項**尚未寫入 Task、尚未修**：並行檢查依開始順序丟掉已通過的結果；完整檢查失敗後不再檢查；重新驗證在請求回應前同步跑、可能超過 30 秒逾時；未選模型仍先做會呼叫模型的重新驗證。
-  - P1-T071 自介未通過草稿：aeba7d5 已合入；對抗屬實 3 項**尚未寫入 Task、尚未修**：「請 AI 修正」不擋正式自介框未存修改且不確認就覆寫；公司名稱數字豁免無邊界（3M）；草稿後已存自介改過時修正仍呼叫模型白耗額度。codex 尚未跑。
-  - P1-T072 履歷改寫經歷：修正 2477974 已合入；未跑修正 diff 的 codex review。
-  - P1-T073 事實項頁：修正 b91ab53 已合入；未跑修正 diff 的 codex review。
+- 2026-10-12 收官 P1-T070～T073：舊審查屬實項與修正 diff 的 codex／對抗審查屬實項皆已修，最後一輪 codex 無發現；harness 手動實跑併入 P1-T032。
+- P1-T069 仍進行中：codex 審查 3 項已修（cc63fdb），其對抗審查（個資標籤辨識退步等 3 項）與 codex 複審（3 項）修正中。
 - 協調者實測發現、尚未開 Task：貼職缺要自己拆欄位（改整段貼上由 AI 拆）；除匯入頁外各頁樣式陽春；照片匯出（併新規格）。
 - 開發入口：`npm run dev:harness -- --pdf <檔> --folders <資料夾>`（P1-T068），測試資料在 `local-samples/`（gitignore）。
 
 ## 主樹基準
 
-- `npm run verify` 綠；Vitest 3311 通過、13 略過（live／Chrome／race／選取器對話框，需環境變數）；test:docs 15（2026-10-12 P1-T064 收官後）。
+- `npm run verify` 綠；Vitest 3551 通過、13 略過（2026-10-12 P1-T070～T073 收官後）；舊紀錄：Vitest 3311 通過、13 略過（live／Chrome／race／選取器對話框，需環境變數）；test:docs 15（2026-10-12 P1-T064 收官後）。
 - P1-T039 live 測試 2026-10-10 以 Claude CLI 2.1.296 跑一次：12 案例全過，模型呼叫 2 次（haiku）。
 
 ## 待專案擁有者
