@@ -96,9 +96,9 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：規則（evidence-model、bridge.md、ADR-0006 #12）、contracts 相加、storage 0007、pipeline 分組建議與歸屬規則、helper 七個操作與 commitUnit 自動歸入、編輯器專案頁分組與事實項頁整理
-- 已通過驗證：worktree 內 `npm run verify` 綠（Vitest 3177 通過、13 略過）
-- 下一步：協調者收官（高風險：對抗驗證）
+- 最後完成：對抗驗證與 codex review 屬實三項已修（刪除或讀不到的文件不進建議也不能建成專案、建議輪詢舊回應失效、組大小對齊建立上限），各補回歸測試
+- 已通過驗證：worktree 內 `npm run verify` 綠（Vitest 3187 通過、13 略過）；四則回歸測試在修正前皆失敗
+- 下一步：協調者收官
 - Blocker：無
 
 ## 完成結果
@@ -111,4 +111,9 @@ npm run verify
 - 編輯器：專案頁新增「專案分組」區（`ProjectGrouping.tsx`、`useProjectSuggestion.ts`、`grouping-model.ts`）：按下才建議、執行中每 2 秒查、完成後可改名、取消某組、逐份文件移到別組或未分組，按「確認建立」才送 `claims.create_projects`。事實項頁：每項「移到專案…」、選中專案時的改名／併入／刪除（`ProjectTools.tsx`、`ClaimMove.tsx`）；自動預設與使用者選擇分開記，自動預設在分析結束或專案變動時重算，`claims.list_unassigned` 讀取失敗時預設停在未歸專案顯示錯誤。
 - 測試（一律假 provider）：helper `suggest.test.ts`（13：合法建議不建專案、只送摘要與相對名稱、不合法 6 種、注入文字只在資料區塊、未選模型不呼叫、撤銷授權的文件不進輸入、已屬專案的文件不進輸入、R6 不通過）、`project-assign.test.ts`（7：建立與歸屬、跨專案留未歸、不合法整批不建、已歸入不搬、整理後 list／list_unassigned、重新分析自動歸入且手動搬過的不動、文件不屬專案時留未歸、commitUnit 失敗整筆回滾）；pipeline `projects.test.ts`（20）；storage `project-documents.test.ts`（2）；編輯器 `ClaimsPage.projects.test.ts`（4）、`ProjectGrouping.test.tsx`（3）。既有編輯器測試因同頁多了「移到專案」選單，改以名稱指定下拉選單；一則測試的假 helper 補上 `claims.list_unassigned` 成功回應（新規則下讀取失敗會停在未歸專案）。
 - 保守選擇／待擁有者裁定：(1) 建議只存在 helper 記憶體，helper 重開後要再按一次；(2) 建議不自動重試；(3) 已屬專案的文件不再送進建議，新文件要歸入既有專案只能先建成新專案再合併（沒有「把文件加入既有專案」的操作）；(4) 事實項的來源只要有一份不屬任何專案就留未歸；(5) 確認建立以資料區的授權狀態判定（撤銷當下已寫入資料區，P1-T060）；(6) 手動移入專案不檢查事實項的來源文件是否屬該專案（使用者的選擇）；(7) 編輯器在頁面重新載入後仍會把 helper 記憶體裡上一次的建議顯示成草稿，再確認會因文件已屬專案被整批拒絕。
+- 對抗驗證／codex 修正（2026-10-12）：
+  - 刪除或讀不到的文件：分析同步把文件視同刪除時，同一交易清掉其摘要與已分析版本（`flow.ts` writeChanges；storage 新增 `analysisState.deleteAnalyzed`，恢復可讀時重新分析）；建議輸入另要求授權集合最近一次列舉仍在（`present`）；`claims.create_projects` 只收仍有摘要的文件。回歸：`suggest.test.ts` 刪檔→分析→建議提示不含該文件的摘要與名稱、create_projects 帶它回 invalid_request。
+  - 建議輪詢舊回應：`useProjectSuggestion` 以請求世代比對，開始新建議時讓先前送出的查詢回應失效。回歸：`ProjectGrouping.test.tsx` 舊的完成結果晚到不蓋掉「建議中…」。
+  - 組大小：輸出驗證每組上限 1,000 份文件（同 `MAX_DOCUMENTS_PER_PROJECT`），超過整份不採用、不自動拆組；編輯器草稿超過上限不送出並提示。回歸：pipeline `projects.test.ts`、`ProjectGrouping.test.tsx` 各一則。
+  - evidence-model「專案分組與事實項歸屬」同步寫入上述規則。
 - 手動驗證需擁有者（自己的資料夾跑一次，併 P1-T032），本次沒有做。

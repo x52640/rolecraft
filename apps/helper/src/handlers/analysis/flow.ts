@@ -80,6 +80,7 @@ export function createAnalysis(deps: AnalysisDeps): Required<AnalysisService> {
     changed: readonly SourceDocument[],
     claimUpdates: readonly Claim[],
     empty: readonly AnalyzedDocumentRow[],
+    gone: readonly string[],
   ) => {
     for (const doc of changed) repos.sourceDocuments.save(doc);
     for (const claim of claimUpdates) repos.claims.save(claim);
@@ -87,6 +88,12 @@ export function createAnalysis(deps: AnalysisDeps): Required<AnalysisService> {
       // 內容只剩空白：記為已分析這個版本，同時清掉舊版本的摘要（codex review）
       repos.analysisState.saveAnalyzed(row);
       repos.analysisState.deleteSummary(row.sourceDocumentId);
+    }
+    // 已刪除或讀不到（符號連結、過大、二進位）的文件：摘要不再代表可讀的內容，不能再進分組建議
+    // 或被建成專案（P1-T063 對抗驗證）；清掉已分析版本，恢復可讀時重新分析
+    for (const id of gone) {
+      repos.analysisState.deleteSummary(id);
+      repos.analysisState.deleteAnalyzed(id);
     }
   };
 
@@ -153,7 +160,7 @@ export function createAnalysis(deps: AnalysisDeps): Required<AnalysisService> {
     if (paused && resumable && resumed && resumed.ok) {
       const jobId = paused.job.id;
       transaction(db, () => {
-        writeChanges(synced.changed, claimUpdates, empty);
+        writeChanges(synced.changed, claimUpdates, empty, synced.deletedDocumentIds);
         repos.workJobs.save(resumed.run.job);
         repos.analysisState.setBlockReason(jobId, null);
         repos.analysisState.addCounts(jobId, 0, claimUpdates.length);
@@ -164,7 +171,9 @@ export function createAnalysis(deps: AnalysisDeps): Required<AnalysisService> {
 
     if (!planned.ok) {
       // 預算失敗：R2 判定仍要保存（來源變更造成的失效不能遺失）
-      transaction(db, () => writeChanges(synced.changed, claimUpdates, []));
+      transaction(db, () =>
+        writeChanges(synced.changed, claimUpdates, [], synced.deletedDocumentIds),
+      );
       return fail('over_budget');
     }
     const { plan } = planned;
@@ -175,7 +184,7 @@ export function createAnalysis(deps: AnalysisDeps): Required<AnalysisService> {
         plan.units.map((u) => u.unitId),
       );
     transaction(db, () => {
-      writeChanges(synced.changed, claimUpdates, empty);
+      writeChanges(synced.changed, claimUpdates, empty, synced.deletedDocumentIds);
       // 暫停中的舊工作計畫已過期、不再續跑：標成「來源已變更」，畫面不再提示續跑它
       if (paused) repos.analysisState.setBlockReason(paused.job.id, 'sources_changed');
       if (plan === null || run === null) return;

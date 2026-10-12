@@ -26,7 +26,8 @@ export function groupingInput(repos: Repositories, registry: SourceRegistry): Gr
   const authorized = new Set(
     registry
       .items()
-      .filter((item) => item.status === 'authorized')
+      // 已授權且最近一次列舉仍在（刪檔後重新列舉就不在）
+      .filter((item) => item.status === 'authorized' && item.present)
       .map((item) => item.id),
   );
   const assigned = repos.projectDocuments.all();

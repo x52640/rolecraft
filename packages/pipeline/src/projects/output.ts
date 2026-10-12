@@ -9,6 +9,8 @@ export const GROUPING_LIMITS = {
   groups: 100,
   /** 組名上限，與 contracts PROJECT_NAME_MAX_CHARS 相同 */
   name: 100,
+  /** 每組文件上限，與 contracts MAX_DOCUMENTS_PER_PROJECT 相同（超過整份不採用，不自動拆組） */
+  documentsPerGroup: 1000,
 } as const;
 
 export interface GroupDraft {
@@ -84,7 +86,8 @@ export function parseGroupingOutput(raw: string, known: ReadonlySet<string>): Gr
     const groups = list(obj.groups, 'groups', GROUPING_LIMITS.groups).map((value, i) => {
       const where = `groups[${String(i)}]`;
       const group = record(value, where, ['name', 'documents']);
-      const labels = list(group.documents, `${where}.documents`, known.size).map((label) => {
+      const max = Math.min(known.size, GROUPING_LIMITS.documentsPerGroup);
+      const labels = list(group.documents, `${where}.documents`, max).map((label) => {
         if (typeof label !== 'string' || !known.has(label)) fail(`${where} 引用未知文件`);
         if (seen.has(label)) fail(`${where} 文件重複出現`);
         seen.add(label);

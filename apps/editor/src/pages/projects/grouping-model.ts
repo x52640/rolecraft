@@ -1,7 +1,8 @@
-import type {
-  ProjectGroupInput,
-  ProjectSuggestionView,
-  SuggestedDocument,
+import {
+  MAX_DOCUMENTS_PER_PROJECT,
+  type ProjectGroupInput,
+  type ProjectSuggestionView,
+  type SuggestedDocument,
 } from '@rolecraft/contracts';
 
 /**
@@ -71,6 +72,12 @@ export function draftToRequest(draft: GroupingDraft): DraftRequest {
     if (!group.included) continue;
     const docs = documentsOf(draft, group.key);
     if (docs.length === 0) continue;
+    if (docs.length > MAX_DOCUMENTS_PER_PROJECT) {
+      return {
+        ok: false,
+        reason: `每個專案最多 ${String(MAX_DOCUMENTS_PER_PROJECT)} 份文件，請把文件分到其他組。`,
+      };
+    }
     const name = group.name.trim();
     if (name === '') return { ok: false, reason: '要建立的專案都要有名稱。' };
     if (name.length > 100) return { ok: false, reason: '專案名稱最多 100 字。' };

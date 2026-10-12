@@ -239,3 +239,38 @@ describe('analysis.suggest_projects：建議', () => {
     expect(last?.subscriptionOnly).toBe('failed');
   });
 });
+
+describe('刪除或讀不到的文件（P1-T063 對抗驗證）', () => {
+  it('刪檔後重新分析：建議不送它的摘要與名稱，確認建立帶它回 invalid_request', async () => {
+    env = testDataDir(FILES);
+    const each: GroupingResponder = (prompt) => ({
+      text: JSON.stringify({
+        groups: [...prompt.matchAll(/^(D\d+)：$/gmu)].map((m) => ({
+          name: `組 ${m[1] ?? ''}`,
+          documents: [m[1]],
+        })),
+      }),
+    });
+    const fake = projectsEngine(each);
+    const run = env.open(fake);
+    await analyzedBoth(run);
+    const notes = docId(run, 'notes.md');
+    env.files.delete('notes.md');
+    await run.call('analysis.start');
+
+    expect(await suggestion(run)).toMatchObject({
+      state: 'ready',
+      groups: [{ documents: [{ name: 'README.md' }] }],
+      ungrouped: [],
+    });
+    const prompt = groupingPrompts(fake.prompts).at(-1) ?? '';
+    expect(prompt).not.toContain('乙的摘要');
+    expect(prompt).not.toContain('notes.md');
+    expect(
+      await run.call('claims.create_projects', {
+        projects: [{ name: '乙', sourceDocumentIds: [notes] }],
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
+    expect(run.repos.projectEvidence.list()).toEqual([]);
+  });
+});

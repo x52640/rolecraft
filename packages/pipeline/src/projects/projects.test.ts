@@ -60,6 +60,15 @@ describe('parseGroupingOutput', () => {
   it.each(bad)('不合格（%s）整份不採用', (_name, raw) => {
     expect(parseGroupingOutput(raw, KNOWN).ok).toBe(false);
   });
+
+  it('一組超過建立上限 1000 份文件：整份不採用（codex review）', () => {
+    const labels = Array.from({ length: 1001 }, (_, i) => `D${String(i + 1)}`);
+    const known = new Set(labels);
+    const big = json({ groups: [{ name: '大組', documents: labels }] });
+    expect(parseGroupingOutput(big, known).ok).toBe(false);
+    const fits = json({ groups: [{ name: '大組', documents: labels.slice(0, 1000) }] });
+    expect(parseGroupingOutput(fits, known).ok).toBe(true);
+  });
 });
 
 const docs: GroupingDocument[] = [

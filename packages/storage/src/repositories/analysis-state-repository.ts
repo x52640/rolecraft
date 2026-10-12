@@ -44,6 +44,8 @@ export interface AnalysisStateRepository {
   saveSummary(row: DocumentSummaryRow): void;
   /** 文件改成只有空白等情況：舊摘要不再代表目前內容，刪掉 */
   deleteSummary(sourceDocumentId: string): void;
+  /** 文件已刪除或讀不到（P1-T063）：清掉已分析版本，之後恢復可讀時重新分析、重建摘要 */
+  deleteAnalyzed(sourceDocumentId: string): void;
 }
 
 function text(row: Record<string, unknown>, name: string, where: string): string {
@@ -153,6 +155,11 @@ export function createAnalysisStateRepository(db: DatabaseSync): AnalysisStateRe
         `INSERT INTO document_summaries (source_document_id, label, text) VALUES (?, ?, ?)
          ON CONFLICT (source_document_id) DO UPDATE SET label = excluded.label, text = excluded.text`,
       ).run(row.sourceDocumentId, row.label, row.text);
+    },
+    deleteAnalyzed(sourceDocumentId) {
+      db.prepare('DELETE FROM analyzed_documents WHERE source_document_id = ?').run(
+        sourceDocumentId,
+      );
     },
     deleteSummary(sourceDocumentId) {
       db.prepare('DELETE FROM document_summaries WHERE source_document_id = ?').run(

@@ -28,14 +28,21 @@ export interface ProjectOps {
   deleteProject(projectId: string): Promise<ClaimsWriteResult>;
 }
 
-/** 文件都存在、目前已授權、尚未屬於任何專案，且整個請求內不重複。 */
+/** 文件都存在、目前已授權、最近一次同步仍可讀（有摘要）、尚未屬於任何專案，且整個請求內不重複。 */
 function documentsUsable(
   repos: Repositories,
   groups: Payload<'claims.create_projects'>['projects'],
 ) {
   const seen = new Set<string>();
+  // 最近一次同步仍可讀的文件才有摘要（刪除或讀不到時同步會清掉，P1-T063 對抗驗證）
+  const readable = new Set(
+    repos.analysisState
+      .listSummaries()
+      .filter((summary) => /\S/u.test(summary.text))
+      .map((summary) => summary.sourceDocumentId),
+  );
   for (const id of groups.flatMap((g) => g.sourceDocumentIds)) {
-    if (seen.has(id)) return false;
+    if (seen.has(id) || !readable.has(id)) return false;
     seen.add(id);
     if (repos.sourceDocuments.get(id)?.authorizationStatus !== 'authorized') return false;
     if (repos.projectDocuments.projectOf(id) !== null) return false;

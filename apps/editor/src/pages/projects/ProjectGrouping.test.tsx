@@ -119,9 +119,49 @@ describe('<ProjectGrouping />', () => {
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('分組格式不合格'));
     expect(screen.queryByRole('button', { name: '確認建立' })).toBeNull();
   });
+
+  it('開始新建議後，舊的查詢晚到不會蓋掉執行中畫面（codex review）', async () => {
+    let releaseOld: (() => void) | null = null;
+    let polls = 0;
+    const transport: BridgeTransport = {
+      send(raw) {
+        const req = raw as Sent;
+        if (req.op === 'analysis.suggest_projects') {
+          return Promise.resolve({ ok: true, suggestion: { ...RUNNING, suggestionId: 's2' } });
+        }
+        polls += 1;
+        // 第一次（掛載時）卡住，等新建議開始後才回上一次的完成結果
+        if (polls === 1) {
+          return new Promise((resolve) => {
+            releaseOld = () => resolve({ ok: true, suggestion: READY });
+          });
+        }
+        return Promise.resolve({ ok: true, suggestion: { ...RUNNING, suggestionId: 's2' } });
+      },
+    };
+    mount(transport);
+    await waitFor(() => expect(releaseOld).not.toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: '建議專案分組' }));
+    await screen.findByRole('button', { name: '建議中…' });
+    await act(async () => {
+      releaseOld?.();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(screen.getByRole('button', { name: '建議中…' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '確認建立' })).toBeNull();
+  });
 });
 
 describe('grouping-model', () => {
+  it('一組超過建立上限 1000 份文件：不送出（codex review）', () => {
+    const many = Array.from({ length: 1001 }, (_, i) => doc(`d${String(i)}`, `f${String(i)}.md`));
+    const view = { ...READY, groups: [{ name: '大組', documents: many }], ungrouped: [] };
+    const result = draftToRequest(
+      draftFromSuggestion(view as Parameters<typeof draftFromSuggestion>[0]),
+    );
+    expect(result).toMatchObject({ ok: false });
+  });
+
   it('全部取消或組名空白：不送出', () => {
     const draft = draftFromSuggestion(READY as Parameters<typeof draftFromSuggestion>[0]);
     const none = toggleGroup(toggleGroup(draft, 'g0', false), 'g1', false);

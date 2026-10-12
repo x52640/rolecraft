@@ -1,5 +1,5 @@
 import type { ProjectSuggestionView } from '@rolecraft/contracts';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
 import { failureText } from './failure-text.ts';
@@ -20,6 +20,8 @@ export function useProjectSuggestion() {
   const [consumed, setConsumed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // 請求世代（codex review）：開始新建議時加一，之前送出的查詢晚到就丟掉，不蓋掉新一次的執行中畫面
+  const generation = useRef(0);
 
   const accept = useCallback((next: ProjectSuggestionView | null) => {
     setView(next);
@@ -29,7 +31,9 @@ export function useProjectSuggestion() {
   }, []);
 
   const refresh = useCallback(async () => {
+    const sentAt = generation.current;
     const res = await bridge.send({ op: 'analysis.project_suggestion', payload: {} });
+    if (sentAt !== generation.current) return;
     if (res.ok) accept(res.suggestion);
     else setNotice(failureText(res));
   }, [bridge, accept]);
@@ -49,8 +53,11 @@ export function useProjectSuggestion() {
     setBusy(true);
     setNotice(null);
     setDraft(null);
+    generation.current += 1;
+    const sentAt = generation.current;
     try {
       const res = await bridge.send({ op: 'analysis.suggest_projects', payload: {} });
+      if (sentAt !== generation.current) return;
       if (res.ok) accept(res.suggestion);
       else setNotice(failureText(res));
     } finally {
