@@ -1,7 +1,7 @@
 ---
 id: P1-T092
 phase: 1
-status: blocked
+status: ready
 depends_on: ["P1-T090"]
 specs: ["resume-output.md", "bridge.md"]
 track: editor
@@ -84,6 +84,6 @@ npm run verify
 - 最後完成：尚未開始
 - 已通過驗證：無
 - 下一步：等 P1-T090 完成後讀必讀入口開工
-- Blocker：相依 P1-T090 未完成
+- Blocker：無（P1-T090 契約與 helper 已合入 main 545217e，審查中；協調者 2026-10-13 提前放行，若 T090 審查改動契約再同步）
 
 ## 完成結果

@@ -11,7 +11,8 @@
 
 ## ready
 
-- 無
+- P1-T091 editor：個人資料頁（D30）
+- P1-T092 editor：履歷頁過期提示（D30 (a)）
 <!-- index:end -->
 
 ## 下一步（2026-10-11 codex 補審後）
