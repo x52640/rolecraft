@@ -24,6 +24,7 @@ export function IntroPanel({
   const state = useIntro(jobSnapshotId, poll);
   const textId = useId();
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
+  const [confirmReload, setConfirmReload] = useState(false);
   const { intro, check, generating } = state;
   const edited = intro !== null && (intro.userEdited || state.dirty);
   const length = introLength(state.text);
@@ -35,6 +36,16 @@ export function IntroPanel({
     }
     setConfirmOverwrite(false);
     void state.generate();
+  };
+
+  /** 已儲存的內容在別處變了時，可重新載入；有未存修改要再按一次確認（也可選擇儲存保留本地修改）。 */
+  const reload = () => {
+    if (state.dirty && !confirmReload) {
+      setConfirmReload(true);
+      return;
+    }
+    setConfirmReload(false);
+    void state.reload();
   };
 
   const copyBlocked = state.dirty
@@ -94,7 +105,15 @@ export function IntroPanel({
             >
               複製自介
             </button>
+            <button type="button" disabled={generating || state.saving} onClick={reload}>
+              重新載入已儲存內容
+            </button>
           </div>
+          {confirmReload && state.dirty ? (
+            <p role="alert">
+              重新載入會放棄你尚未儲存的修改；要保留就直接按「儲存修改」。確定放棄的話再按一次「重新載入已儲存內容」。
+            </p>
+          ) : null}
           {copyBlocked ? <p data-testid="copy-blocked">{copyBlocked}</p> : null}
           {!state.dirty && check?.warning ? (
             <p data-testid="intro-warning" className="job-hint">

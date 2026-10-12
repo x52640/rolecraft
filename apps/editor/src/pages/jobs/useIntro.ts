@@ -33,7 +33,7 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
   const [intro, setIntro] = useState<ApplicationIntro | null>(null);
   const [check, setCheck] = useState<IntroCheckView | null>(null);
   const [text, setText] = useState('');
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirtyState] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -43,6 +43,13 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
   const latestText = useRef('');
   /** 儲存請求序號：只採用最新一次儲存的回應（亂序回來的舊回應丟棄） */
   const saveSeq = useRef(0);
+
+  /** 有沒有未儲存修改（await 之後要看最新值，所以另存一份 ref） */
+  const dirtyRef = useRef(false);
+  const setDirty = (next: boolean) => {
+    dirtyRef.current = next;
+    setDirtyState(next);
+  };
 
   const applyText = (next: string) => {
     latestText.current = next;
@@ -164,16 +171,38 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     }
   }
 
-  /** 複製前重新讀取並重跑檢查；通過且內容與畫面一致才寫入剪貼簿。 */
+  /** 重新載入已儲存的內容（放棄未儲存的修改；有未存修改時由畫面先確認）。 */
+  async function reload() {
+    setNotice(null);
+    setFailure(null);
+    const loaded = await load();
+    if (disposed.current || loaded === undefined) return;
+    replaceText(loaded);
+    setNotice('已重新載入已儲存的內容。');
+  }
+
+  /**
+   * 複製前重新讀取並重跑檢查；通過且已儲存內容與「目前」編輯框一致才寫入剪貼簿
+   * （比對用 await 之後的編輯框內容：重檢期間使用者可能又改了）。
+   */
   async function copy() {
     setNotice(null);
     setFailure(null);
-    const shown = latestText.current;
     const loaded = await load();
     if (disposed.current || loaded === undefined) return;
     const fresh = loaded.intro;
-    if (!fresh || !loaded.check || fresh.text !== shown) {
-      setFailure('自介內容已變更：請重新檢查畫面上的內容後再複製。');
+    if (!fresh || !loaded.check) {
+      setFailure('找不到已儲存的自介：請重新產生。');
+      return;
+    }
+    if (dirtyRef.current) {
+      setFailure('有尚未儲存的修改：儲存後會重新檢查，通過才能複製。');
+      return;
+    }
+    if (fresh.text !== latestText.current) {
+      // 已儲存的內容在別處變了（另一頁編輯、逾時後才產生完成）；沒有未存修改就同步成新內容
+      replaceText(loaded);
+      setNotice('已儲存的自介在別處有變更，已更新為最新內容：請確認後再按一次複製。');
       return;
     }
     if (loaded.check.problem) {
@@ -204,5 +233,6 @@ export function useIntro(jobSnapshotId: string, poll: IntroPollOptions) {
     generate,
     save,
     copy,
+    reload,
   };
 }
