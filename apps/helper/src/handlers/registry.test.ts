@@ -204,6 +204,7 @@ describe('profile.update（D30，P1-T090）', () => {
     ['multiple_profiles', 'multiple_profiles'],
     ['bad_source_row', undefined],
     ['empty_profile', undefined],
+    ['invalid_profile', undefined],
   ] as const)('服務回 %s：invalid_request＋固定原因 %s', async (refusal, reason) => {
     const services: HelperServices = {
       profile: { update: () => ({ ok: false, reason: refusal }) },

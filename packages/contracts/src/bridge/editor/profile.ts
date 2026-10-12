@@ -20,9 +20,18 @@ export const ConfirmedProfile = Profile.refine((p) => p.pdfParseConfirmed, {
 const FromLabel = z.string().min(1).nullable();
 const FromIndex = z.int().min(0).nullable();
 
-/** profile.update 的一列基本資料（含「學歷」列）。 */
+/**
+ * 會被 Profile.personalInfo（record）丟掉的鍵：`__proto__` 寫進物件會被當成原型、不會留下（P1-T090 審查）。
+ * 其他名稱（constructor、toString…）照常是自己的鍵。
+ */
+const DROPPED_RECORD_KEYS: ReadonlySet<string> = new Set(['__proto__']);
+
+/** profile.update 的一列基本資料（含「學歷」列）。標籤不得是會被丟掉的鍵。 */
 export const ProfileUpdateInfoRow = z.strictObject({
-  label: z.string().min(1),
+  label: z
+    .string()
+    .min(1)
+    .refine((label) => !DROPPED_RECORD_KEYS.has(label), '不能用這個欄位名稱'),
   value: z.string(),
   from: FromLabel,
 });

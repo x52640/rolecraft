@@ -24,6 +24,7 @@ const UPDATE_MESSAGES: Record<ProfileUpdateRefusal, string> = {
   multiple_profiles: '資料區有多份個人資料，無法判斷要用哪一份',
   bad_source_row: '欄位對應不正確，這次修改沒有存',
   empty_profile: '內容全空，沒有可寫入的個人資料',
+  invalid_profile: '個人資料內容不合格，這次修改沒有存',
 };
 
 /** 有固定原因的（呼叫端據此處理）；其他只有固定訊息。 */

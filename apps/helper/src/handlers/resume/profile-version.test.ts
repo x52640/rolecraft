@@ -98,16 +98,18 @@ async function generate(db: ResumeDb, settled: Promise<void>) {
 }
 
 describe('ResumeVersion.profileVersion（D30 (a)）', () => {
-  it('產生後記到當時的 Profile 版本號；resume.get 照實帶出', async () => {
+  it('產生後記到當時的 Profile 版本號；resume.get／resume.list 照實帶出', async () => {
     const { db, settled } = setup([GOOD]);
     db.repos.profiles.save({ ...PROFILE, version: 7 });
     const saved = await generate(db, settled);
     expect(saved?.profileVersion).toBe(7);
     const got = await db.send({ op: 'resume.get', payload: { resumeVersionId: saved?.id } });
     expect(got).toMatchObject({ ok: true, version: { profileVersion: 7 } });
-    // resume.list 的契約已相加選填 profileVersion；handler（list.ts）不在 P1-T090 write_paths，尚未帶出
     const list = await db.send({ op: 'resume.list', payload: { jobSnapshotId: JOB } });
-    expect(list).toMatchObject({ ok: true, versions: [{ resumeVersionId: saved?.id }] });
+    expect(list).toEqual({
+      ok: true,
+      versions: [{ resumeVersionId: saved?.id, createdAt: saved?.createdAt, profileVersion: 7 }],
+    });
   });
 
   it('生成途中（兩次送出之間）Profile 被 profile.update 改過：記最後一次送出讀到的版本號', async () => {
@@ -165,5 +167,10 @@ describe('ResumeVersion.profileVersion（D30 (a)）', () => {
     };
     expect(got.ok).toBe(true);
     expect(got.version).not.toHaveProperty('profileVersion');
+    const list = (await db.send({ op: 'resume.list', payload: { jobSnapshotId: JOB } })) as {
+      versions: Record<string, unknown>[];
+    };
+    expect(list.versions).toHaveLength(1);
+    expect(list.versions[0]).not.toHaveProperty('profileVersion');
   });
 });

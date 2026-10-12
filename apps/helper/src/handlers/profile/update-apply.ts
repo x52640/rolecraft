@@ -2,8 +2,8 @@
 // 「已修改」→ 驗證（同 import.confirm）→ 組出新的 Profile（版本號加一）。不做 I/O；寫入由呼叫端在同一段同步程式內做。
 // 出處只從基準 Profile 搬移，請求裡沒有也不能帶出處文字。
 import {
+  Profile,
   profileVersionOf,
-  type Profile,
   type ProfileExperienceSources,
   type ProfileFieldSource,
   type ProfileSources,
@@ -53,7 +53,9 @@ function infoOf(base: Profile, request: ProfileUpdatePayload, sources: ProfileSo
       sources && Object.hasOwn(sources.personalInfo, row.from)
         ? sources.personalInfo[row.from]
         : undefined;
-    const source = moved(old, base.personalInfo[row.from] !== row.value);
+    // 值或標籤與來源列不同都算已修改（只改標籤時出處仍跟著，但要提示已改過；P1-T090 審查）
+    const changed = row.label !== row.from || base.personalInfo[row.from] !== row.value;
+    const source = moved(old, changed);
     if (source) moves.push([row.label, source]);
   }
   return { personalInfo: Object.fromEntries(values), sources: Object.fromEntries(moves) };
@@ -116,25 +118,32 @@ export function applyProfileUpdate(base: Profile, request: ProfileUpdatePayload)
   const experiences = experiencesOf(base, request, base.sources);
   const skills = skillsOf(base, request, base.sources);
   if (!info || !experiences || !skills) return { ok: false, reason: 'bad_source_row' };
-  const content = {
+  const built: Profile = {
+    id: base.id,
     personalInfo: info.personalInfo,
     experiences: experiences.experiences,
     skills: skills.skills,
-  };
-  if (isEmptyProfileContent(content)) return { ok: false, reason: 'empty_profile' };
-  return {
-    ok: true,
-    profile: {
-      id: base.id,
-      ...content,
-      // 儲存即視為使用者確認（D4），維持已確認（R10）
-      pdfParseConfirmed: true,
-      version: version + 1,
-      sources: {
-        personalInfo: info.sources,
-        experiences: experiences.sources,
-        skills: skills.sources,
-      },
+    // 儲存即視為使用者確認（D4），維持已確認（R10）
+    pdfParseConfirmed: true,
+    version: version + 1,
+    sources: {
+      personalInfo: info.sources,
+      experiences: experiences.sources,
+      skills: skills.sources,
     },
   };
+  // 雙保險（P1-T090 審查）：先過 Profile schema，而且驗證後不得少任何欄位（record 會丟掉 __proto__ 鍵；
+  // strict 物件多帶欄位會直接失敗），再以驗證後的內容做空內容檢查，避免存出與請求不一致或全空的 Profile。
+  const parsed = Profile.safeParse(built);
+  const keyCount = (record: Record<string, unknown> | undefined) =>
+    Object.keys(record ?? {}).length;
+  const dropped =
+    parsed.success &&
+    (keyCount(parsed.data.personalInfo) !== keyCount(built.personalInfo) ||
+      keyCount(parsed.data.sources?.personalInfo) !== keyCount(built.sources?.personalInfo));
+  if (!parsed.success || dropped) {
+    return { ok: false, reason: 'invalid_profile' };
+  }
+  if (isEmptyProfileContent(parsed.data)) return { ok: false, reason: 'empty_profile' };
+  return { ok: true, profile: parsed.data };
 }

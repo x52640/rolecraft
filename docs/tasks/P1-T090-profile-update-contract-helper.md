@@ -6,7 +6,7 @@ depends_on: ["P1-T079"]
 specs: ["resume-import.md", "bridge.md", "architecture.md", "evidence-model.md", "resume-output.md"]
 track: contracts
 primary_repo: rolecraft
-write_paths: ["packages/contracts/src/", "apps/helper/src/handlers/profile/", "apps/helper/src/handlers/import/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/bridge/__fixtures__/", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "apps/extension/src/bridge/client.test.ts", "packages/domain/src/evidence/profile-sources.test.ts", "packages/pipeline/src/generation/profile-sources.test.ts", "packages/pipeline/src/intro/profile-sources.test.ts", "packages/pipeline/src/resume-parse/check.ts", "packages/pipeline/src/resume-parse/web-check.ts", "packages/pipeline/src/resume-parse/types.ts", "apps/editor/src/pages/resumes/profile/useProfileCopy.ts", "apps/editor/src/pages/resumes/profile/ProfileCopy.test.ts", "apps/helper/src/handlers/resume/generation.ts", "apps/helper/src/handlers/resume/profile-version.test.ts"]
+write_paths: ["packages/contracts/src/", "apps/helper/src/handlers/profile/", "apps/helper/src/handlers/import/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/bridge/__fixtures__/", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "apps/extension/src/bridge/client.test.ts", "packages/domain/src/evidence/profile-sources.test.ts", "packages/pipeline/src/generation/profile-sources.test.ts", "packages/pipeline/src/intro/profile-sources.test.ts", "packages/pipeline/src/resume-parse/check.ts", "packages/pipeline/src/resume-parse/web-check.ts", "packages/pipeline/src/resume-parse/types.ts", "apps/editor/src/pages/resumes/profile/useProfileCopy.ts", "apps/editor/src/pages/resumes/profile/ProfileCopy.test.ts", "apps/helper/src/handlers/resume/generation.ts", "apps/helper/src/handlers/resume/profile-version.test.ts", "docs/specs/resume-import.md", "apps/helper/src/handlers/resume/list.ts", "apps/helper/src/handlers/resume/list.test.ts", "packages/pipeline/src/resume-parse/run.ts", "packages/pipeline/src/resume-parse/draft-limit-sources.test.ts"]
 contract_change: additive
 expected_commit: "feat(P1-T090): profile.update 契約與 helper：個人資料編輯、版本衝突、各欄出處、履歷版本記 Profile 版本號"
 ---
@@ -91,9 +91,13 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：「包含」各項與協調者補充、D30 (a) 補充實作完成，單一 commit（worker，worktree）
-- 已通過驗證：`npm run verify` 綠（4279 passed／34 skipped）
-- 下一步：協調者收官（範圍稽核、E3 對抗驗證、codex review）
+- 最後完成：首個 commit（c21ad2f）後，依協調者轉來的對抗審查＋codex 3 項與協調者核准 1 項修正（第二個 commit `fix(P1-T090): 審查項…`）：
+  1. （中）`profile.update` 標籤 `__proto__` 被 record 丟掉，可存出全空的已確認 Profile 或默默丟列 → contracts 擋 `__proto__` 標籤；`applyProfileUpdate` 組好後先以 `Profile` schema 驗證、與組出的內容比對一致再做空內容檢查。
+  2. （中）只改標籤不改值時出處被搬到新標籤且未標已修改 → 標籤與來源標籤不同也算已修改；同步 resume-import D30「欄位對應」（協調者核准 `docs/specs/resume-import.md` 加入 write_paths）。
+  3. （低）草稿 512 KiB 上限改為量測時排除 `moreLines`／`moreBlockIds`，維持 T069／T078／T080 原判定；判定通過但連同額外出處超過上限時拿掉額外出處（保住 `import.ai_status` 低於 1 MiB）。量測在 `pipeline/resume-parse/run.ts`，不在原 write_paths，因協調者指定此項修正而加入（含新測試檔 `draft-limit-sources.test.ts`）。
+  4. （協調者核准擴充 write_paths）`handlers/resume/list.ts`（與 `list.test.ts`）：`resume.list` 照實帶 `profileVersion`。
+- 已通過驗證：見完成結果
+- 下一步：協調者收官
 - Blocker：無
 
 ## 完成結果
@@ -106,4 +110,10 @@ npm run verify
 - **editor `useProfileCopy.ts`**：只比 `personalInfo`／`experiences`／`skills`。
 - **新測試**：`handlers/profile/profile-update.test.ts`、`handlers/import/confirm-sources.test.ts`、`handlers/resume/profile-version.test.ts`、`domain/evidence/profile-sources.test.ts`、`pipeline/generation/profile-sources.test.ts`、`pipeline/intro/profile-sources.test.ts`；`registry.test.ts`、`main.test.ts`、`ProfileCopy.test.ts` 補案例；`import.test.ts`、`web-session.test.ts` 的 Profile 期望值補上版本號與出處。
 - **保守選擇**：(1) 只有一份但未確認的 Profile，`profile.update` 回 `profile_missing`（同 `profile.get` 當成沒有）。(2) 「已修改」只看值（基本資料改標籤但值不變不算修改）。(3) PDF 通用規則預填的經歷不寫出處（不在 helper 重做編輯器的跨行對應）。(4) 只有一個出處單位卻不含整個值時，往後補連續單位到涵蓋為止（最多 30 個），補不到只記第一個。(5) 「至今」（`endDate` 為 null）沒有出處。
-- **殘餘**：`resume.list` 契約已相加 `profileVersion`，但 handler `handlers/resume/list.ts` 不在 write_paths，尚未帶出（P1-T092 若需要清單上顯示，要開 Task 改 list.ts；過期提示只需 `resume.get` 已帶出）。
+- **審查修正（第二個 commit）**：
+  1. `ProfileUpdateInfoRow.label` 擋 `__proto__`（實測 zod record 只丟這個鍵；`constructor`、`toString` 照常保留）；`applyProfileUpdate` 組好後先過 `Profile` schema、比對基本資料與出處的鍵數沒有少，再以驗證後的內容做空內容檢查，不合回新原因 `invalid_profile`（invalid_request、無固定原因）。
+  2. 基本資料列標籤與來源標籤不同也標「已修改」；spec resume-import D30「欄位對應」同步。
+  3. `pipeline/resume-parse/run.ts`：512 KiB 判定量測不含 `moreLines`／`moreBlockIds`；通過但連同額外出處超過上限時回傳拿掉額外出處的草稿（該次匯入的出處只剩第一個引用來源）。
+  4. `resume.list` 照實帶 `profileVersion`（舊版本不帶）。
+  - 新測試：`profile-update.test.ts` 審查項 3 則（`__proto__` 經 schema 被擋、繞過 schema 直接呼叫服務也不寫入、只改標籤標已修改）、`pipeline/resume-parse/draft-limit-sources.test.ts` 4 則（網頁與 PDF 的極端案例在模型輸出上限內：每欄 400 個引用、網頁 60 段／PDF 40 段）、`profile-version.test.ts` 的 `resume.list` 斷言、`registry.test.ts` 加 `invalid_profile`。修正前先跑過，確認這些測試會失敗。
+- **殘餘**：無新增。

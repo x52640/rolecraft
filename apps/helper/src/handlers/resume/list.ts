@@ -10,6 +10,11 @@ export const resumeList: OpHandler<'resume.list'> = async (payload, services) =>
   const sorted = [...versions].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return {
     ok: true,
-    versions: sorted.map((v) => ({ resumeVersionId: v.id, createdAt: v.createdAt })),
+    // D30 (a)：產生時的 Profile 版本號照實帶出（舊版本沒有就不帶）
+    versions: sorted.map((v) => ({
+      resumeVersionId: v.id,
+      createdAt: v.createdAt,
+      ...(v.profileVersion === undefined ? {} : { profileVersion: v.profileVersion }),
+    })),
   };
 };

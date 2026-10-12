@@ -273,3 +273,52 @@ describe('profile.update（D30）', () => {
     expect(env.repos.profiles.list()[0]?.version).toBe(3);
   });
 });
+
+describe('profile.update 審查項（P1-T090）', () => {
+  const onlyProto = (from: string | null): ProfileUpdatePayload => ({
+    baseVersion: 3,
+    personalInfo: [{ label: '__proto__', value: '范例安', from }],
+    experiences: [],
+    skills: [],
+  });
+
+  it('標籤 __proto__：schema 擋下（invalid_request），儲存不變', async () => {
+    const env = setup(BASE);
+    const before = JSON.stringify(env.repos.profiles.list());
+    for (const payload of [onlyProto(null), onlyProto('姓名')]) {
+      expect(await env.update(payload)).toBeNull();
+    }
+    const mixed = unchanged(BASE);
+    mixed.personalInfo.push({ label: '__proto__', value: 'x', from: null });
+    expect(await env.update(mixed)).toBeNull();
+    expect(JSON.stringify(env.repos.profiles.list())).toBe(before);
+  });
+
+  it('雙保險：繞過 schema 直接呼叫服務也不寫入（組出的 Profile 先過 schema、與內容一致）', () => {
+    const { db } = openDatabase(':memory:');
+    const repos = createRepositories(db);
+    repos.profiles.save(BASE);
+    const before = JSON.stringify(repos.profiles.list());
+    const service = createProfileService(repos.profiles);
+    expect(service.update?.(onlyProto(null))).toEqual({ ok: false, reason: 'invalid_profile' });
+    const mixed = unchanged(BASE);
+    mixed.personalInfo.push({ label: '__proto__', value: 'x', from: null });
+    expect(service.update?.(mixed)).toEqual({ ok: false, reason: 'invalid_profile' });
+    expect(JSON.stringify(repos.profiles.list())).toBe(before);
+  });
+
+  it('只改標籤不改值：出處搬到新標籤下並標已修改', async () => {
+    const env = setup(BASE);
+    const payload = unchanged(BASE);
+    payload.personalInfo = [
+      { label: '姓名', value: '范例安', from: '姓名' },
+      { label: '最高學歷', value: '虛構大學', from: '學歷' },
+    ];
+    const response = await env.update(payload);
+    expect(response).toMatchObject({ ok: true });
+    expect(env.repos.profiles.list()[0]?.sources?.personalInfo).toEqual({
+      姓名: src('姓名：范例安'),
+      最高學歷: src('虛構大學 資工系', true),
+    });
+  });
+});

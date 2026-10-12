@@ -3,6 +3,8 @@
  * R6 紀錄一律交 recordRunCheck。輸出先驗格式（整份不合格就失敗、不自動重試），再逐欄照抄檢查（check.ts），
  * 不符的欄位丟棄並記原因。姓名與聯絡資料由本機抽出（prepare 時），不經過模型。本模組不寫入任何資料。
  * 通過檢查的草稿序列化後 UTF-8 超過 512 KiB 整份判失敗（invalid_output；D28 W3，PDF 與網頁共用）。
+ * 量測時不算 D30 的額外出處（moreLines／moreBlockIds），維持原判定；通過後連同額外出處超過上限，
+ * 就拿掉額外出處再回傳（回應仍在上限內；出處原文因此只剩第一個引用來源，P1-T090 審查）。
  */
 import {
   IMPORT_AI_DRAFT_MAX_BYTES,
@@ -58,6 +60,24 @@ export function draftFitsLimit(draft: unknown): boolean {
   return utf8ByteLength(JSON.stringify(draft)) <= IMPORT_AI_DRAFT_MAX_BYTES;
 }
 
+/** D30 的額外出處欄位：只供確認匯入時取完整出處原文，不算進草稿大小判定。 */
+const EXTRA_SOURCE_KEYS: ReadonlySet<string> = new Set(['moreLines', 'moreBlockIds']);
+
+/** 拿掉所有額外出處欄位（其餘不變）。 */
+export function withoutExtraSources<D>(draft: D): D {
+  const json = JSON.stringify(draft, (key, value: unknown) =>
+    EXTRA_SOURCE_KEYS.has(key) ? undefined : value,
+  );
+  return JSON.parse(json) as D;
+}
+
+/** 大小判定（不算額外出處）；通過但連同額外出處超過上限時回拿掉額外出處的版本，不通過回 null。 */
+function sizedDraft<D>(draft: D): D | null {
+  const base = withoutExtraSources(draft);
+  if (!draftFitsLimit(base)) return null;
+  return draftFitsLimit(draft) ? draft : base;
+}
+
 /** 送出一次並驗格式；通過的輸出交給 build 檢查，草稿超過上限整份判失敗。 */
 async function runOnce<S, D>(
   prompt: string,
@@ -77,8 +97,8 @@ async function runOnce<S, D>(
   }
   const parsed = parseResumeParseOutput(outcome.result.text, source);
   if (!parsed.ok) return { ok: false, failure: 'invalid_output' };
-  const draft = build(parsed.output);
-  return draftFitsLimit(draft) ? { ok: true, draft } : { ok: false, failure: 'invalid_output' };
+  const draft = sizedDraft(build(parsed.output));
+  return draft === null ? { ok: false, failure: 'invalid_output' } : { ok: true, draft };
 }
 
 export function runResumeParse<S>(

@@ -13,9 +13,15 @@ export type ProfileGetOutcome =
  * - multiple_profiles：資料區已有多份 Profile（舊資料）
  * - bad_source_row：來源列不存在，或同一列被引用兩次
  * - empty_profile：個人資料、經歷、技能全空（驗證同 import.confirm）
+ * - invalid_profile：組出的 Profile 不合 schema，或驗證後與請求內容不一致（例如欄位被丟掉；雙保險）
  */
 export type ProfileUpdateRefusal =
-  'profile_conflict' | 'profile_missing' | 'multiple_profiles' | 'bad_source_row' | 'empty_profile';
+  | 'profile_conflict'
+  | 'profile_missing'
+  | 'multiple_profiles'
+  | 'bad_source_row'
+  | 'empty_profile'
+  | 'invalid_profile';
 
 export type ProfileUpdateOutcome =
   { ok: true; profile: Profile } | { ok: false; reason: ProfileUpdateRefusal };
