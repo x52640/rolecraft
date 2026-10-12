@@ -1,7 +1,7 @@
 ---
 id: P1-T061
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T060"]
 specs: ["evidence-model.md", "bridge.md", "architecture.md"]
 track: helper
@@ -79,7 +79,7 @@ npm run verify
 ## 中斷／接手紀錄
 
 - 最後完成：bridge.md 規則、contracts 新操作 `claims.list_unassigned`、helper handler／service、編輯器事實項頁「未歸專案」區與測試
-- 已通過驗證：worktree 內 `npm run verify` 全綠
+- 已通過驗證：worktree 與協調者主樹 `npm run verify` 全綠（2979 通過）；對抗驗證 2 個角度：發現 2 項經複核不成立（需有專案才會發生），轉 P1-T063；codex review 無發現
 - 下一步：協調者收官；擁有者手動驗證併 P1-T032
 - Blocker：無
 

@@ -5,7 +5,6 @@
 <!-- index:start -->
 ## 進行中
 
-- P1-T061 事實項頁列出未歸專案的事實項（`docs/tasks/P1-T061-unassigned-claims.md`）
 - P1-T062 Claude 重新驗證：中斷不算失敗、失敗只綁版本、可手動重新啟用（`docs/tasks/P1-T062-claude-reverify-recovery.md`）
 
 ## ready
