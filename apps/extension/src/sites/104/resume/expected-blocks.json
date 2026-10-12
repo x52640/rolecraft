@@ -45,38 +45,10 @@
       "continues": false
     },
     {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "編輯版型背景",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "更多",
-      "continues": false
-    },
-    {
       "kind": "heading",
       "level": 2,
       "label": null,
-      "text": "學歷 排列在第一筆的會被系統當作最高學歷哟～",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "新增",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "版型",
+      "text": "學歷",
       "continues": false
     },
     {
@@ -104,21 +76,7 @@
       "kind": "heading",
       "level": 2,
       "label": null,
-      "text": "工作經驗 系統依日期自動排序，如果經歷有調整過，記得總年資也要更新呦~",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "新增",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "版型",
+      "text": "工作經驗",
       "continues": false
     },
     {
@@ -237,13 +195,6 @@
       "kind": "paragraph",
       "level": null,
       "label": null,
-      "text": "查看薪資競爭力",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
       "text": "區域督導",
       "continues": false
     },
@@ -322,13 +273,6 @@
       "level": null,
       "label": null,
       "text": "#區域督導 #營收分析",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "解鎖薪資競爭力",
       "continues": false
     },
     {
@@ -489,13 +433,6 @@
       "kind": "paragraph",
       "level": null,
       "label": null,
-      "text": "解鎖薪資競爭力",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
       "text": "範",
       "continues": false
     },
@@ -580,13 +517,6 @@
       "kind": "paragraph",
       "level": null,
       "label": null,
-      "text": "解鎖薪資競爭力",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
       "text": "門市人員",
       "continues": false
     },
@@ -661,24 +591,10 @@
       "continues": false
     },
     {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "解鎖薪資競爭力",
-      "continues": false
-    },
-    {
       "kind": "heading",
       "level": 2,
       "label": null,
       "text": "求職條件",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "編輯版型",
       "continues": false
     },
     {
@@ -804,13 +720,6 @@
       "kind": "paragraph",
       "level": null,
       "label": null,
-      "text": "新增版型",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
       "text": "韓文",
       "continues": false
     },
@@ -819,13 +728,6 @@
       "level": null,
       "label": null,
       "text": "聽/略懂說/略懂讀/不會寫/不會",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "測你的中文能力",
       "continues": false
     },
     {
@@ -843,24 +745,10 @@
       "continues": false
     },
     {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "求職門檻多益700你有嗎？免費測",
-      "continues": false
-    },
-    {
       "kind": "heading",
       "level": 2,
       "label": null,
       "text": "專長",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "新增版型",
       "continues": false
     },
     {
@@ -987,13 +875,6 @@
       "level": null,
       "label": null,
       "text": "#門市營運 #排班 #新人培訓 #試算表 #顧客服務 #庫存管理 #活動企劃 #POS #團隊溝通 #展店 #食品衛生 #門市營運 #排班",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "免費職場能力檢測",
       "continues": false
     },
     {
@@ -1133,13 +1014,6 @@
       "kind": "paragraph",
       "level": null,
       "label": null,
-      "text": "編輯刪除",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
       "text": "林雨晴 Ivy Lin，高雄人。第一份打工在巷口的麵包店，從那時起就喜歡看著客人帶著剛出爐的麵包離開。",
       "continues": false
     },
@@ -1193,31 +1067,10 @@
       "continues": false
     },
     {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "更多",
-      "continues": false
-    },
-    {
       "kind": "heading",
       "level": 2,
       "label": null,
       "text": "專案成就",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "新增",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "版型",
       "continues": false
     },
     {
@@ -1312,13 +1165,6 @@
       "continues": false
     },
     {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "前往查看",
-      "continues": false
-    },
-    {
       "kind": "heading",
       "level": 3,
       "label": null,
@@ -1351,13 +1197,6 @@
       "level": null,
       "label": null,
       "text": "不同品牌的門市觀察服務細節。希望下一份工作能在營運管理上持續累積經驗，帶領團隊穩定成長。負責三家門市的日常營運與排班，每週檢視來客數與客單價，調整人力配置。建立新人訓練清單，讓新進人員在兩週內能獨立值班。與採購及中央廚房協調備料，降低報廢率並維持出餐速度。整理顧客意見表，歸納客人最常提的疑問後改寫門市服務話術。導入共用試算表追蹤庫存，每月盤點時間明顯縮短。協助規劃節慶檔期活動，與行銷同事一起設計店頭陳列。定期召開店務會議，追蹤改善事項並回報區域主管。處理客訴時先釐清事實，再提出。",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "前往查看",
       "continues": false
     },
     {
@@ -1417,13 +1256,6 @@
       "continues": false
     },
     {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "前往查看",
-      "continues": false
-    },
-    {
       "kind": "heading",
       "level": 3,
       "label": null,
@@ -1476,13 +1308,6 @@
       "kind": "paragraph",
       "level": null,
       "label": null,
-      "text": "編輯刪除",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
       "text": "2025/5~仍在進行",
       "continues": false
     },
@@ -1491,13 +1316,6 @@
       "level": null,
       "label": null,
       "text": "先釐清事實，再提出。",
-      "continues": false
-    },
-    {
-      "kind": "paragraph",
-      "level": null,
-      "label": null,
-      "text": "前往查看",
       "continues": false
     }
   ]

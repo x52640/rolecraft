@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import type { ResumeCaptureBlock } from '@rolecraft/contracts';
+import type { ResumeCaptureBlock, SubmitResumeCaptureRequest } from '@rolecraft/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
@@ -15,6 +15,8 @@ import {
   RUN_CHROME,
 } from './chrome.test-helpers.ts';
 import { resumeConfig104 } from './config.ts';
+import type { UiNoiseRules } from '../../resume/types.ts';
+import { UI_NOISE_104 } from './ui-noise.ts';
 
 const FIXTURE = readFileSync(
   path.join(import.meta.dirname, '../fixtures/resume-edit.html'),
@@ -44,8 +46,8 @@ const COLLAPSED = [
 
 /** ADR-0004 5.2：根節點底下的區塊標題（h2），info 頁首卡沒有標題。 */
 const SECTION_HEADINGS = [
-  '學歷 排列在第一筆的會被系統當作最高學歷哟～',
-  '工作經驗 系統依日期自動排序，如果經歷有調整過，記得總年資也要更新呦~',
+  '學歷',
+  '工作經驗',
   '求職條件',
   '語文能力',
   '專長',
@@ -53,6 +55,14 @@ const SECTION_HEADINGS = [
   '專案成就',
   '門市動線改善紀錄',
 ];
+
+/** ADR-0004 5.3 的介面字樣（D29）：過濾後一個都不能出現（按鈕會接成一個區塊，所以也比對組合）。 */
+const UI_WORDS = ['編輯', '版型', '背景', '更多', '新增', '刪除'];
+const UI_JOINED = /^(?:編輯|版型|背景|更多|新增|刪除)+$/u;
+
+function sameBlock(a: ResumeCaptureBlock | undefined, b: ResumeCaptureBlock): boolean {
+  return a?.kind === b.kind && a.level === b.level && a.label === b.label && a.text === b.text;
+}
 
 /** 依 h2 分段統計：清單項、h3（專案標題）、各段區塊數。 */
 function sections(blocks: readonly ResumeCaptureBlock[]) {
@@ -68,19 +78,29 @@ describe.runIf(RUN_CHROME)('104 履歷編輯頁 fixture（真實 Chrome，RUN_CH
   let probe: ChromeProbe;
   let blocks: ResumeCaptureBlock[];
   let payload: { truncated: boolean; nameText: string | null; url: string };
+  /** 不套介面字樣過濾的對照組（過濾前） */
+  let raw: { nameText: string | null; blocks: ResumeCaptureBlock[] };
 
   beforeAll(async () => {
     probe = await launchChromeProbe();
     probe.serve('/profile/edit', FIXTURE);
     const config = resumeConfig104();
-    const result = await probe.capture('/profile/edit', {
-      rootSelector: config.rootSelector,
-      nameSelector: config.nameSelector ?? null,
-      pageUrl: 'https://pda.104.com.tw/profile/edit?vno=fake#top',
-    });
-    if (typeof result !== 'object' || !('op' in result)) throw new Error(JSON.stringify(result));
-    payload = result.payload;
-    blocks = result.payload.blocks;
+    expect(config.uiNoise).toBe(UI_NOISE_104);
+    type Payload = SubmitResumeCaptureRequest['payload'];
+    const run = async (uiNoise: UiNoiseRules | null): Promise<Payload> => {
+      const result = await probe.capture('/profile/edit', {
+        rootSelector: config.rootSelector,
+        nameSelector: config.nameSelector ?? null,
+        uiNoise,
+        pageUrl: 'https://pda.104.com.tw/profile/edit?vno=fake#top',
+      });
+      if (typeof result !== 'object' || !('op' in result)) throw new Error(JSON.stringify(result));
+      return result.payload;
+    };
+    const filtered = await run(UI_NOISE_104);
+    payload = filtered;
+    blocks = filtered.blocks;
+    raw = await run(null);
   }, CHROME_TIMEOUT);
 
   afterAll(async () => {
@@ -94,13 +114,38 @@ describe.runIf(RUN_CHROME)('104 履歷編輯頁 fixture（真實 Chrome，RUN_CH
     expect(blocks).toEqual(EXPECTED.blocks);
   });
 
-  it('「更多」收合區（含聯絡資料、英文姓名）不送；fixture 裡確實有這些字', () => {
-    const sent = blocks.flatMap((b) => [b.text, b.label ?? '']).join('\n');
-    for (const value of COLLAPSED) {
-      expect(FIXTURE).toContain(value);
-      expect(sent).not.toContain(value);
+  it('「更多」收合區（含聯絡資料、英文姓名）過濾前後都不送；fixture 裡確實有這些字', () => {
+    for (const list of [blocks, raw.blocks]) {
+      const sent = list.flatMap((b) => [b.text, b.label ?? '']).join('\n');
+      for (const value of COLLAPSED) {
+        expect(FIXTURE).toContain(value);
+        expect(sent).not.toContain(value);
+      }
+      expect(sent).not.toMatch(/[\w.]+@[\w.]+/u);
     }
-    expect(sent).not.toMatch(/[\w.]+@[\w.]+/u);
+    expect(raw.nameText).toBe(payload.nameText);
+  });
+
+  it('介面字樣過濾（D29）：預期不含 ADR 列的字樣；其餘區塊與過濾前依序相同', () => {
+    expect(raw.blocks).toHaveLength(214);
+    const texts = blocks.map((b) => b.text);
+    for (const text of texts) expect(UI_JOINED.test(text)).toBe(false);
+    for (const noise of UI_NOISE_104.texts) expect(texts).not.toContain(noise);
+    const sent = texts.join('\n');
+    for (const hint of UI_NOISE_104.headingHints) expect(sent).not.toContain(hint);
+    // 過濾前確實有這些字樣（不是 fixture 沒有才通過）
+    const rawTexts = raw.blocks.map((b) => b.text);
+    expect(rawTexts.some((t) => UI_JOINED.test(t))).toBe(true);
+    for (const word of UI_WORDS) expect(rawTexts.join('')).toContain(word);
+    // 非標題區塊只少不多、順序不變（不會讀到過濾前沒有的內容）
+    const kept = blocks.filter((b) => b.kind !== 'heading');
+    let at = 0;
+    for (const block of kept) {
+      while (at < raw.blocks.length && !sameBlock(raw.blocks[at], block)) at += 1;
+      expect(at).toBeLessThan(raw.blocks.length);
+      at += 1;
+    }
+    expect(blocks.length).toBeLessThan(raw.blocks.length);
   });
 
   it('姓名元素是頁首卡的中文姓名；英文姓名元素（收合）不讀', () => {
@@ -125,8 +170,8 @@ describe.runIf(RUN_CHROME)('104 履歷編輯頁 fixture（真實 Chrome，RUN_CH
     // 專案成就 4 筆，標題是 h3；其他區塊沒有 h3
     expect(blocks.filter((b) => b.kind === 'heading' && b.level === 3)).toHaveLength(4);
     expect(count('專案成就', (b) => b.kind === 'heading')).toBe(4);
-    // 經歷 5 筆：每筆底下一個薪資推廣連結
-    expect(count('工作經驗', (b) => /薪資競爭力$/u.test(b.text))).toBe(5);
+    // 經歷 5 筆：每筆底下的薪資推廣連結已濾掉
+    expect(count('工作經驗', (b) => /薪資競爭力$/u.test(b.text))).toBe(0);
     // 自傳 2 段（中文、英文），第 1 段雖有「更多」（CSS 截高），全文都讀到
     expect(blocks.some((b) => b.text.startsWith('下一步想往多店營運的方向走'))).toBe(true);
     expect(blocks.some((b) => b.text.startsWith('Next, I want to look after'))).toBe(true);

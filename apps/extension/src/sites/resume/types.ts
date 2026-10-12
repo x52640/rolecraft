@@ -10,6 +10,21 @@ export interface ResumeSiteConfig {
   rootSelector: string;
   /** 選填的姓名元素選擇器 */
   nameSelector?: string | null;
+  /** 選填的介面字樣過濾規則（區塊抽取規則 7，D29）；沒登記＝不過濾 */
+  uiNoise?: UiNoiseRules | null;
+}
+
+/**
+ * 站台登記的介面字樣（按鈕、操作提示、推廣連結）：只列該站 fixture 與 ADR 記錄過的雜訊。
+ * 共用流程只執行這裡登記的規則（`noise.ts`）。
+ */
+export interface UiNoiseRules {
+  /** 一般區塊（非標題）的文字完全等於其中一項才丟；部分相符不丟 */
+  texts: readonly string[];
+  /** 元素選擇器：符合的元素整棵不讀（只用在抽取區塊，不影響根節點與姓名元素） */
+  selectors: readonly string[];
+  /** 標題裡夾帶的提示字樣：從標題文字移除，移除後變空才丟 */
+  headingHints: readonly string[];
 }
 
 /**

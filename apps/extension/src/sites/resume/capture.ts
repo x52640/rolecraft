@@ -8,6 +8,7 @@ import { relayMessage } from '../../relay/messages.ts';
 import { flatText } from './dom.ts';
 import { extractBlocks } from './extract.ts';
 import { applyLimits } from './limits.ts';
+import { filterNoiseBlocks, noiseElementMatcher } from './noise.ts';
 import { RESUME_FAILED_MESSAGE, RESUME_NOT_FOUND_MESSAGE } from './notice.ts';
 import { isReadableChain, scopedOracle } from './render.ts';
 import { joinLines } from './text.ts';
@@ -60,7 +61,10 @@ function originAndPath(pageUrl: string): string | null {
   }
 }
 
-/** 組請求：找不到根節點（或根節點沒有可讀內容）回 not_found；不符 schema 回 invalid。 */
+/**
+ * 組請求：找不到根節點（或根節點沒有可讀內容）回 not_found；不符 schema 回 invalid。
+ * 介面字樣過濾在上限之前（介面字樣不佔上限）；姓名元素不套過濾。
+ */
 export function buildResumeCapture(
   config: ResumeSiteConfig,
   deps: Pick<ResumeCaptureDeps, 'doc' | 'pageUrl' | 'oracle' | 'now'>,
@@ -69,7 +73,10 @@ export function buildResumeCapture(
   const oracle = scopedOracle(deps.oracle);
   const root = query(doc, config.rootSelector);
   if (!root || !isReadableChain(root, oracle, null)) return 'not_found';
-  const extracted = extractBlocks(root, oracle);
+  const extracted = filterNoiseBlocks(
+    extractBlocks(root, oracle, noiseElementMatcher(config.uiNoise)),
+    config.uiNoise,
+  );
   if (extracted.length === 0) return 'not_found';
   const { blocks, truncated } = applyLimits(extracted);
   const parsed = SubmitResumeCaptureRequest.safeParse({

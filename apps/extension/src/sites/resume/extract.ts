@@ -21,6 +21,8 @@ interface Ctx {
   oracle: RenderOracle;
   root: Element;
   pairs: Pairs;
+  /** 站台登記的介面元素（區塊抽取規則 7）：整棵不讀 */
+  isNoise: ((el: Element) => boolean) | null;
 }
 
 const PARAGRAPH: Shape = { kind: 'paragraph', level: null, label: null };
@@ -115,6 +117,7 @@ function scanFormPart(el: Element, ctx: Ctx, out: Item[]): boolean {
 
 function scanElement(el: Element, ctx: Ctx, mode: Mode, out: Item[]): void {
   if (isSkipped(el, ctx.oracle)) return;
+  if (ctx.isNoise?.(el) && el !== ctx.root) return;
   if (el.localName === 'br') {
     out.push({ text: '\n' });
     return;
@@ -160,6 +163,7 @@ function rowBlocks(tr: Element, ctx: Ctx): ResumeBlock[] {
     (cell) =>
       (cell.localName === 'td' || cell.localName === 'th') &&
       !isSkipped(cell, ctx.oracle) &&
+      !ctx.isNoise?.(cell) &&
       isChildRendered(tr, cell, ctx.oracle),
   );
   const scanned = cells.map((cell) => collect(cell, ctx, 'unit'));
@@ -180,11 +184,15 @@ function rowBlocks(tr: Element, ctx: Ctx): ResumeBlock[] {
 
 /**
  * 從根節點抽出區塊（未套上限）。根節點本身走同一套分類（標題、清單項、表格列、控制項…）；
- * 根節點的祖先是否可見由呼叫端判定。
+ * 根節點的祖先是否可見由呼叫端判定。`isNoise` 符合的元素（根節點除外）整棵不讀。
  */
-export function extractBlocks(root: Element, base: RenderOracle): ResumeBlock[] {
+export function extractBlocks(
+  root: Element,
+  base: RenderOracle,
+  isNoise: ((el: Element) => boolean) | null = null,
+): ResumeBlock[] {
   const oracle = scopedOracle(base);
-  const ctx: Ctx = { oracle, root, pairs: findPairs(root, oracle) };
+  const ctx: Ctx = { oracle, root, pairs: findPairs(root, oracle), isNoise };
   const items: Item[] = [];
   scanElement(root, ctx, 'paragraph', items);
   return flush(items, PARAGRAPH);

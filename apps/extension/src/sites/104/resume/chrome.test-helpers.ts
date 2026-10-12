@@ -12,6 +12,8 @@ import type { SubmitResumeCaptureRequest } from '@rolecraft/contracts';
 import puppeteer, { type Browser } from 'puppeteer-core';
 import { build } from 'vite';
 
+import type { UiNoiseRules } from '../../resume/types.ts';
+
 const HERE = import.meta.dirname;
 const DEFAULT_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 export const RUN_CHROME = process.env.RUN_CHROME === '1';
@@ -20,6 +22,7 @@ export const CHROME_TIMEOUT = 120_000;
 export interface ProbeRequest {
   rootSelector: string;
   nameSelector?: string | null;
+  uiNoise?: UiNoiseRules | null;
   pageUrl?: string;
   useChromeDom?: boolean;
 }
@@ -137,6 +140,7 @@ function fullRequest(request: ProbeRequest) {
   return {
     rootSelector: request.rootSelector,
     nameSelector: request.nameSelector ?? null,
+    uiNoise: request.uiNoise ?? null,
     pageUrl: request.pageUrl ?? 'https://resume.example.com/view',
     useChromeDom: request.useChromeDom ?? true,
   };

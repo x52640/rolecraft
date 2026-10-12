@@ -1,7 +1,7 @@
 ---
 id: P1-T088
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T077"]
 specs: ["web-resume-capture.md"]
 track: extension
@@ -77,16 +77,22 @@ RUN_CHROME=1 npx vitest run apps/extension/src/sites/104/resume
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠、`RUN_CHROME=1` 比對綠
-- [ ] 變更全在 write_paths 內
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠、`RUN_CHROME=1` 比對綠
+- [x] 變更全在 write_paths 內
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：實作、測試、expected-blocks、ADR-0004 5.3／5.4 更新（worker，2026-10-13）
+- 已通過驗證：`npm run verify` 綠；`RUN_CHROME=1 npx vitest run apps/extension/src/sites/104/resume` 3 檔 17 測試全過
+- 下一步：協調者收官（對抗驗證 E3、codex review、`RUN_CHROME=1` 實跑）
 - Blocker：無
 
 ## 完成結果
+
+- 共用流程：`src/sites/resume/noise.ts`（`noiseElementMatcher`、`filterNoiseBlocks`）＋`types.ts` 的 `UiNoiseRules`（`texts` 完全相等、`selectors` 元素整棵不讀、`headingHints` 從標題移除）。選擇器只在 `extract.ts` 抽區塊時用（根節點本身除外、表格儲存格也看），不碰 `isSkipped`／姓名元素；文字過濾在上限之前（介面字樣不佔上限）。被丟區塊後的續行改成不續行（contracts 要求續行接同一段）。全部被濾光＝not_found。沒登記規則的站行為不變。
+- 104 清單：`src/sites/104/resume/ui-noise.ts`，由 `config.ts` 帶入（registry 不動）。選擇器 `button`；完全相等 6 項（查看／解鎖薪資競爭力、測你的中文能力、求職門檻多益700你有嗎？免費測、免費職場能力檢測、前往查看）；標題提示 2 項。單字按鈕不登記成完全相等（職稱可能就是「編輯」）。
+- 真實 Chrome：過濾前 214 → 過濾後 188 區塊（丟 26：按鈕組合 14、推廣連結 8、前往查看 4；2 個標題移除提示）；其餘非標題區塊與過濾前依序相同；「更多」收合區個資過濾前後皆 0 筆、`nameText` 相同。
+- 測試：`resume/noise.test.ts`（合成 DOM 12 案例）；`104/resume/fixture.chrome.test.ts` 加過濾前對照組。
+- 殘餘：未跑對抗驗證與 codex review（交協調者收官）；fixture 只有預設版型，其他版型或 104 改版的按鈕／連結字樣要再登記；表單 label 若被登記成雜訊、而控制項在雜訊外，控制項仍會帶該 label 文字（104 本文沒有表單，未處理）。
