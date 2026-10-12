@@ -15,15 +15,25 @@ export const ResumeImportFailureReason = z.enum([
 ]);
 export type ResumeImportFailureReason = z.infer<typeof ResumeImportFailureReason>;
 
+/** PDF 的一行位置（頁碼、該頁第幾行）。 */
+export const ImportLineRef = z.strictObject({
+  pageNumber: z.int().min(1),
+  lineIndex: z.int().min(0),
+});
+export type ImportLineRef = z.infer<typeof ImportLineRef>;
+
 /**
  * 一個待校正欄位：值＋出處（頁碼、該頁第幾行）。一律未確認。
  * containsPersonalData（D28／W7，相加選填）：AI 草稿還原佔位字時還原出姓名或聯絡資料。
+ * moreLines（D30，相加選填）：AI 草稿的欄位引用多行時，第一行（pageNumber／lineIndex）以外的其餘引用行，
+ * 依送出順序；只引用一行時省略。helper 確認匯入時用它取完整的出處原文。
  */
 export const ImportDraftField = z.strictObject({
   value: z.string(),
   pageNumber: z.int().min(1),
   lineIndex: z.int().min(0),
   containsPersonalData: z.boolean().optional(),
+  moreLines: z.array(ImportLineRef).optional(),
 });
 export type ImportDraftField = z.infer<typeof ImportDraftField>;
 

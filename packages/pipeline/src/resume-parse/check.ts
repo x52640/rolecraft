@@ -160,10 +160,20 @@ export function checkFields<L extends SourceLine, F extends { readonly value: st
   return { education, experiences, skills, otherSections, discarded };
 }
 
+/**
+ * 出處＝第一個引用行；引用多行時其餘的放 moreLines（D30：確認匯入時取完整出處原文）。
+ * 只加欄位、不影響檢查結果；只引用一行時省略，形狀與先前相同。
+ */
 const PDF_ADAPTER: FieldAdapter<SentLine, ImportDraftField> = {
   toField: (value, _raw, cited) => {
-    const first = cited[0] as SentLine;
-    return { value, pageNumber: first.pageNumber, lineIndex: first.lineIndex };
+    const [first, ...rest] = cited as [SentLine, ...SentLine[]];
+    const moreLines = rest.map(({ pageNumber, lineIndex }) => ({ pageNumber, lineIndex }));
+    return {
+      value,
+      pageNumber: first.pageNumber,
+      lineIndex: first.lineIndex,
+      ...(moreLines.length > 0 ? { moreLines } : {}),
+    };
   },
 };
 

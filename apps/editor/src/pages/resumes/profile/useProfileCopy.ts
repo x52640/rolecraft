@@ -27,11 +27,16 @@ function stateOf(res: ProfileResponse): ProfileState | null {
   return null;
 }
 
-const same = (a: Profile, b: Profile) => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * 只比欄位值（基本資料、經歷、技能）；出處原文、版本號等中繼資料不比（D30：只有出處或版本號不同時仍可複製）。
+ */
+const values = (p: Profile) =>
+  JSON.stringify({ personalInfo: p.personalInfo, experiences: p.experiences, skills: p.skills });
+const same = (a: Profile, b: Profile) => values(a) === values(b);
 
 /**
  * 已確認個人資料的顯示與逐欄複製（P1-T085；resume-output「內容回填到求職網站」、D28 Q12）。
- * 按下複製時重新 profile.get：讀回的整份 Profile 與畫面完全一致才把該欄寫入剪貼簿；
+ * 按下複製時重新 profile.get：讀回的整份 Profile 欄位值與畫面完全一致才把該欄寫入剪貼簿；
  * 不一致就把畫面更新成讀回的內容、請使用者確認後再按一次（不在同一次按下裡複製新值）。
  */
 export function useProfileCopy(lock: BlockLock) {

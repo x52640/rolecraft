@@ -91,6 +91,37 @@ describe('個人資料複製（P1-T085）', () => {
     expect(shown('Go')).toBe(true);
   });
 
+  it('只有出處或版本號不同：仍可複製（D30：中繼資料不比）', async () => {
+    const source = { kind: 'web', text: '甲公司 前端', truncated: false, modified: false } as const;
+    const base = sampleProfile();
+    const withMeta = sampleProfile({
+      version: 9,
+      sources: {
+        personalInfo: {},
+        experiences: base.experiences.map(() => ({
+          company: source,
+          title: null,
+          startDate: null,
+          endDate: null,
+          description: null,
+        })),
+        skills: base.skills.map(() => ({ ...source, modified: true })),
+      },
+    });
+    const helper = fakeHelper({
+      profileReplies: [
+        { ok: true, profile: base },
+        { ok: true, profile: base },
+        { ok: true, profile: withMeta },
+      ],
+    });
+    renderPanel(helper);
+    await screen.findByText('甲公司');
+    fireEvent.click(copyButton('經歷 1的公司'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('甲公司'));
+    expect(shown(PROFILE_TEXT.changed)).toBe(false);
+  });
+
   it('重新讀取時已沒有 Profile：不複製、畫面改成沒有個人資料', async () => {
     const helper = fakeHelper({
       profileReplies: [

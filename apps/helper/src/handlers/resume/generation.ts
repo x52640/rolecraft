@@ -6,14 +6,15 @@
 //   改為已暫停，等使用者主動續跑（D21）。工作狀態查詢與續跑沒有橋接操作，本 Task 不做。
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-  JobSnapshot,
-  Profile,
-  Provider,
-  ResumeSection,
-  ResumeVersion,
-  SectionPlacement,
-  WorkJob,
+import {
+  profileVersionOf,
+  type JobSnapshot,
+  type Profile,
+  type Provider,
+  type ResumeSection,
+  type ResumeVersion,
+  type SectionPlacement,
+  type WorkJob,
 } from '@rolecraft/contracts';
 import { createWorkRun, restoreWorkRun, type InputBudget } from '@rolecraft/domain';
 import {
@@ -85,8 +86,11 @@ export function toPlacement(placement: PipelinePlacement): SectionPlacement {
   }
 }
 
-/** 生成結果 → 要存的履歷版本：補上段落歸屬，decision 從 pending 開始。 */
-export function toStoredVersion(result: GenerationResult): ResumeVersion {
+/**
+ * 生成結果 → 要存的履歷版本：補上段落歸屬，decision 從 pending 開始；
+ * 記下產生時的 Profile 版本號（D30 (a)：最後一次送出模型時讀到的，沒有記 0）。
+ */
+export function toStoredVersion(result: GenerationResult, profileVersion = 0): ResumeVersion {
   const bySection = new Map(result.placements.map((p) => [p.sectionId, p.placement]));
   const sections = result.resumeVersion.sections.map((section): ResumeSection => {
     const placement = bySection.get(section.id);
@@ -98,7 +102,7 @@ export function toStoredVersion(result: GenerationResult): ResumeVersion {
       decision: 'pending',
     };
   });
-  return { ...result.resumeVersion, sections };
+  return { ...result.resumeVersion, sections, profileVersion };
 }
 
 function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -154,6 +158,11 @@ export function createGeneration(deps: GenerationDeps) {
     if (!pre.ok) return failure(PREPARE_REASONS[pre.reason]);
     if (running.has(jobSnapshotId)) return failure('already_running');
 
+    /**
+     * D30 (a)：runner 每次送出前都會重讀（loadInputs → 送出），所以最後一次 loadInputs 讀到的
+     * 就是最後一次送出用的 Profile；存檔時用這個值，不另外重讀。
+     */
+    let sentProfileVersion = 0;
     const initial = createWorkRun(plan.jobId, [plan.unitId]);
     repos.workJobs.save(initial.job);
     const controller = new AbortController();
@@ -168,11 +177,13 @@ export function createGeneration(deps: GenerationDeps) {
       },
       loadInputs: async () => {
         await deps.gate?.refresh();
-        return loadInputs(jobSnapshotId);
+        const inputs = loadInputs(jobSnapshotId);
+        sentProfileVersion = inputs.profile ? profileVersionOf(inputs.profile) : 0;
+        return inputs;
       },
       commitUnit: ({ job, written }) => {
         transaction(db, () => {
-          repos.resumeVersions.save(toStoredVersion(written.output));
+          repos.resumeVersions.save(toStoredVersion(written.output, sentProfileVersion));
           repos.workJobs.save(job);
         });
         return Promise.resolve();

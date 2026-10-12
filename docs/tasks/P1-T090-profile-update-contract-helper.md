@@ -1,7 +1,7 @@
 ---
 id: P1-T090
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T079"]
 specs: ["resume-import.md", "bridge.md", "architecture.md", "evidence-model.md", "resume-output.md"]
 track: contracts
@@ -91,9 +91,19 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：讀必讀入口後開工
+- 最後完成：「包含」各項與協調者補充、D30 (a) 補充實作完成，單一 commit（worker，worktree）
+- 已通過驗證：`npm run verify` 綠（4279 passed／34 skipped）
+- 下一步：協調者收官（範圍稽核、E3 對抗驗證、codex review）
 - Blocker：無
 
 ## 完成結果
+
+- **contracts（additive）**：`Profile` 相加選填 `version`（非負整數）與 `sources`（`ProfileSources`：基本資料以欄位名對應、經歷／技能與 Profile 同索引；每欄 `kind`／`text`≤300 字／`truncated`／`modified`），並以 refine 鎖住出處與欄位對齊；`ProfileInput` 改為 `ProfileContent`（只有欄位值，帶 `version`／`sources` 被 strict schema 擋）。`profile.update` 請求（`baseVersion`＋每列 `from`：基本資料原標籤、經歷／技能原位置、null＝新增；欄位名不可重複）與回應（整份已確認 Profile）。`BridgeFailureReason` 加 `profile_conflict`、`profile_missing`。`ResumeVersion`、`resume.list` 項目相加選填 `profileVersion`。`ImportDraftField` 加選填 `moreLines`、`ImportWebDraftField` 加選填 `moreBlockIds`（第一個以外的其餘引用來源，只引用一個時省略）。兩份 editor-requests fixture 加 `profile.update`。
+- **pipeline 照抄檢查**（`check.ts`、`web-check.ts`）：只在 `toField` 多帶其餘引用來源，檢查邏輯不變；P1-T069／T078／T080 既有測試全過。
+- **helper `profile.update`**（`handlers/profile/update.ts`、`update-apply.ts`、`profile-service.ts`）：讀唯一 Profile → 比版本 → 搬移出處（值與基準不同標 `modified`，標過就保留）→ 驗證（內容全空擋，同 import.confirm）→ 寫入，全部在同一段同步程式內（node:sqlite 同步、無 await）。來源列以 `Object.hasOwn` 判斷（`constructor` 等原型名稱不算）。
+- **helper `import.confirm`**（`confirm-draft.ts`、`confirm-sources.ts`）：AI 整理成功用 AI 草稿，否則 PDF 用本機預填（有 104 結構化草稿用它，否則只有姓名與技能）；網頁無 AI 草稿與手動輸入沒有出處。比對與出處文字照 resume-import「出處」；版本號 = 既有 +1（新建為 1）；出處整份重算。
+- **helper `generation.ts`**：runner 的 `loadInputs` 每次記下讀到的 Profile 版本號，`commitUnit` 用最後一次的值寫 `profileVersion`，不在存檔時重讀；pipeline generation 未改。
+- **editor `useProfileCopy.ts`**：只比 `personalInfo`／`experiences`／`skills`。
+- **新測試**：`handlers/profile/profile-update.test.ts`、`handlers/import/confirm-sources.test.ts`、`handlers/resume/profile-version.test.ts`、`domain/evidence/profile-sources.test.ts`、`pipeline/generation/profile-sources.test.ts`、`pipeline/intro/profile-sources.test.ts`；`registry.test.ts`、`main.test.ts`、`ProfileCopy.test.ts` 補案例；`import.test.ts`、`web-session.test.ts` 的 Profile 期望值補上版本號與出處。
+- **保守選擇**：(1) 只有一份但未確認的 Profile，`profile.update` 回 `profile_missing`（同 `profile.get` 當成沒有）。(2) 「已修改」只看值（基本資料改標籤但值不變不算修改）。(3) PDF 通用規則預填的經歷不寫出處（不在 helper 重做編輯器的跨行對應）。(4) 只有一個出處單位卻不含整個值時，往後補連續單位到涵蓋為止（最多 30 個），補不到只記第一個。(5) 「至今」（`endDate` 為 null）沒有出處。
+- **殘餘**：`resume.list` 契約已相加 `profileVersion`，但 handler `handlers/resume/list.ts` 不在 write_paths，尚未帶出（P1-T092 若需要清單上顯示，要開 Task 改 list.ts；過期提示只需 `resume.get` 已帶出）。

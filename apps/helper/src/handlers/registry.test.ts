@@ -9,6 +9,7 @@ import { editorRequests } from '../bridge/__fixtures__/editor-requests.ts';
 import { connectDataDir, DATA_DIR_IN_USE_MESSAGE } from '../services/data-dir.ts';
 import { DataDirInUseError } from '../services/runtime.ts';
 import { HANDLERS } from './registry.ts';
+import type { ProfileService } from './profile/service.ts';
 import type { HelperServices } from './services.ts';
 
 const HERE = import.meta.dirname;
@@ -168,5 +169,50 @@ describe('D28 新操作（P1-T074）', () => {
       const response = await HANDLERS['photo.pick']({}, services);
       expect(response).toEqual({ ok: true, selection: { status } });
     }
+  });
+});
+
+describe('profile.update（D30，P1-T090）', () => {
+  const update = HANDLERS['profile.update'] as (p: unknown, s: HelperServices) => Promise<unknown>;
+  const payload = editorRequests['profile.update'].payload;
+
+  it('資料區被另一個 helper 占用時回 helper_unavailable，不呼叫服務', async () => {
+    const called: string[] = [];
+    const spy = { update: () => called.push('update') };
+    const services = connectDataDir(
+      { dataDir: '/nonexistent', fontsDir: '/f' },
+      {
+        open: () => {
+          throw new DataDirInUseError();
+        },
+        assemble: () => ({}),
+        withoutStorage: () => ({ profile: spy as unknown as ProfileService }),
+        notice: () => undefined,
+      },
+    );
+    const response = await update(payload, services);
+    expect(response).toEqual({
+      ok: false,
+      error: { code: 'helper_unavailable', message: DATA_DIR_IN_USE_MESSAGE },
+    });
+    expect(called).toEqual([]);
+  });
+
+  it.each([
+    ['profile_conflict', 'profile_conflict'],
+    ['profile_missing', 'profile_missing'],
+    ['multiple_profiles', 'multiple_profiles'],
+    ['bad_source_row', undefined],
+    ['empty_profile', undefined],
+  ] as const)('服務回 %s：invalid_request＋固定原因 %s', async (refusal, reason) => {
+    const services: HelperServices = {
+      profile: { update: () => ({ ok: false, reason: refusal }) },
+    };
+    const response = await update(payload, services);
+    expect(response).toEqual({
+      ok: false,
+      error: { code: 'invalid_request', message: anyString, ...(reason ? { reason } : {}) },
+    });
+    expect(BRIDGE_SCHEMAS['profile.update'].response.safeParse(response).success).toBe(true);
   });
 });

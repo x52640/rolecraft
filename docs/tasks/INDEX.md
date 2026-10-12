@@ -96,7 +96,7 @@
 | [P1-T087](P1-T087-editor-hide-pdf-import.md) | editor：拿掉 PDF 匯入入口（Q10） | blocked | 1 | editor | P1-T077、P1-T080、P1-T081 |
 | [P1-T088](P1-T088-extension-104-ui-noise-filter.md) | extension：104 履歷頁介面字樣過濾（D29 (a)） | done | 1 | extension | P1-T077 |
 | [P1-T089](P1-T089-editor-web-import-review.md) | editor：網頁來源核對改版（D29 (b)(c)(d)） | done | 1 | editor | P1-T081 |
-| [P1-T090](P1-T090-profile-update-contract-helper.md) | contracts＋helper：profile.update、Profile 版本號與各欄出處（D30） | ready | 1 | contracts | P1-T079 |
+| [P1-T090](P1-T090-profile-update-contract-helper.md) | contracts＋helper：profile.update、Profile 版本號與各欄出處（D30） | in_progress | 1 | contracts | P1-T079 |
 | [P1-T091](P1-T091-editor-profile-page.md) | editor：個人資料頁（D30） | blocked | 1 | editor | P1-T090 |
 | [P1-T092](P1-T092-editor-resume-stale-notice.md) | editor：履歷頁過期提示（D30 (a)） | blocked | 1 | editor | P1-T090 |
 | [P1-T093](P1-T093-pipeline-redact-url-residence.md) | pipeline：送模型前遮蔽網址與區級居住地（D31） | in_progress | 1 | pipeline | P1-T080 |

@@ -90,7 +90,14 @@ export const RESUME_SCHEMAS = {
     response: withFailure(
       z.strictObject({
         ok: z.literal(true),
-        versions: z.array(z.strictObject({ resumeVersionId: Id, createdAt: Timestamp })),
+        versions: z.array(
+          z.strictObject({
+            resumeVersionId: Id,
+            createdAt: Timestamp,
+            /** 產生時的 Profile 版本號（D30 (a)，相加選填；舊版本沒有） */
+            profileVersion: z.int().min(0).optional(),
+          }),
+        ),
       }),
     ),
   },

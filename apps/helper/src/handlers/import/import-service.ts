@@ -3,19 +3,23 @@
 // 沒有選取器時不提供 pickPdf（回尚未支援），網頁擷取與手動輸入照常可用。
 // 工作階段只留在記憶體（Q11）：三種來源共用最多 maxImports 筆、超過丟最舊；擷取送達不呼叫模型。
 // 有接上 AI（deps.ai）時另提供 AI 整理（P1-T069，ai-runner.ts）；沒接上時這兩個方法不存在（回尚未支援）。
-import type {
-  ImportLatestCapture,
-  ImportResult,
-  Profile,
-  ProfileInput,
+import {
+  profileVersionOf,
+  type ImportLatestCapture,
+  type ImportResult,
+  type Profile,
+  type ProfileInput,
 } from '@rolecraft/contracts';
 import { extractResumePdf, type ExtractResult } from '@rolecraft/resume-import';
 import { newId as defaultNewId } from '@rolecraft/storage';
 
+import { isEmptyProfileContent } from '../profile/content.ts';
 import { uniqueProfile } from '../profile/unique.ts';
 import { createAiParser, type AiSource, type ImportAiDeps } from './ai-runner.ts';
 import type { AiJob } from './ai-jobs.ts';
 import { aiSourceOf } from './ai-source.ts';
+import { sourceDraftOf } from './confirm-draft.ts';
+import { confirmSources } from './confirm-sources.ts';
 import { webInputsOf } from './ai-web-source.ts';
 import type {
   ConfirmOutcome,
@@ -66,12 +70,6 @@ interface ImportEntry {
   aiSource: AiSource | null;
   /** 網頁來源的網址與姓名元素文字：只在 helper 本機（P1-T080 遮蔽與預填用） */
   capture: WebCaptureLocal | null;
-}
-
-/** 個人資料、經歷、技能全空：沒有可寫入的內容。 */
-function isEmptyProfile(profile: ProfileInput): boolean {
-  const hasInfo = Object.values(profile.personalInfo).some((value) => /\S/u.test(value));
-  return !hasInfo && profile.experiences.length === 0 && profile.skills.length === 0;
 }
 
 /** 這筆匯入要整理的來源：PDF 用解析出的行；網頁用區塊＋姓名來源（呼叫當下讀資料區 Profile）；手動沒有。 */
@@ -179,13 +177,20 @@ export function createResumeImportService(deps: ResumeImportDeps): ResumeImportS
     confirm(importId, profile): ConfirmOutcome {
       const entry = imports.get(importId);
       if (!entry) return { ok: false, reason: 'unknown_import' };
-      if (isEmptyProfile(profile)) return { ok: false, reason: 'empty_profile' };
-      // Q8：已有一份就更新那一份（保留 id），沒有才新增；多份（舊資料）不寫入、不代為挑選
+      if (isEmptyProfileContent(profile)) return { ok: false, reason: 'empty_profile' };
+      // D30：出處依該工作階段的草稿比對，文字一律從工作階段原文取（請求沒有出處欄位）
+      const sources = confirmSources(
+        sourceDraftOf(entry.result, ai?.status(importId) ?? null),
+        profile,
+      );
+      // Q8：已有一份就更新那一份（保留 id），沒有才新增；多份（舊資料）不寫入、不代為挑選。
+      // 讀、版本號加一、寫在同一段同步程式內（中間沒有 await），profile.update 插不進來（D30）。
       const existing = uniqueProfile(deps.profiles.list());
       if (!existing.ok) return existing;
       const profileId = existing.profile?.id ?? newId();
-      // 只寫請求帶來的內容（使用者確認當下看到的），不混入草稿或先前暫存的校正。
-      deps.profiles.save({ ...profile, id: profileId, pdfParseConfirmed: true });
+      const version = existing.profile ? profileVersionOf(existing.profile) + 1 : 1;
+      // 只寫請求帶來的內容（使用者確認當下看到的），不混入草稿或先前暫存的校正；出處整份重算（取代舊的）。
+      deps.profiles.save({ ...profile, id: profileId, pdfParseConfirmed: true, version, sources });
       entry.corrections = profile;
       return { ok: true, profileId };
     },

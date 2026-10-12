@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { Id, NonEmptyText } from '../../entities/common.ts';
-import { Profile } from '../../entities/profile.ts';
+import { ProfileContent } from '../../entities/profile.ts';
 import { Ack, EmptyPayload, OpaqueId, bridgeOp } from '../common.ts';
 import { withFailure } from '../operations.ts';
 import {
@@ -85,8 +85,11 @@ export const ImportAiParseView = z
   });
 export type ImportAiParseView = z.infer<typeof ImportAiParseView>;
 
-/** 使用者校正後的個人資料（Profile 去掉 id 與確認旗標；確認旗標只由 import.confirm 設定）。 */
-export const ProfileInput = Profile.omit({ id: true, pdfParseConfirmed: true });
+/**
+ * 使用者校正後的個人資料（Profile 去掉 id 與確認旗標；確認旗標只由 import.confirm 設定）。
+ * D30：也不含版本號與出處（由 helper 管理、從工作階段原文取出；呼叫端送來就被 schema 擋）。
+ */
+export const ProfileInput = ProfileContent;
 export type ProfileInput = z.infer<typeof ProfileInput>;
 
 const ImportRef = z.strictObject({ importId: OpaqueId });
@@ -125,6 +128,7 @@ export const IMPORT_SCHEMAS = {
    * 帶的是使用者確認當下看到的內容；解析失敗時也可確認手動輸入的內容（D18）。
    * D28／Q8（網頁、PDF、手動共用）：已有一份 Profile 就更新那一份（保留 id），沒有才新增；
    * 已有多份時不寫入，回 invalid_request＋固定原因 multiple_profiles。
+   * D30：請求形狀不變；helper 依工作階段草稿比對寫下各欄出處（不接受呼叫端的出處文字）、版本號加一。
    */
   'import.confirm': {
     request: bridgeOp('import.confirm', WithProfile),

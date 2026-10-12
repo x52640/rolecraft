@@ -55,6 +55,7 @@ import { photoGet } from './photo/get.ts';
 import { photoPick } from './photo/pick.ts';
 import { photoRemove } from './photo/remove.ts';
 import { profileGet } from './profile/get.ts';
+import { profileUpdate } from './profile/update.ts';
 import { providersListCandidates } from './providers/list-candidates.ts';
 import { providersRecheck } from './providers/recheck.ts';
 import { providersReverifyClaude } from './providers/reverify-claude.ts';
@@ -95,6 +96,7 @@ const RAW_HANDLERS: HandlerTable = {
   'import.latest_capture': importLatestCapture,
   'import.start_manual': importStartManual,
   'profile.get': profileGet,
+  'profile.update': profileUpdate,
   'photo.pick': photoPick,
   'photo.get': photoGet,
   'photo.remove': photoRemove,

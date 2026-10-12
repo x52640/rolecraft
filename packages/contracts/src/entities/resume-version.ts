@@ -94,6 +94,11 @@ export const ResumeVersion = z.strictObject({
   jobSnapshotId: Id,
   sections: z.array(ResumeSection),
   createdAt: Timestamp,
+  /**
+   * 產生時的 Profile 版本號（D30 (a)，相加選填）：這次生成最後一次送出模型時實際讀到的 Profile 版本號
+   * （沒有版本號記 0）。之後的段落編輯、接受、確認都不改；舊版本沒有這欄，比對時視為 0。
+   */
+  profileVersion: z.int().min(0).optional(),
 });
 export type ResumeVersion = z.infer<typeof ResumeVersion>;
 

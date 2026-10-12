@@ -69,6 +69,24 @@ export const editorRequests = {
   'import.start_manual': { op: 'import.start_manual', payload: {} },
   submit_resume_capture: { op: 'submit_resume_capture', payload: resumeCapture },
   'profile.get': { op: 'profile.get', payload: {} },
+  'profile.update': {
+    op: 'profile.update',
+    payload: {
+      baseVersion: 0,
+      personalInfo: [{ label: '姓名', value: '王小明', from: '姓名' }],
+      experiences: [
+        {
+          company: '某公司',
+          title: '工程師',
+          startDate: '2020-01',
+          endDate: null,
+          description: '',
+          from: 0,
+        },
+      ],
+      skills: [{ value: 'TypeScript', from: null }],
+    },
+  },
   'photo.pick': { op: 'photo.pick', payload: {} },
   'photo.get': { op: 'photo.get', payload: {} },
   'photo.remove': { op: 'photo.remove', payload: {} },

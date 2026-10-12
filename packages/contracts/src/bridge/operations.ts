@@ -27,8 +27,9 @@ export const BridgeOperation = z.enum([
   'import.ai_status',
   'import.latest_capture', // 最近一次網頁擷取（D28）；查詢不觸發 AI 整理
   'import.start_manual', // 建立沒有原文的匯入工作階段（D28，手動輸入）
-  // profile：唯讀已確認的 Profile，供複製按鈕比對（D28）
+  // profile：已確認的 Profile，供複製按鈕比對（D28）與個人資料頁編輯（D30）
   'profile.get',
+  'profile.update', // 個人資料頁按儲存：帶基準版本號，不符回 profile_conflict（D30）
   // photo：匯出用的目前照片（D28）；照片不送模型
   'photo.pick',
   'photo.get',
@@ -121,9 +122,16 @@ export type BridgeErrorCode = z.infer<typeof BridgeErrorCode>;
 /**
  * 失敗的固定原因（D28，相加）：讓呼叫端不必比對訊息文字就能分辨要怎麼處理，只配 invalid_request。
  * - name_required：import.ai_parse 網頁來源，本次頁面姓名沒辨識出來、請求也沒帶姓名（要使用者先確認姓名）
- * - multiple_profiles：import.confirm／profile.get，資料區已有多份 Profile（舊資料），不寫入也不讀
+ * - multiple_profiles：import.confirm／profile.get／profile.update，資料區已有多份 Profile（舊資料），不寫入也不讀
+ * - profile_conflict：profile.update 的基準版本號不是目前版本（D30），不寫入
+ * - profile_missing：profile.update 時資料區沒有（已確認的）Profile（D30），不寫入
  */
-export const BridgeFailureReason = z.enum(['name_required', 'multiple_profiles']);
+export const BridgeFailureReason = z.enum([
+  'name_required',
+  'multiple_profiles',
+  'profile_conflict',
+  'profile_missing',
+]);
 export type BridgeFailureReason = z.infer<typeof BridgeFailureReason>;
 
 export const BridgeFailure = z.strictObject({

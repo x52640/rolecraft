@@ -1,6 +1,6 @@
 /**
  * 網頁來源的逐欄照抄檢查（D28；resume-import「網頁來源的 AI 整理」W8）。規則同 PDF（check.ts），來源單位是區塊：
- * - 欄位出處是第一個引用區塊的編號；標籤不算來源文字（只比對區塊文字）。
+ * - 欄位出處是第一個引用區塊的編號（其餘引用區塊依序放 moreBlockIds，D30）；標籤不算來源文字（只比對區塊文字）。
  * - 「至今」類字眼獨占一個區塊時：引用只能是這個區塊；往前找日期上下文——略過只有區間分隔符的區塊，
  *   遇到的第一個區塊去掉結尾的區間分隔符後必須整個是年份或年月（isDateValue），兩者之間沒有標題區塊，
  *   也沒有本機移除的區塊（區塊編號必須連續）。上下文不列入引用。
@@ -46,11 +46,16 @@ function webAdapter(
   tokens: ReadonlyMap<string, string>,
 ): FieldAdapter<WebSentLine, ImportWebDraftField> {
   return {
-    toField: (value, raw, cited) => ({
-      value,
-      blockId: (cited[0] as WebSentLine).id,
-      containsPersonalData: restoresSecret(raw.value, tokens),
-    }),
+    // 出處＝第一個引用區塊；其餘引用區塊放 moreBlockIds（D30，只加欄位、不影響檢查結果）
+    toField: (value, raw, cited) => {
+      const [first, ...rest] = cited as [WebSentLine, ...WebSentLine[]];
+      return {
+        value,
+        blockId: first.id,
+        containsPersonalData: restoresSecret(raw.value, tokens),
+        ...(rest.length > 0 ? { moreBlockIds: rest.map((line) => line.id) } : {}),
+      };
+    },
     currentContext: currentFromContext,
   };
 }

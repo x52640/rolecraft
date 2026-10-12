@@ -56,11 +56,13 @@ export type ImportManualResult = z.infer<typeof ImportManualResult>;
 /**
  * 網頁來源 AI 草稿的一個欄位：值＋出處（第一個引用區塊的編號）。
  * containsPersonalData：還原佔位字時還原出姓名或聯絡資料（W7），畫面在該欄標示「含姓名或聯絡資料」。
+ * moreBlockIds（D30，相加選填）：引用多個區塊時，第一個以外的其餘引用區塊，依送出順序；只引用一個時省略。
  */
 export const ImportWebDraftField = z.strictObject({
   value: z.string(),
   blockId: WebBlockId,
   containsPersonalData: z.boolean(),
+  moreBlockIds: z.array(WebBlockId).optional(),
 });
 export type ImportWebDraftField = z.infer<typeof ImportWebDraftField>;
 

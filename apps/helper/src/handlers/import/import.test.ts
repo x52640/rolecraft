@@ -150,8 +150,9 @@ describe('import.*（P1-T020）', () => {
     expect(profiles.list()).toEqual([]);
     const confirmed = await call('import.confirm', { importId: 'id-1', profile: PROFILE });
     expect(confirmed).toEqual({ ok: true, profileId: 'id-2' });
-    const expected: Profile = { ...PROFILE, id: 'id-2', pdfParseConfirmed: true };
-    expect(profiles.list()).toEqual([expected]);
+    const expected: Profile = { ...PROFILE, id: 'id-2', pdfParseConfirmed: true, version: 1 };
+    // D30：另寫出處（依草稿比對，出處另有 confirm-sources.test.ts）
+    expect(profiles.list()).toMatchObject([expected]);
   });
 
   it('寫入的是確認請求帶的內容；同一筆匯入再確認覆寫同一份 Profile', async () => {

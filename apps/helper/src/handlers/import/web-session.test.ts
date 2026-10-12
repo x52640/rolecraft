@@ -173,8 +173,25 @@ describe('import.start_manual／import.confirm 更新唯一 Profile（Q8）', ()
       ok: true,
       profileId: 'id-2',
     });
+    // D30：版本號加一；手動輸入沒有草稿，全部沒有出處
     expect(env.repos.profiles.list()).toEqual([
-      { ...PROFILE, id: 'id-2', pdfParseConfirmed: true },
+      {
+        ...PROFILE,
+        id: 'id-2',
+        pdfParseConfirmed: true,
+        version: 1,
+        sources: {
+          personalInfo: {},
+          experiences: PROFILE.experiences.map(() => ({
+            company: null,
+            title: null,
+            startDate: null,
+            endDate: null,
+            description: null,
+          })),
+          skills: PROFILE.skills.map(() => null),
+        },
+      },
     ]);
   });
 
@@ -201,8 +218,9 @@ describe('import.start_manual／import.confirm 更新唯一 Profile（Q8）', ()
       ok: true,
       profileId: 'old-1',
     });
-    expect(env.repos.profiles.list()).toEqual([
-      { ...PROFILE, id: 'old-1', pdfParseConfirmed: true },
+    // 舊資料沒有版本號視為 0，確認後為 1（D30）
+    expect(env.repos.profiles.list()).toMatchObject([
+      { ...PROFILE, id: 'old-1', pdfParseConfirmed: true, version: 1 },
     ]);
   });
 

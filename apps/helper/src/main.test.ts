@@ -457,9 +457,15 @@ describe('服務組裝（createServices，P1-T043）', () => {
       capture: { platform: '104', truncated: false },
     });
     expect(await send(services, 'import.start_manual')).toMatchObject({ ok: true });
+    // D30：profile.update 有資料區就接上（沒有 Profile 回固定原因 profile_missing）
+    const update = await dispatch(editorRequests['profile.update'], services, recordingLogger());
+    expect(update.response).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_request', reason: 'profile_missing' },
+    });
   });
 
-  it('沒有 storage：profile.get、網頁擷取不接', async () => {
+  it('沒有 storage：profile.get、profile.update、網頁擷取不接', async () => {
     const services = createServices(null, fakePickers());
     for (const op of ['profile.get', 'import.latest_capture', 'import.start_manual']) {
       expect(await send(services, op)).toMatchObject({
@@ -467,6 +473,8 @@ describe('服務組裝（createServices，P1-T043）', () => {
         error: { code: 'not_implemented' },
       });
     }
+    const update = await dispatch(editorRequests['profile.update'], services, recordingLogger());
+    expect(update.response).toMatchObject({ ok: false, error: { code: 'not_implemented' } });
   });
 });
 
