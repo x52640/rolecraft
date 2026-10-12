@@ -1,7 +1,7 @@
 ---
 id: P1-T078
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T074"]
 specs: ["resume-import.md", "evidence-model.md"]
 track: pipeline
@@ -82,9 +82,19 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等 P1-T074 收官後改 ready
-- Blocker：無（相依 P1-T074 已於 2026-10-12 收官）
+- 最後完成：2026-10-12 worker 實作完成（單一 commit，未 push）
+- 已通過驗證：`npm run verify` 綠（Vitest 3827 通過、13 略過）；P1-T069 既有 resume-parse 測試 91 項全過、helper import 測試全過
+- 下一步：協調者收官（E3 對抗驗證上限 4、codex review），再標 done；helper 接線在 P1-T080
+- Blocker：無
 
 ## 完成結果
+
+- 新增（`packages/pipeline/src/resume-parse/`）：
+  - `web-personal.ts` `splitWebBlocks`：區塊依序當行套 PDF 標籤規則；標籤＋值區塊直接看標籤；被移除區塊後的 `continues` 一併移除並接回同一列；標題聯絡區移除到同級或更高級標題（段落形式照 PDF 8 行規則）；同標籤第二個值不預填但一律遮蔽；遮蔽用每段＋接回後完整值。
+  - `web-names.ts` `knownNames`：四個姓名來源合併；中文姓名開頭後接 1–3 個大寫英文字的別名（headerNameAlias 同規則，另允許中英之間無空白）；「中文名 其他字」切出中文名。
+  - `web-prepare.ts` `prepareWebResumeParse`：送出條件（姓名元素或姓名標籤值，否則要使用者確認姓名；只有舊 Profile 姓名不算）→ `name_unconfirmed`；標籤也遮蔽；既有 Profile 聯絡值加入遮蔽；姓名元素文字預填「姓名」，出處取第一個含它的區塊，找不到不預填。
+  - `web-prompt.ts`：「[b12 h3]」「[b13 標籤=職務類別]」「li2」「tr」「p」標記，隨機界線資料區塊。
+  - `web-check.ts` `checkWebResumeParse`、`currentFromContext`：出處＝區塊編號；標籤不算來源；獨占區塊的「至今」往前找日期上下文（略過純分隔符、去結尾分隔符後整個 `isDateValue`、無標題區塊、區塊編號須連續）；還原佔位字時標 `containsPersonalData`。
+- 共用改動：`check.ts` 抽出 `checkFields`＋`FieldAdapter`（PDF 行為不變，`checkResumeParse` 簽名不變）；`output.ts` `parseResumeParseOutput(raw, source='pdf')` 依來源驗編號；`run.ts` 加 `runWebResumeParse`、`draftFitsLimit`，PDF 與網頁草稿 UTF-8 超過 512 KiB 判 `invalid_output`；`redact.ts` 加 `restoresSecret`（相加）；`personal.ts` 匯出 `CONTACT_HEADINGS`、`CONTACT_BLOCK_MAX`；`types.ts` 加 `SourceLine`、`WebSentLine`、`WebResumeParseInputs`。
+- 測試：`web-prepare.test.ts`（9）、`web-check.test.ts`（7）。
+- 保守選擇：送出條件 (2) 認任何形式抽到的姓名標籤值（含段落／表格「姓名：值」）；「至今」上下文中間有本機移除的區塊即不算；W7 旗標只做網頁來源（PDF 欄位不加，維持既有輸出）。

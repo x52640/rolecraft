@@ -7,13 +7,13 @@
  * 4. 日期必須是年份或年月格式；結束日期是「至今」類字眼時，要緊接在區間分隔符後或獨占一欄，
  *    且引用行含數字年份。
  * 不符的欄位丟棄並記原因（不帶 AI 給的值）；整段經歷所有欄位都被丟棄時整段不收。
+ * 規則與來源種類無關（checkFields）；欄位出處的形狀與網頁「至今」的上下文規則由 FieldAdapter 決定（D28）。
  */
 import type {
   ImportAiDiscard,
   ImportAiDiscardReason,
   ImportAiDraft,
   ImportDraftField,
-  ImportStructuredExperience,
 } from '@rolecraft/contracts';
 
 import {
@@ -25,25 +25,50 @@ import {
 } from './match.ts';
 import { unredact } from './redact.ts';
 import { normalizeForMatch } from './text.ts';
-import type { RawField, ResumeParseOutput, SentLine } from './types.ts';
+import type { RawField, ResumeParseOutput, SentLine, SourceLine } from './types.ts';
 
 export { coversLines, coversWholeLines } from './match.ts';
 
 /** single：一般欄位；joined：描述與段落內文；start／end：開始與結束日期 */
 type Kind = 'single' | 'joined' | 'start' | 'end';
 
-export interface CheckContext {
-  readonly lines: readonly SentLine[];
+export interface CheckContext<L extends SourceLine = SentLine> {
+  readonly lines: readonly L[];
   readonly tokens: ReadonlyMap<string, string>;
 }
 
-type Verified =
-  | { readonly ok: true; readonly field: ImportDraftField }
+/** 欄位出處的形狀（PDF 頁／行、網頁區塊編號）與來源種類專屬的規則。 */
+export interface FieldAdapter<L extends SourceLine, F extends { readonly value: string }> {
+  /** 通過檢查的欄位：value 已換回原文，cited 依送出順序 */
+  readonly toField: (value: string, raw: RawField, cited: readonly L[]) => F;
+  /** 「至今」不符通用規則時的補充判斷（網頁：獨占區塊時往前找日期上下文） */
+  readonly currentContext?: (cited: readonly L[], ctx: CheckContext<L>) => boolean;
+}
+
+export interface CheckedExperience<F> {
+  readonly company: F | null;
+  readonly title: F | null;
+  readonly startDate: F | null;
+  readonly endDate: F | null;
+  readonly current: boolean;
+  readonly description: F | null;
+}
+
+export interface CheckedDraft<F> {
+  readonly education: F[];
+  readonly experiences: CheckedExperience<F>[];
+  readonly skills: F[];
+  readonly otherSections: { readonly heading: F; readonly body: F }[];
+  readonly discarded: ImportAiDiscard[];
+}
+
+type Verified<F> =
+  | { readonly ok: true; readonly field: F }
   | { readonly ok: false; readonly reason: ImportAiDiscardReason };
 
-function citedLines(raw: RawField, kind: Kind, ctx: CheckContext) {
+function citedLines<L extends SourceLine>(raw: RawField, kind: Kind, ctx: CheckContext<L>) {
   const byId = new Map(ctx.lines.map((line) => [line.id, line]));
-  const cited: SentLine[] = [];
+  const cited: L[] = [];
   for (const id of new Set(raw.lines)) {
     const line = byId.get(id);
     if (!line) return 'unknown_line' as const;
@@ -55,7 +80,12 @@ function citedLines(raw: RawField, kind: Kind, ctx: CheckContext) {
   return kind !== 'joined' && gap ? ('lines_not_consecutive' as const) : cited;
 }
 
-function verify(raw: RawField, kind: Kind, ctx: CheckContext): Verified {
+function verify<L extends SourceLine, F extends { readonly value: string }>(
+  raw: RawField,
+  kind: Kind,
+  ctx: CheckContext<L>,
+  adapter: FieldAdapter<L, F>,
+): Verified<F> {
   if (normalizeForMatch(raw.value) === '') return { ok: false, reason: 'empty' };
   const cited = citedLines(raw, kind, ctx);
   if (typeof cited === 'string') return { ok: false, reason: cited };
@@ -68,39 +98,39 @@ function verify(raw: RawField, kind: Kind, ctx: CheckContext): Verified {
   }
   if (kind === 'start' || kind === 'end') {
     const current = kind === 'end' && CURRENT.test(normalizeForMatch(value));
-    if (current ? !currentWordGrounded(value, originals) : !isDateValue(value)) {
+    const grounded = () =>
+      currentWordGrounded(value, originals) || (adapter.currentContext?.(cited, ctx) ?? false);
+    if (current ? !grounded() : !isDateValue(value)) {
       return { ok: false, reason: 'not_a_date' };
     }
   }
-  const first = cited[0] as SentLine;
-  return { ok: true, field: { value, pageNumber: first.pageNumber, lineIndex: first.lineIndex } };
+  return { ok: true, field: adapter.toField(value, raw, cited) };
 }
 
-/** 逐欄檢查；回傳只含通過欄位的草稿（personalInfo 由呼叫端填入本機抽出的值）。 */
-export function checkResumeParse(
+/** 逐欄檢查（與來源種類無關）；回傳只含通過欄位的草稿。 */
+export function checkFields<L extends SourceLine, F extends { readonly value: string }>(
   output: ResumeParseOutput,
-  ctx: CheckContext,
-): Omit<ImportAiDraft, 'personalInfo'> {
+  ctx: CheckContext<L>,
+  adapter: FieldAdapter<L, F>,
+): CheckedDraft<F> {
   const discarded: ImportAiDiscard[] = [];
-  const take = (raw: RawField | null, kind: Kind, label: string): ImportDraftField | null => {
+  const take = (raw: RawField | null, kind: Kind, label: string): F | null => {
     if (raw === null) return null;
-    const result = verify(raw, kind, ctx);
+    const result = verify(raw, kind, ctx, adapter);
     if (result.ok) return result.field;
     discarded.push({ field: label, reason: result.reason });
     return null;
   };
   const many = (raws: readonly RawField[], kind: Kind, label: (n: string) => string) =>
-    raws
-      .map((raw, i) => take(raw, kind, label(String(i + 1))))
-      .filter((f): f is ImportDraftField => f !== null);
+    raws.map((raw, i) => take(raw, kind, label(String(i + 1)))).filter((f): f is F => f !== null);
 
   const education = many(output.education, 'single', (n) => `第 ${n} 筆學歷`);
-  const experiences: ImportStructuredExperience[] = [];
+  const experiences: CheckedExperience<F>[] = [];
   output.experiences.forEach((raw, i) => {
     const at = `第 ${String(i + 1)} 段經歷`;
     const end = take(raw.end, 'end', `${at}結束日期`);
     const current = end !== null && CURRENT.test(normalizeForMatch(end.value));
-    const experience: ImportStructuredExperience = {
+    const experience: CheckedExperience<F> = {
       company: take(raw.company, 'single', `${at}公司`),
       title: take(raw.title, 'single', `${at}職稱`),
       startDate: take(raw.start, 'start', `${at}開始日期`),
@@ -127,4 +157,19 @@ export function checkResumeParse(
     return heading && body ? [{ heading, body }] : [];
   });
   return { education, experiences, skills, otherSections, discarded };
+}
+
+const PDF_ADAPTER: FieldAdapter<SentLine, ImportDraftField> = {
+  toField: (value, _raw, cited) => {
+    const first = cited[0] as SentLine;
+    return { value, pageNumber: first.pageNumber, lineIndex: first.lineIndex };
+  },
+};
+
+/** PDF 來源的逐欄檢查；personalInfo 由呼叫端填入本機抽出的值。 */
+export function checkResumeParse(
+  output: ResumeParseOutput,
+  ctx: CheckContext,
+): Omit<ImportAiDraft, 'personalInfo'> {
+  return checkFields(output, ctx, PDF_ADAPTER);
 }

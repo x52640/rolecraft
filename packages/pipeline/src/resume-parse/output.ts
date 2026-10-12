@@ -1,6 +1,7 @@
 /**
  * 履歷 AI 整理輸出的格式驗證（P1-T069）。輸出是資料：只解析成固定欄位的 JSON（可整份包一層 ```json）。
- * 多餘欄位、缺欄位、型別錯、超量、行編號格式錯，整份不合格（不採用、不自動重試）。
+ * 多餘欄位、缺欄位、型別錯、超量、來源編號格式錯，整份不合格（不採用、不自動重試）。
+ * 來源編號依來源種類驗證（D28）：PDF 是「頁-行」、網頁是區塊編號「b<數字>」，混用整份不合格。
  * 值是否照抄原文屬於內容檢查（check.ts），不合的只丟那個欄位。
  */
 import type { RawExperience, RawField, ResumeParseOutput } from './types.ts';
@@ -20,7 +21,12 @@ export type ResumeParseParseResult =
   | { readonly ok: true; readonly output: ResumeParseOutput }
   | { readonly ok: false; readonly error: string };
 
-const LINE_ID = /^[1-9]\d{0,3}-[1-9]\d{0,5}$/u;
+export type ResumeParseSource = 'pdf' | 'web';
+
+const SOURCE_ID: Record<ResumeParseSource, RegExp> = {
+  pdf: /^[1-9]\d{0,3}-[1-9]\d{0,5}$/u,
+  web: /^b[1-9]\d{0,3}$/u,
+};
 
 class Invalid extends Error {}
 
@@ -41,28 +47,28 @@ function list(value: unknown, max: number, what: string): unknown[] {
   return value;
 }
 
-function field(value: unknown, what: string): RawField {
+function field(value: unknown, what: string, id: RegExp): RawField {
   const f = record(value, ['value', 'lines'], what);
   if (typeof f.value !== 'string') throw new Invalid(`${what}.value 必須是字串`);
   if (f.value.length > L.valueChars) throw new Invalid(`${what}.value 過長`);
   const lines = list(f.lines, L.linesPerField, `${what}.lines`);
-  if (!lines.every((id): id is string => typeof id === 'string' && LINE_ID.test(id))) {
+  if (!lines.every((line): line is string => typeof line === 'string' && id.test(line))) {
     throw new Invalid(`${what}.lines 有不合格的行編號`);
   }
   return { value: f.value, lines };
 }
 
-const optional = (value: unknown, what: string): RawField | null =>
-  value === null ? null : field(value, what);
+const optional = (value: unknown, what: string, id: RegExp): RawField | null =>
+  value === null ? null : field(value, what, id);
 
-function experience(value: unknown): RawExperience {
+function experience(value: unknown, id: RegExp): RawExperience {
   const e = record(value, ['company', 'title', 'start', 'end', 'description'], 'experience');
   return {
-    company: optional(e.company, 'company'),
-    title: optional(e.title, 'title'),
-    start: optional(e.start, 'start'),
-    end: optional(e.end, 'end'),
-    description: optional(e.description, 'description'),
+    company: optional(e.company, 'company', id),
+    title: optional(e.title, 'title', id),
+    start: optional(e.start, 'start', id),
+    end: optional(e.end, 'end', id),
+    description: optional(e.description, 'description', id),
   };
 }
 
@@ -72,7 +78,11 @@ function unwrapFence(raw: string): string {
   return fenced?.[1] ?? trimmed;
 }
 
-export function parseResumeParseOutput(raw: string): ResumeParseParseResult {
+export function parseResumeParseOutput(
+  raw: string,
+  source: ResumeParseSource = 'pdf',
+): ResumeParseParseResult {
+  const id = SOURCE_ID[source];
   if (raw.length > L.rawChars) return { ok: false, error: '輸出過長' };
   let json: unknown;
   try {
@@ -83,12 +93,16 @@ export function parseResumeParseOutput(raw: string): ResumeParseParseResult {
   try {
     const top = record(json, ['education', 'experiences', 'skills', 'sections'], '輸出');
     const output: ResumeParseOutput = {
-      education: list(top.education, L.education, 'education').map((v) => field(v, 'education')),
-      experiences: list(top.experiences, L.experiences, 'experiences').map(experience),
-      skills: list(top.skills, L.skills, 'skills').map((v) => field(v, 'skill')),
+      education: list(top.education, L.education, 'education').map((v) =>
+        field(v, 'education', id),
+      ),
+      experiences: list(top.experiences, L.experiences, 'experiences').map((v) =>
+        experience(v, id),
+      ),
+      skills: list(top.skills, L.skills, 'skills').map((v) => field(v, 'skill', id)),
       sections: list(top.sections, L.sections, 'sections').map((v) => {
         const s = record(v, ['heading', 'body'], 'section');
-        return { heading: field(s.heading, 'heading'), body: field(s.body, 'body') };
+        return { heading: field(s.heading, 'heading', id), body: field(s.body, 'body', id) };
       }),
     };
     return { ok: true, output };

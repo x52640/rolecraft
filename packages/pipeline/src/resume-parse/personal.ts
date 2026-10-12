@@ -16,7 +16,7 @@ import type { ResumeParseInputs, SentLine } from './types.ts';
 export { isPersonalLabel } from './labels.ts';
 export { unredact } from './redact.ts';
 
-const CONTACT_HEADINGS = new Set([
+export const CONTACT_HEADINGS = new Set([
   '聯絡方式',
   '聯絡資訊',
   '聯絡資料',
@@ -30,7 +30,7 @@ const CONTACT_HEADINGS = new Set([
   'personaldetails',
   'personalinfo',
 ]);
-const CONTACT_BLOCK_MAX = 8;
+export const CONTACT_BLOCK_MAX = 8;
 
 export interface PersonalRow {
   readonly label: string;

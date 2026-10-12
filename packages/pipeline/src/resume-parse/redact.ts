@@ -104,3 +104,8 @@ export function createRedactor(secrets: readonly Secret[]) {
 export function unredact(value: string, tokens: ReadonlyMap<string, string>): string {
   return value.replace(TOKEN, (token) => tokens.get(token) ?? token);
 }
+
+/** 值裡有認得的佔位字（換回原文時會還原出姓名或個資；D28 W7）。 */
+export function restoresSecret(value: string, tokens: ReadonlyMap<string, string>): boolean {
+  return [...value.matchAll(TOKEN)].some((match) => tokens.has(match[0]));
+}
