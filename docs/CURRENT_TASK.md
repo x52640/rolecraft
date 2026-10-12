@@ -6,7 +6,6 @@
 ## 進行中
 
 - P1-T066 104 履歷 PDF 版面辨識（`docs/tasks/P1-T066-resume-import-104-layout.md`）
-- P1-T067 匯入頁版面重整（`docs/tasks/P1-T067-import-page-layout.md`）
 - P1-T068 開發用網頁測試入口（協調者自測用）（`docs/tasks/P1-T068-dev-web-harness.md`）
 
 ## ready
