@@ -3,6 +3,7 @@ export const PACKAGE_NAME = '@rolecraft/pipeline';
 
 export * from './analysis/index.ts';
 export * from './generation/index.ts';
+export * from './intro/index.ts';
 export * from './messages/index.ts';
 export * from './projects/index.ts';
 export {

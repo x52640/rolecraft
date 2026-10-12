@@ -33,6 +33,9 @@ import { importConfirm } from './import/confirm.ts';
 import { importGet } from './import/get.ts';
 import { importPickPdf } from './import/pick-pdf.ts';
 import { importSaveCorrections } from './import/save-corrections.ts';
+import { introGenerate } from './intro/generate.ts';
+import { introGet } from './intro/get.ts';
+import { introUpdate } from './intro/update.ts';
 import { jobsConfirm } from './jobs/confirm.ts';
 import { jobsGet } from './jobs/get.ts';
 import { jobsList } from './jobs/list.ts';
@@ -124,6 +127,9 @@ const RAW_HANDLERS: HandlerTable = {
   'analysis.status': analysisStatus,
   'analysis.suggest_projects': analysisSuggestProjects,
   'analysis.project_suggestion': analysisProjectSuggestion,
+  'intro.generate': introGenerate,
+  'intro.get': introGet,
+  'intro.update': introUpdate,
 };
 
 function gated<Op extends BridgeOperation>(op: Op, handler: OpHandler<Op>): OpHandler<Op> {

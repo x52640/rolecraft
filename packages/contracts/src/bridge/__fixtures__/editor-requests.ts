@@ -133,4 +133,10 @@ export const editorRequests = {
   'analysis.status': { op: 'analysis.status', payload: {} },
   'analysis.suggest_projects': { op: 'analysis.suggest_projects', payload: {} },
   'analysis.project_suggestion': { op: 'analysis.project_suggestion', payload: {} },
+  'intro.generate': { op: 'intro.generate', payload: { jobSnapshotId: ID } },
+  'intro.get': { op: 'intro.get', payload: { jobSnapshotId: ID } },
+  'intro.update': {
+    op: 'intro.update',
+    payload: { jobSnapshotId: ID, text: '您好，我是工程師。' },
+  },
 } as const;

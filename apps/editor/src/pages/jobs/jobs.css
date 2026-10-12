@@ -80,3 +80,14 @@
 .job-hint {
   opacity: 0.8;
 }
+
+/* 投遞自介（P1-T064）。 */
+.job-intro {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.job-intro textarea {
+  font: inherit;
+}

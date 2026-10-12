@@ -13,6 +13,7 @@ export * from './entities/application-record.ts';
 export * from './entities/message-draft.ts';
 export * from './entities/provider-connection.ts';
 export * from './entities/work-job.ts';
+export * from './entities/application-intro.ts';
 
 export * from './bridge/operations.ts';
 export * from './bridge/common.ts';
@@ -30,5 +31,6 @@ export * from './bridge/editor/claims.ts';
 export * from './bridge/editor/resume.ts';
 export * from './bridge/editor/messages.ts';
 export * from './bridge/editor/analysis.ts';
+export * from './bridge/editor/intro.ts';
 export * from './bridge/envelope.ts';
 export * from './bridge/protocol.ts';

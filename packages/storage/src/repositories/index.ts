@@ -5,6 +5,10 @@ import {
   type AnalysisStateRepository,
 } from './analysis-state-repository.ts';
 import {
+  createApplicationIntroRepository,
+  type ApplicationIntroRepository,
+} from './application-intro-repository.ts';
+import {
   createAuthorizedFolderRepository,
   type AuthorizedFolderRepository,
 } from './authorized-folder-repository.ts';
@@ -73,6 +77,7 @@ export interface Repositories {
   providerSelections: ProviderSelectionRepository;
   claudeVersionRecords: ClaudeVersionRecordRepository;
   analysisState: AnalysisStateRepository;
+  applicationIntros: ApplicationIntroRepository;
 }
 
 /**
@@ -98,11 +103,13 @@ export function createRepositories(db: DatabaseSync): Repositories {
     providerSelections: createProviderSelectionRepository(db),
     claudeVersionRecords: createClaudeVersionRecordRepository(db),
     analysisState: createAnalysisStateRepository(db),
+    applicationIntros: createApplicationIntroRepository(db),
   };
 }
 
 export type {
   AnalysisStateRepository,
+  ApplicationIntroRepository,
   AuthorizedFolderRepository,
   ClaimRepository,
   ClaudeVersionRecordRepository,

@@ -82,16 +82,24 @@ npm run verify
 
 ## 完成定義
 
-- [ ] 「包含」各項完成
-- [ ] `npm run verify` 綠
-- [ ] 中斷／接手紀錄與完成結果已回填
+- [x] 「包含」各項完成
+- [x] `npm run verify` 綠
+- [x] 中斷／接手紀錄與完成結果已回填
 
 ## 中斷／接手紀錄
 
-- 最後完成：
-- 已通過驗證：
-- 下一步：
-- Blocker：
+- 最後完成：spec（jobs-and-messages「投遞自介」、bridge `intro.*`）、contracts、pipeline `intro/`、storage 0008、helper `handlers/intro/`、編輯器職缺頁投遞自介區塊與測試
+- 已通過驗證：worktree 內 `npm run verify` 綠（Vitest 3285 通過、13 略過）
+- 下一步：協調者收官；高風險 Task，收官前跑對抗驗證
+- Blocker：無（手動驗證需擁有者，併 P1-T032）
 
 ## 完成結果
+
+- 橋接新增 `intro` 群組：`intro.generate`（背景產生、立即回狀態）、`intro.get`（自介＋依目前事實項重跑的檢查＋最近一次產生狀態）、`intro.update`（存編輯並重跑檢查）。contracts 新增 `ApplicationIntro`、`IntroProblem`、`INTRO_MAX_CHARS`／`introLength`（code point），只做相加；ADR-0006 加第 13 項。
+- pipeline `intro/`：送出前準備（快照已確認、可用事實項、已確認個人資料只送經歷與技能、預算）、提示照 analysis 資料區塊隔離、輸出格式驗證、檢查（字數、引用存在／可用／不重複、完成程度上限沿用 `completionCap`、網址與倍數詞出自引用事實項、數字另可出自已確認個人資料、承諾字眼沿用 `commitmentProblem`、最後過 domain R1 匯出前檢查）。沿用既有匯出，沒有改 generation／messages 的任何檔。
+- 執行走 `createClaudeGenerationEngine`（選定模型＋`ClaudeService.run`，R5、R6 每次重做，R6 紀錄照存）；不自動重試。寫入前在同一交易確認快照仍是同一份確認、自介期間沒被使用者改過，否則不覆蓋並回原因。
+- storage 0008 `application_intros`（職缺快照 ID 為主鍵、快照刪除連帶刪除）。
+- 編輯器職缺頁快照詳情加「產生投遞自介」、字數、編輯框、儲存、複製；有未儲存修改或檢查不通過時停用複製並說明；重新產生前已編輯要再按一次確認；沒有任何送出按鈕。
+- 測試全用假 provider：合格存檔可取回；超過 300 字、引用不存在、未確認寫成已完成、數字無依據、承諾薪資／時間／到職不採用並回原因；撤銷來源事實項不進輸入；未選模型、快照未確認、沒有可用事實項不呼叫模型；編輯加入無依據數字複製停用；重新產生前確認。
+- 手動驗證（真實職缺產生一次）需擁有者，併 P1-T032。
 

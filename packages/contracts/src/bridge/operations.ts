@@ -78,6 +78,10 @@ export const BridgeOperation = z.enum([
   'analysis.status',
   'analysis.suggest_projects', // AI 建議專案分組，只由使用者觸發、不建立專案（D23、P1-T063）
   'analysis.project_suggestion',
+  // intro：針對職缺產生 300 字內投遞自介（D25、P1-T064）；只能編輯與複製，沒有送出（D7）
+  'intro.generate',
+  'intro.get',
+  'intro.update',
 ]);
 export type BridgeOperation = z.infer<typeof BridgeOperation>;
 

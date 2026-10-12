@@ -9,6 +9,7 @@ import type { ApplicationsService } from './applications/service.ts';
 import type { ClaimsService } from './claims/service.ts';
 import type { ExportService } from './export/service.ts';
 import type { ResumeImportService } from './import/service.ts';
+import type { IntroService } from './intro/service.ts';
 import type { JobsService } from './jobs/service.ts';
 import type { MessagesService } from './messages/service.ts';
 import type { ProvidersService } from './providers/service.ts';
@@ -20,6 +21,7 @@ export type {
   ApplicationsService,
   ClaimsService,
   ExportService,
+  IntroService,
   JobsService,
   MessagesService,
   ProvidersService,
@@ -40,6 +42,7 @@ export interface HelperServices {
   resume?: ResumeService;
   messages?: MessagesService;
   analysis?: AnalysisService;
+  intro?: IntroService;
 }
 
 /** 服務尚未接上：回 not_implemented。 */

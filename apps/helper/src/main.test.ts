@@ -192,6 +192,27 @@ describe('服務組裝（createServices，P1-T043）', () => {
     expect(await send(services, 'analysis.status')).toEqual({ ok: true, analysis: null });
   });
 
+  it('投遞自介（P1-T064）：有 storage 才接；查不到的快照回 invalid_request，不呼叫模型', async () => {
+    const call = (services: ReturnType<typeof createServices>, request: object) =>
+      dispatch(request, services, recordingLogger()).then((r) => r.response);
+    const ref = { jobSnapshotId: 'job-missing' };
+    expect(await call(createServices(null, {}), { op: 'intro.get', payload: ref })).toMatchObject({
+      ok: false,
+      error: { code: 'not_implemented' },
+    });
+    const services = createServices(storage(), {});
+    for (const request of [
+      { op: 'intro.get', payload: ref },
+      { op: 'intro.generate', payload: ref },
+      { op: 'intro.update', payload: { ...ref, text: '改寫' } },
+    ]) {
+      expect(await call(services, request)).toMatchObject({
+        ok: false,
+        error: { code: 'invalid_request', message: expect.stringContaining('找不到') as unknown },
+      });
+    }
+  });
+
   it('真實選取器＋假 osascript：回應只有檔名／名稱，不含路徑；非 PDF 回固定錯誤', async () => {
     const pdfPath = path.join(dir, '我的履歷.pdf');
     const fakePath = path.join(dir, 'fake.pdf');

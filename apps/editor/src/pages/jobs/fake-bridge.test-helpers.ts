@@ -1,5 +1,13 @@
-// 測試用：在記憶體裡模擬 helper 的 jobs.* 與 submit_job_capture（語意同 helper storage-service）。
-import type { BridgeFailure, JobSnapshot } from '@rolecraft/contracts';
+// 測試用：在記憶體裡模擬 helper 的 jobs.*、submit_job_capture 與 intro.*（語意同 helper storage-service）。
+import {
+  introLength,
+  type ApplicationIntro,
+  type BridgeFailure,
+  type IntroCheckView,
+  type IntroGenerationView,
+  type IntroProblem,
+  type JobSnapshot,
+} from '@rolecraft/contracts';
 
 import type { BridgeTransport } from '../../bridge/transport.ts';
 
@@ -36,6 +44,14 @@ export interface FakeBridge {
   requests: Req[];
   /** 之後的請求一律回這個失敗。 */
   failWith: BridgeFailure | null;
+  /** intro.*：最近一份自介、檢查結果、最近一次產生狀態 */
+  intro: ApplicationIntro | null;
+  introCheck: IntroCheckView | null;
+  generation: IntroGenerationView | null;
+  /** intro.generate 的回應覆寫（例如回 invalid_request）；沒給就標成執行中 */
+  generateReply: unknown;
+  /** intro.update 重跑檢查的假規則 */
+  checkText: (text: string) => IntroProblem | null;
 }
 
 const NOT_FOUND: BridgeFailure = {
@@ -48,6 +64,11 @@ export function fakeBridge(initial: JobSnapshot[] = []): FakeBridge {
     snapshots: [...initial],
     requests: [],
     failWith: null,
+    intro: null,
+    introCheck: null,
+    generation: null,
+    generateReply: null,
+    checkText: () => null,
     transport: { send: (request) => Promise.resolve(handle(request as Req)) },
   };
   const find = (id: unknown) => fake.snapshots.find((s) => s.id === id);
@@ -91,6 +112,21 @@ export function fakeBridge(initial: JobSnapshot[] = []): FakeBridge {
         const id = `job-${String(fake.snapshots.length + 1)}`;
         fake.snapshots.push({ ...p, id, userModified: false, confirmedAt: null });
         return { ok: true, jobSnapshotId: id };
+      }
+      case 'intro.get':
+        return current
+          ? { ok: true, intro: fake.intro, check: fake.introCheck, generation: fake.generation }
+          : NOT_FOUND;
+      case 'intro.generate':
+        if (fake.generateReply) return fake.generateReply;
+        fake.generation = { state: 'running', failure: null, problem: null };
+        return { ok: true, generation: fake.generation };
+      case 'intro.update': {
+        if (!fake.intro) return NOT_FOUND;
+        const text = req.payload.text as string;
+        fake.intro = { ...fake.intro, text, userEdited: true };
+        fake.introCheck = { length: introLength(text), problem: fake.checkText(text) };
+        return { ok: true, intro: fake.intro, check: fake.introCheck };
       }
       default:
         return { ok: false, error: { code: 'not_implemented', message: '此操作尚未支援' } };

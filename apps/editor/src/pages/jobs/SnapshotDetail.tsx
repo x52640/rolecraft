@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useBridge } from '../../bridge/BridgeProvider.tsx';
 import { draftFromFields, fieldsFromDraft, sameDraft, type DraftErrors } from './draft.ts';
 import { FieldsEditor } from './FieldsEditor.tsx';
+import { IntroPanel } from './IntroPanel.tsx';
 import { CAPTURE_METHOD_LABELS, PLATFORM_LABELS, failureText, formatTime } from './labels.ts';
 import { ConfirmationStatus } from './SnapshotStatus.tsx';
 
@@ -148,6 +149,7 @@ export function SnapshotDetail({ jobSnapshotId, onChanged, onClose }: SnapshotDe
           回到清單
         </button>
       </div>
+      <IntroPanel jobSnapshotId={jobSnapshotId} confirmed={snapshot.confirmedAt !== null} />
     </section>
   );
 }

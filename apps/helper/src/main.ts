@@ -19,6 +19,7 @@ import { createApplicationsService } from './handlers/applications/storage-servi
 import { createClaimsService, type HelperStorage } from './handlers/claims/storage-service.ts';
 import { createExportService } from './handlers/export/export-service.ts';
 import { createResumeImportService, type PdfFilePicker } from './handlers/import/import-service.ts';
+import { createIntroWithClaude } from './handlers/intro/assemble.ts';
 import { createJobsService } from './handlers/jobs/storage-service.ts';
 import { createMessagesService } from './handlers/messages/assemble.ts';
 import { persistedProvidersOptions } from './handlers/providers/persistence.ts';
@@ -83,6 +84,7 @@ export function createServices(
     ...(storage && { resume: createResumeWithClaude(storage.db, providers, sources) }),
     ...(storage && { messages: createMessagesService(storage.db, providers, sources) }),
     ...(storage && { analysis: createAnalysisWithClaude(storage.db, providers, sources) }),
+    ...(storage && { intro: createIntroWithClaude(storage.db, providers, sources) }),
     ...(storage && isRuntime(storage) && { pdfExport: createExportService(storage) }),
   };
 }

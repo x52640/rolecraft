@@ -44,6 +44,8 @@ const CORE_TABLES = [
   'document_summaries',
   // 0007（P1-T063）
   'project_documents',
+  // 0008（P1-T064）
+  'application_intros',
 ];
 
 /** 正式 migration 的全部版本與下一個可用版本（新增 migration 時測試不必跟著改）。 */

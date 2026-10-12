@@ -6,6 +6,7 @@ import { APPLICATIONS_SCHEMAS } from './editor/applications.ts';
 import { CLAIMS_SCHEMAS } from './editor/claims.ts';
 import { EXPORT_SCHEMAS } from './editor/export.ts';
 import { IMPORT_SCHEMAS } from './editor/import.ts';
+import { INTRO_SCHEMAS } from './editor/intro.ts';
 import { JOBS_SCHEMAS } from './editor/jobs.ts';
 import { MESSAGES_SCHEMAS } from './editor/messages.ts';
 import { PROVIDERS_SCHEMAS } from './editor/providers.ts';
@@ -33,6 +34,7 @@ export const BRIDGE_SCHEMAS = {
   ...RESUME_SCHEMAS,
   ...MESSAGES_SCHEMAS,
   ...ANALYSIS_SCHEMAS,
+  ...INTRO_SCHEMAS,
 } as const satisfies Record<BridgeOperation, { request: z.ZodType; response: z.ZodType }>;
 
 type RequestSchemaOf<Op extends BridgeOperation> = (typeof BRIDGE_SCHEMAS)[Op]['request'];
