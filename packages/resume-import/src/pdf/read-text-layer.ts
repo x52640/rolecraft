@@ -9,6 +9,8 @@ import {
 
 import type { RawPage, TextRun } from '../types.ts';
 
+import { normalizeCjkLookalikes } from './normalize-cjk.ts';
+
 /** 讀檔失敗的分類，交給上層轉成使用者看得懂的原因。 */
 export class PdfReadError extends Error {
   readonly kind: 'invalid_pdf' | 'encrypted';
@@ -45,7 +47,7 @@ function toRun(item: PdfjsTextItem): TextRun {
   const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = item.transform;
   const scale = Math.hypot(c, d);
   return {
-    text: item.str,
+    text: normalizeCjkLookalikes(item.str),
     x: e,
     y: f,
     width: item.width,

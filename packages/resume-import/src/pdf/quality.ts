@@ -37,14 +37,12 @@ export function garbledRatio(runs: readonly TextRun[]): number {
 }
 
 /**
- * 讀取順序異常的字元比例：
+ * 讀取順序異常的字元數（只能傳同一頁的文字段；不同頁的座標互不相干）：
  * - 旋轉／傾斜的文字
  * - 同一條基線上互相疊在一起的文字段（重複繪製、疊字）
  */
-export function disorderRatio(runs: readonly TextRun[]): number {
-  const total = countVisible(runs);
-  if (total === 0) return 0;
-  let bad = countVisible(runs.filter((r) => r.rotated));
+function disorderedChars(runs: readonly TextRun[]): number {
+  const bad = countVisible(runs.filter((r) => r.rotated));
   const upright = runs.filter((r) => !r.rotated).sort((p, q) => q.y - p.y || p.x - q.x);
   const flagged = new Set<TextRun>();
   for (let i = 0; i < upright.length; i += 1) {
@@ -61,8 +59,14 @@ export function disorderRatio(runs: readonly TextRun[]): number {
       }
     }
   }
-  bad += countVisible([...flagged]);
-  return bad / total;
+  return bad + countVisible([...flagged]);
+}
+
+/** 讀取順序異常的字元比例；逐頁計算後合計，避免把不同頁同一高度的文字當成疊字。 */
+export function disorderRatio(pages: readonly RawPage[]): number {
+  const total = countVisible(pages.flatMap((p) => p.runs));
+  if (total === 0) return 0;
+  return pages.reduce((sum, p) => sum + disorderedChars(p.runs), 0) / total;
 }
 
 /** 檢查文字層品質；有問題就回傳失敗，沒問題回傳 null。 */
@@ -83,7 +87,7 @@ export function assessQuality(pages: readonly RawPage[]): ExtractFailure | null 
       message: `文字層有 ${Math.round(garbled * 100)}% 是無法辨識的字元（字型缺字或編碼錯誤），結果不可靠，請手動輸入或校正。`,
     };
   }
-  const disorder = disorderRatio(runs);
+  const disorder = disorderRatio(pages);
   if (disorder > MAX_DISORDER_RATIO) {
     return {
       ok: false,
