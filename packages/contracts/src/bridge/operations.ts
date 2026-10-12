@@ -11,7 +11,7 @@ export const BridgeOperation = z.enum([
   // 擷取（content script 也可呼叫；P1-T034）
   'submit_job_capture', // 送入職缺頁擷取內容；編輯器手動貼上職缺也用它
   'submit_message_capture', // 送入使用者選定的訊息；編輯器手動貼上訊息也用它
-  'submit_resume_capture', // 送入履歷頁擷取的區塊清單（D28）；content script 白名單由 P1-T076 加
+  'submit_resume_capture', // 送入履歷頁擷取的區塊清單（D28）；content script 只在履歷頁（P1-T076）
   'request_draft', // 要求產生回覆草稿
   // jobs：職缺快照（P1-T019）
   'jobs.list',
@@ -97,13 +97,14 @@ export const BridgeOperation = z.enum([
 export type BridgeOperation = z.infer<typeof BridgeOperation>;
 
 /**
- * content script 可以呼叫的操作：只有職缺／訊息擷取（還要再過 relay 的網站、平台、自動擷取檢查）。
- * 其餘操作一律只限擴充功能頁（編輯器）。`submit_resume_capture` 要連同「操作×頁型」的 relay 檢查一起加
- * （P1-T076），在那之前 content script 呼叫會被擋。
+ * content script 可以呼叫的操作：職缺／訊息擷取與履歷擷取，還要再過 relay 的「操作×頁型」檢查
+ * （職缺／訊息只在職缺頁、履歷只在履歷頁，主框架、平台相符；P1-T076、web-resume-capture）。
+ * 其餘操作一律只限擴充功能頁（編輯器）。
  */
 export const CONTENT_SCRIPT_OPERATIONS = [
   'submit_job_capture',
   'submit_message_capture',
+  'submit_resume_capture',
 ] as const satisfies readonly BridgeOperation[];
 export type ContentScriptOperation = (typeof CONTENT_SCRIPT_OPERATIONS)[number];
 

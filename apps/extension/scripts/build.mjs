@@ -3,7 +3,8 @@
 //   npm run build -w @rolecraft/extension
 // 1. service worker：ES module（MV3 service worker 用 type: module）
 // 2. 編輯器頁：apps/editor 的 React 程式，由它的 buildEditor() 打包到 editor/（EDITOR_PAGE）
-// 3. 每站 content script：各自一個 IIFE（executeScript 注入的檔案不能是 module）
+// 3. 每站 content script：職缺頁一支、有登記履歷頁的站另一支，各自一個 IIFE
+//    （executeScript 注入的檔案不能是 module；service worker 依網址選，web-resume-capture）
 // 4. 由 src/manifest.ts 產生 manifest.json
 // dist/ 其他位置是 tsc -b 的輸出，互不重疊。
 import { writeFile } from 'node:fs/promises';
@@ -12,13 +13,8 @@ import path from 'node:path';
 import { build } from 'vite';
 
 import { buildEditor } from '../../editor/scripts/build.mjs';
-import {
-  buildManifest,
-  EDITOR_PAGE,
-  SITE_REGISTRY,
-  siteScriptFile,
-  siteSourceEntry,
-} from '../src/index.ts';
+import { buildManifest, EDITOR_PAGE } from '../src/index.ts';
+import { siteBundles } from '../src/sites/registry.ts';
 
 const APP = path.resolve(import.meta.dirname, '..');
 const OUT = path.join(APP, 'dist', 'unpacked');
@@ -44,7 +40,7 @@ await build({
 // 編輯器只以擴充功能頁形式提供（ADR-0003）；它只經 chrome.runtime.sendMessage 轉送橋接請求。
 await buildEditor(path.join(OUT, path.dirname(EDITOR_PAGE)));
 
-for (const site of SITE_REGISTRY) {
+for (const bundle of siteBundles()) {
   await build({
     ...common,
     root: APP,
@@ -53,10 +49,10 @@ for (const site of SITE_REGISTRY) {
       emptyOutDir: false,
       target: 'chrome116',
       lib: {
-        entry: path.join(APP, siteSourceEntry(site.platform)),
+        entry: path.join(APP, bundle.entry),
         formats: ['iife'],
-        name: `rolecraftSite${site.platform}`,
-        fileName: () => siteScriptFile(site.platform),
+        name: bundle.name,
+        fileName: () => bundle.file,
       },
     },
   });

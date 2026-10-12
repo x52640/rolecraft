@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BridgeClient } from '../bridge/client.ts';
 import { handleRelay } from './handler.ts';
 import { relayMessage } from './messages.ts';
-import { authorizeSender, type SenderInfo } from './sender.ts';
+import { authorizeSender, CONTENT_SCRIPT_ONLY_OPERATIONS, type SenderInfo } from './sender.ts';
 
 const EXT = 'abcdefghijklmnopabcdefghijklmnop';
 const EDITOR: SenderInfo = { id: EXT, url: `chrome-extension://${EXT}/editor/index.html` };
@@ -23,8 +23,9 @@ const editorOnly = BridgeOperation.options.filter(
 const requestFor = (op: BridgeOperation) => ({ op, payload: {} }) as unknown as BridgeRequest;
 
 describe('relay sender 規則（P1-T041）', () => {
-  it('content script 可用的只有職缺／訊息擷取', () => {
-    expect(editorOnly).toHaveLength(BridgeOperation.options.length - 2);
+  it('content script 可用的只有職缺／訊息／履歷擷取', () => {
+    expect(editorOnly).toHaveLength(BridgeOperation.options.length - 3);
+    expect(editorOnly).not.toContain('submit_resume_capture');
     expect(editorOnly).toContain('request_draft');
     expect(editorOnly).toContain('claims.confirm');
   });
@@ -36,8 +37,21 @@ describe('relay sender 規則（P1-T041）', () => {
     });
   });
 
-  it.each(BridgeOperation.options)('擴充功能頁呼叫 %s：允許', (op) => {
+  const extensionPageOps = BridgeOperation.options.filter(
+    (op) => !(CONTENT_SCRIPT_ONLY_OPERATIONS as readonly string[]).includes(op),
+  );
+
+  it.each(extensionPageOps)('擴充功能頁呼叫 %s：允許', (op) => {
     expect(authorizeSender(EDITOR, requestFor(op), EXT)).toEqual({ allowed: true });
+  });
+
+  it('擴充功能頁只少了履歷擷取（只限 content script，bridge.md）', () => {
+    expect([...CONTENT_SCRIPT_ONLY_OPERATIONS]).toEqual(['submit_resume_capture']);
+    expect(extensionPageOps).toHaveLength(BridgeOperation.options.length - 1);
+    expect(authorizeSender(EDITOR, requestFor('submit_resume_capture'), EXT)).toEqual({
+      allowed: false,
+      reason: '擴充功能頁不能呼叫 submit_resume_capture',
+    });
   });
 
   it.each(editorOnly)('其他擴充功能的頁面呼叫 %s：拒絕', (op) => {

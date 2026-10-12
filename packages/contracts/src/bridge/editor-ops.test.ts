@@ -55,10 +55,11 @@ describe('編輯器操作清單（P1-T041）', () => {
     );
   });
 
-  it('content script 只能用職缺／訊息擷取', () => {
+  it('content script 只能用職缺／訊息／履歷擷取', () => {
     expect([...CONTENT_SCRIPT_OPERATIONS].sort()).toEqual([
       'submit_job_capture',
       'submit_message_capture',
+      'submit_resume_capture',
     ]);
   });
 

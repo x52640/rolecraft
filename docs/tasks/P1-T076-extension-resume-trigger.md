@@ -1,12 +1,12 @@
 ---
 id: P1-T076
 phase: 1
-status: ready
+status: in_progress
 depends_on: ["P1-T074"]
 specs: ["web-resume-capture.md", "bridge.md", "jobs-and-messages.md"]
 track: extension
 primary_repo: rolecraft
-write_paths: ["apps/extension/src/background/", "apps/extension/src/relay/", "apps/extension/src/manifest.ts", "apps/extension/src/manifest.test.ts", "apps/extension/src/sites/registry.ts", "apps/extension/src/sites/registry.test.ts", "apps/extension/scripts/build.mjs", "packages/contracts/src/bridge/operations.ts"]
+write_paths: ["apps/extension/src/background/", "apps/extension/src/relay/", "apps/extension/src/manifest.ts", "apps/extension/src/manifest.test.ts", "apps/extension/src/sites/registry.ts", "apps/extension/src/sites/registry.test.ts", "apps/extension/scripts/build.mjs", "packages/contracts/src/bridge/operations.ts", "packages/contracts/src/bridge/editor-ops.test.ts", "packages/contracts/src/bridge/resume-capture.test.ts"]
 contract_change: additive
 expected_commit: "feat(P1-T076): extension：履歷頁點圖示擷取、快捷鍵依頁型注入、操作×頁型發送者驗證"
 ---
@@ -87,9 +87,9 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：尚未開始
-- 已通過驗證：無
-- 下一步：等 P1-T074 收官後改 ready
-- Blocker：無（相依 P1-T074 已於 2026-10-12 收官）
+- 最後完成：2026-10-12 「包含」各項已在 worktree 實作（未 commit）：registry 頁型、打包、點圖示／快捷鍵、注入失敗提示、操作×頁型授權、履歷擷取成功開編輯器、說明文字
+- 已通過驗證：format、lint、typecheck；extension 與 contracts 測試除下列 2 項外全過；extension 打包成功（104 尚無履歷頁規則，只產出 `sites/104.js`）
+- 下一步：協調者核准擴充 write_paths 後，改那 2 個測試、跑 `npm run verify`、commit
+- Blocker：`CONTENT_SCRIPT_OPERATIONS` 加 `submit_resume_capture` 必然讓 write_paths 外的兩個 contracts 測試失敗——`packages/contracts/src/bridge/editor-ops.test.ts`「content script 只能用職缺／訊息擷取」（期望清單兩項）、`packages/contracts/src/bridge/resume-capture.test.ts`「content script 白名單這裡不動（P1-T076 才加）」；需把這兩個檔加進 write_paths
 
 ## 完成結果

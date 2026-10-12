@@ -60,8 +60,8 @@ describe('submit_resume_capture 請求（D28，web-resume-capture）', () => {
     expect(res.safeParse({ ok: true, importId: 'x' }).success).toBe(false);
   });
 
-  it('content script 白名單這裡不動（P1-T076 才加）', () => {
-    expect(CONTENT_SCRIPT_OPERATIONS).not.toContain('submit_resume_capture');
+  it('content script 白名單含履歷擷取（P1-T076；relay 另做操作×頁型檢查）', () => {
+    expect(CONTENT_SCRIPT_OPERATIONS).toContain('submit_resume_capture');
   });
 
   it('區塊數與文字大小剛好在上限內通過，超過被拒', () => {

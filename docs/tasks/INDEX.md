@@ -82,7 +82,7 @@
 | [P1-T073](P1-T073-claims-page-usability.md) | 事實項頁實用性 | done | 1 | editor | P1-T063 |
 | [P1-T074](P1-T074-web-import-contracts.md) | contracts：網頁履歷匯入、照片、個人資料讀取的橋接契約 | done | 1 | contracts | P1-T041、P1-T069 |
 | [P1-T075](P1-T075-extension-resume-blocks.md) | extension：履歷頁區塊抽取與擷取共用流程 | ready | 1 | extension | P1-T074 |
-| [P1-T076](P1-T076-extension-resume-trigger.md) | extension：點圖示／快捷鍵依頁型觸發與發送者驗證 | ready | 1 | extension | P1-T074 |
+| [P1-T076](P1-T076-extension-resume-trigger.md) | extension：點圖示／快捷鍵依頁型觸發與發送者驗證 | in_progress | 1 | extension | P1-T074 |
 | [P1-T077](P1-T077-extension-104-resume-page.md) | extension：104 履歷頁登記與 fixture 比對 | blocked | 1 | extension | P1-T017、P1-T075、P1-T076 |
 | [P1-T078](P1-T078-pipeline-web-resume-parse.md) | pipeline：網頁區塊來源的去個資、提示與照抄檢查 | ready | 1 | pipeline | P1-T074 |
 | [P1-T079](P1-T079-helper-import-session-web.md) | helper：網頁擷取與手動輸入的匯入工作階段、確認更新唯一 Profile、profile.get | in_progress | 1 | helper | P1-T074 |
