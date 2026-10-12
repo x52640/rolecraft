@@ -70,7 +70,7 @@
 | [P1-T061](P1-T061-unassigned-claims.md) | 事實項頁列出未歸專案的事實項 | done | 1 | helper | P1-T060 |
 | [P1-T062](P1-T062-claude-reverify-recovery.md) | Claude 重新驗證：中斷不算失敗、失敗只綁版本、可手動重新啟用 | done | 1 | providers | P1-T058 |
 | [P1-T063](P1-T063-project-grouping.md) | AI 建議專案分組、使用者確認建立，重新分析自動歸入 | done | 1 | helper | P1-T061 |
-| [P1-T064](P1-T064-application-intro.md) | 針對職缺產生 300 字內投遞自介 | in_progress | 1 | helper | P1-T060、P1-T062 |
+| [P1-T064](P1-T064-application-intro.md) | 針對職缺產生 300 字內投遞自介 | done | 1 | helper | P1-T060、P1-T062 |
 
 ## 依賴清單
 

@@ -1,7 +1,7 @@
 ---
 id: P1-T064
 phase: 1
-status: in_progress
+status: done
 depends_on: ["P1-T060", "P1-T062"]
 specs: ["jobs-and-messages.md", "evidence-model.md", "resume-output.md", "bridge.md", "providers.md", "runtime-and-budget.md", "architecture.md"]
 track: helper
@@ -102,7 +102,7 @@ npm run verify
 ## 中斷／接手紀錄
 
 - 最後完成：首次實作（e24c82b）；對抗驗證與 codex 屬實 7 項、D25 承諾字眼只擋模型的修正與回歸測試
-- 已通過驗證：worktree 內 `npm run verify` 綠
+- 已通過驗證：協調者主樹 `npm run verify` 綠（3311 通過、13 略過）；對抗驗證屬實 4 項（含規格缺口：加引用對照）、codex 主體 3 項與複審三輪 7 項皆已修，最後一輪 codex 複審無發現；全程假 provider
 - 下一步：協調者收官
 - Blocker：無（手動驗證需擁有者，併 P1-T032）
 
