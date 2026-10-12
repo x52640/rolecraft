@@ -41,6 +41,10 @@ describe('頁首大字姓名', () => {
     expect(headerNameAlias('林測試 Alex Lin 邏輯清晰')).toBe('Alex Lin');
     expect(headerNameAlias('林測試 邏輯清晰')).toBeNull();
     expect(headerNameAlias('Alex Sample')).toBeNull();
+    // 英文名後接標點（P1-T078 審查 1）：整個英文名都要，結尾的句點不算
+    expect(headerNameAlias('林雨晴 Ivy Lin，高雄人')).toBe('Ivy Lin');
+    expect(headerNameAlias('林雨晴 Ivy Lin, from Kaohsiung')).toBe('Ivy Lin');
+    expect(headerNameAlias('林雨晴 Ivy Lin.')).toBe('Ivy Lin');
   });
 
   it('104 版面：大字行「姓名 標語⇥…」的姓名欄只有姓名', () => {

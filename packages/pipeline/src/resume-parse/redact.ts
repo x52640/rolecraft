@@ -26,6 +26,17 @@ function escape(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
+const HAN = /\p{Script=Han}/u;
+
+/** 姓名的比對式：相鄰兩個中文字之間允許空白（「林 雨 晴」；P1-T078 審查 3）。其他值逐字比對。 */
+function pattern(value: string, name: boolean): string {
+  if (!name) return escape(value);
+  const chars = [...value];
+  return chars
+    .map((c, i) => escape(c) + (HAN.test(c) && HAN.test(chars[i + 1] ?? '') ? '\\s*' : ''))
+    .join('');
+}
+
 /**
  * 重疊的範圍合併成一段（不論誰先比對到；codex 複審 2）：姓名「Jose」與 email「Jose.Sample@example.org」
  * 重疊時整段 email 一起遮掉。合併的每一段都是姓名才用姓名佔位字。
@@ -71,7 +82,7 @@ export function createRedactor(secrets: readonly Secret[]) {
     .map((p) => ({ value: foldMarks(p.value), name: true, fold: true }));
   const all = [...patterns, ...folded]
     .filter((p) => p.value !== '')
-    .map((p) => ({ re: new RegExp(escape(p.value), 'gu'), name: p.name, fold: p.fold }));
+    .map((p) => ({ re: new RegExp(pattern(p.value, p.name), 'gu'), name: p.name, fold: p.fold }));
   const generic = [EMAIL, PHONE, NATIONAL_ID].map((re) => ({ re, name: false, fold: false }));
 
   function redact(original: string): string {

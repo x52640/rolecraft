@@ -36,6 +36,15 @@ const CJK_KEYWORDS = [
   '本名',
   '個人資料',
   '基本資料',
+  // P1-T078 審查 3（PDF 與網頁共用，偏向多遮）
+  '英文名',
+  '中文名',
+  '暱稱',
+  '綽號',
+  '現居',
+  '戶籍',
+  '居住城市',
+  '年次',
 ];
 
 const ASCII_WORDS = new Set([
@@ -65,6 +74,9 @@ const ASCII_WORDS = new Set([
   'dob',
   'gender',
   'contact',
+  'born',
+  'nickname',
+  'surname',
 ]);
 
 /** 只認整個標籤相等（去空白、連字號、轉小寫後）。 */
@@ -77,11 +89,26 @@ const ASCII_EXACT = new Set([
   'chinesename',
   'line',
   'lineid',
+  'givenname',
+  'familyname',
+  'middlename',
 ]);
 
+/** 姓名標籤（整個標籤相等）；isPersonalLabel 與 isNameLabel 都認（審查 6：First Name／Last Name 一致）。 */
 const NAME_EXACT = new Set([
   'name',
   'fullname',
+  'firstname',
+  'lastname',
+  'givenname',
+  'familyname',
+  'middlename',
+  'surname',
+  'nickname',
+  '姓',
+  '名',
+  '姓氏',
+  '名字',
   'englishname',
   'chinesename',
   '英文姓名',
@@ -110,7 +137,7 @@ export function isPersonalLabel(label: string): boolean {
 function looseLabel(label: string): boolean {
   const key = compact(label);
   if (key === '' || [...key].length > 24) return false;
-  if (ASCII_EXACT.has(key)) return true;
+  if (ASCII_EXACT.has(key) || NAME_EXACT.has(key)) return true;
   // 中文標籤限 8 字內（「負責與客戶聯絡協調：…」這種內文不算標籤）
   if ([...key].length <= 8 && CJK_KEYWORDS.some((k) => key.includes(k))) return true;
   const words = label
@@ -184,10 +211,24 @@ function strictLabel(label: string): boolean {
   return CJK_TAIL.test(cjk) || (asciiKeyword && CJK_SUFFIX_ONLY.test(cjk));
 }
 
-/** 這個標籤的值是姓名（抽到的值一律加入遮蔽集合）。 */
+const NAME_PARTS = ['姓名', '英文名', '中文名', '暱稱', '綽號', '本名'];
+
+/** 這個標籤的值是姓名（抽到的值一律加入遮蔽集合）。去括號修飾後再認一次（「姓名（中文）」）。 */
 export function isNameLabel(label: string): boolean {
+  const bare = withoutParens(label);
+  return [label, ...(bare === null ? [] : [bare])].some((l) => {
+    const key = compact(l);
+    return NAME_PARTS.some((k) => key.includes(k)) || NAME_EXACT.has(key);
+  });
+}
+
+/**
+ * 網頁標籤＋值區塊的標籤（網頁專用，P1-T078 審查 3）：位置已確定是標籤，中文標籤不受 8 字限制
+ * （「緊急聯絡人姓名與電話」）；其餘同 isPersonalLabel。
+ */
+export function isPersonalBlockLabel(label: string): boolean {
   const key = compact(label);
-  return key.includes('姓名') || NAME_EXACT.has(key);
+  return isPersonalLabel(label) || CJK_KEYWORDS.some((k) => key.includes(k));
 }
 
 /** 冒號後緊接 // 是網址，不是標籤。標籤可含全形／半形空白（「地  址：」）。 */

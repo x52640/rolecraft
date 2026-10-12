@@ -1,7 +1,7 @@
 /**
  * 逐欄照抄檢查（P1-T069，R1 不捏造）。每個欄位：
  * 1. 引用的行都必須是這次送出的行（本機已移除的聯絡資料行、不存在的行都不算）。
- * 2. 公司、職稱、日期、學歷、技能、段落標題只能引用連續的行，值是引用行接合後的子字串（英數要合詞界）；
+ * 2. 公司、職稱、日期、學歷、技能、段落標題只能引用原文中連續的行（本機移除的個資行也佔位），值是引用行接合後的子字串（英數要合詞界）；
  *    描述與段落內文以行為單位，每段等於一行或連續幾行引用行的全文（match.ts）。
  * 3. 先對模型看到的（遮蔽後）文字檢查，佔位字換回原文後再對原文檢查一次。
  * 4. 日期必須是年份或年月格式；結束日期是「至今」類字眼時，要緊接在區間分隔符後或獨占一欄，
@@ -76,7 +76,8 @@ function citedLines<L extends SourceLine>(raw: RawField, kind: Kind, ctx: CheckC
   }
   if (cited.length === 0) return 'unknown_line' as const;
   cited.sort((a, b) => a.order - b.order);
-  const gap = cited.some((line, i) => i > 0 && line.order !== (cited[i - 1]?.order ?? 0) + 1);
+  // 連續看原文位置（被移除的個資行也佔位）；描述與段落內文可略過未引用的行，不受此限
+  const gap = cited.some((line, i) => i > 0 && line.position !== (cited[i - 1]?.position ?? 0) + 1);
   return kind !== 'joined' && gap ? ('lines_not_consecutive' as const) : cited;
 }
 

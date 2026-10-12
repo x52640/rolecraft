@@ -6,20 +6,16 @@
  *   第一個」）；遮蔽用每一段與接回後的完整值。
  * - 聯絡區：「聯絡方式」等標題區塊下，移除到下一個同級或更高級的標題區塊為止；段落形式的聯絡標題照 PDF 規則。
  * - 同一標籤的第二個值不預填，但一律加入遮蔽。
+ * - 網頁專用的標籤寫法（長中文標籤、值裡的「LINE:」、4 格表格列、中英並列聯絡標題）見 web-labels.ts。
+ * - 續行（continues）不當段落邊界：「聯絡方式⏎地址」切成兩個標題區塊時，第二個不結束聯絡區（審查 4）。
  */
 import type { ImportWebDraftField, ImportWebBlock } from '@rolecraft/contracts';
 
-import {
-  isNameLabel,
-  isPersonalLabel,
-  isStrictPersonalLabel,
-  labelOnlyLine,
-  personalLabelLine,
-  type LabelLine,
-} from './labels.ts';
-import { CONTACT_BLOCK_MAX, CONTACT_HEADINGS } from './personal.ts';
+import { isNameLabel, isStrictPersonalLabel, labelOnlyLine } from './labels.ts';
+import { CONTACT_BLOCK_MAX } from './personal.ts';
 import type { Secret } from './redact.ts';
-import { headingKey, isSectionHeading, normalizeForMatch } from './text.ts';
+import { isSectionHeading, normalizeForMatch } from './text.ts';
+import { isContactHeading, labelOf, personalTablePairs } from './web-labels.ts';
 
 export interface WebPersonalRow {
   readonly label: string;
@@ -115,12 +111,23 @@ export function splitWebBlocks(blocks: readonly ImportWebBlock[]): WebSplit {
     if (region && regionEnds(region, block)) region = null;
     if (region) {
       region.remaining -= 1;
+      // 聯絡區裡獨占一塊的標籤（104「主要手機」⏎「0900…」）：下一塊是它的值，一併移除（不佔聯絡區行數）
+      if (labelsOnly) {
+        pending = labelsOnly;
+        continue;
+      }
       last = labelLine
         ? remove(labelLine.label, labelLine.value, block)
         : remove(region.label, line, block, true);
       continue;
     }
-    if (CONTACT_HEADINGS.has(headingKey(block.text)) && block.label === null) {
+    const pairs = personalTablePairs(block);
+    if (pairs.length > 0) {
+      // 4 格表格列：任何一對是個資就整列移除，個資的值各自預填與遮蔽
+      for (const pair of pairs) last = remove(pair.label, pair.value, block) ?? last;
+      continue;
+    }
+    if (block.label === null && isContactHeading(block.text)) {
       const label = block.text.trim().replace(/[:：]+$/u, '');
       region = {
         label,
@@ -151,16 +158,9 @@ export function splitWebBlocks(blocks: readonly ImportWebBlock[]): WebSplit {
   return { rows, kept, removed: secretsOf(chains), labeledNames: namesOf(chains) };
 }
 
-/** 個資標籤行：標籤＋值區塊直接看標籤（標籤不受 24 字、冒號的寫法限制），其他區塊照 PDF 規則。 */
-function labelOf(block: ImportWebBlock, line: string, labelsOnly: boolean): LabelLine | null {
-  if (block.label !== null) {
-    return isPersonalLabel(block.label) ? { label: block.label.trim(), value: block.text } : null;
-  }
-  return labelsOnly ? null : personalLabelLine(line);
-}
-
 /** 標題區塊開的聯絡區到下一個同級或更高級的標題區塊為止；段落形式的照 PDF 規則（段落標題、最多 8 行）。 */
 function regionEnds(region: Region, block: ImportWebBlock): boolean {
+  if (block.continues) return false;
   if (region.level !== null) {
     return block.kind === 'heading' && (block.level ?? 1) <= region.level;
   }

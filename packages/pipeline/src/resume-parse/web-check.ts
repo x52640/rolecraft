@@ -17,7 +17,6 @@ import type { ResumeParseOutput, WebSentLine } from './types.ts';
 const RANGE_ONLY = /^(?:[~〜\-–—至]|to)+$/iu;
 const TRAILING_RANGE = /(?:\s*(?:[~〜\-–—至]|(?<![A-Za-z])to))+\s*$/iu;
 
-const blockNumber = (line: WebSentLine) => Number(line.id.slice(1));
 const isHeading = (line: WebSentLine) => line.kind === 'heading' || isSectionHeading(line.original);
 
 /** 獨占區塊的「至今」往前找日期上下文。 */
@@ -33,7 +32,7 @@ export function currentFromContext(
   while (at > 0) {
     at -= 1;
     const line = ordered[at] as WebSentLine;
-    if (blockNumber(line) !== blockNumber(next) - 1 || isHeading(line)) return false;
+    if (line.position !== next.position - 1 || isHeading(line)) return false;
     if (RANGE_ONLY.test(normalizeForMatch(line.original))) {
       next = line;
       continue;

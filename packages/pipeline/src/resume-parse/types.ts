@@ -23,8 +23,13 @@ export interface ResumeParseInputs {
 /** 送給模型的一個來源單位（PDF 的行、網頁的區塊）：text 已遮蔽姓名與聯絡資料，original 是原文。 */
 export interface SourceLine {
   readonly id: string;
-  /** 在送出清單中的順序（判斷連續） */
+  /** 在送出清單中的順序 */
   readonly order: number;
+  /**
+   * 在原文中的位置（判斷連續；P1-T078 審查 2）：本機移除的個資行／區塊也佔位，引用兩側不能拼成原文沒有的值。
+   * PDF＝非空白行的流水號（空白行與換頁不佔位）；網頁＝區塊編號的數字。
+   */
+  readonly position: number;
   readonly text: string;
   readonly original: string;
 }

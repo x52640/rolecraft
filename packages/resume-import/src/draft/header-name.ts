@@ -17,7 +17,12 @@ export function cleanHeaderName(segment: string): string {
   return CJK_NAME_THEN_MORE.exec(text)?.[1] ?? text;
 }
 
-const ENGLISH_NAME = /^([A-Z][A-Za-z'.-]*(?:\s+[A-Z][A-Za-z'.-]*){0,2})(?=\s|$)/u;
+/** 後面可接標點（「Ivy Lin，高雄人」「Ivy Lin, from…」）；結尾的 . ' - 不算名字的一部分（P1-T078 審查 1）。 */
+const ENGLISH_NAME = /^([A-Z][A-Za-z'.-]*(?:\s+[A-Z][A-Za-z'.-]*){0,2})(?![A-Za-z'.-])/u;
+function englishName(text: string): string | null {
+  const name = ENGLISH_NAME.exec(text)?.[1]?.replace(/[.'-]+$/u, '');
+  return name ? name : null;
+}
 
 /**
  * 切掉的部分開頭像英文姓名（1～3 個大寫開頭的英文字，例如「林測試 Alex Lin 邏輯清晰」的 Alex Lin）：
@@ -27,7 +32,7 @@ export function headerNameAlias(segment: string): string | null {
   const text = segment.trim();
   const name = CJK_NAME_THEN_MORE.exec(text)?.[1];
   if (!name) return null;
-  return ENGLISH_NAME.exec(text.slice(name.length).trim())?.[1] ?? null;
+  return englishName(text.slice(name.length).trim());
 }
 
 function median(values: readonly number[]): number {

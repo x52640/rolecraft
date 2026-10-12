@@ -45,6 +45,7 @@ export interface PersonalExtraction {
 }
 
 interface Kept {
+  position: number;
   pageNumber: number;
   lineIndex: number;
   original: string;
@@ -83,11 +84,13 @@ function split(inputs: ResumeParseInputs) {
   let block: { label: string; remaining: number } | null = null;
   let pending: string[] | null = null;
   let rest = '';
+  let position = 0;
   for (const page of inputs.pages) {
     page.lines.forEach((original, lineIndex) => {
       const where: [number, number] = [page.pageNumber, lineIndex];
       const norm = normalizeForMatch(original);
       if (norm === '') return;
+      position += 1;
       const heading = isSectionHeading(original);
       // 先認「整行都是標籤」（雙欄「姓名⇥居住地」不能被當成「姓名＝居住地」）
       const labelsOnly = labelOnlyLine(original);
@@ -124,7 +127,7 @@ function split(inputs: ResumeParseInputs) {
         if (labelLine.value === '') {
           // 值在下一行、會連下一行一起移除：標籤要嚴格辨識（「Mobile Developer：」照送，codex 審查 2）
           if (!isStrictPersonalLabel(labelLine.label)) {
-            kept.push({ pageNumber: page.pageNumber, lineIndex, original });
+            kept.push({ position, pageNumber: page.pageNumber, lineIndex, original });
             return;
           }
           pending = [labelLine.label];
@@ -139,7 +142,7 @@ function split(inputs: ResumeParseInputs) {
         pending = labelsOnly;
         return;
       }
-      kept.push({ pageNumber: page.pageNumber, lineIndex, original });
+      kept.push({ position, pageNumber: page.pageNumber, lineIndex, original });
     });
   }
   return { rows, kept };
@@ -159,6 +162,7 @@ export function extractPersonal(inputs: ResumeParseInputs): PersonalExtraction {
   const sent = kept.map((k, order): SentLine => ({
     id: `${String(k.pageNumber)}-${String(k.lineIndex + 1)}`,
     order,
+    position: k.position,
     pageNumber: k.pageNumber,
     lineIndex: k.lineIndex,
     text: redact(k.original),
