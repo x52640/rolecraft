@@ -77,7 +77,6 @@ export function coversWholeLines(value: string, parts: readonly string[]): boole
 
 const CURRENT_WORDS = '至今|迄今|仍在職|在職中|現職|現在|目前|present|now|current|today';
 export const CURRENT = new RegExp(String.raw`^(?:${CURRENT_WORDS})$`, 'iu');
-const YEAR = /(?:19|20)\d{2}/u;
 const MONTHS = 'jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec';
 const DATE_FORMATS = [
   String.raw`(?:19|20)\d{2}(?:[./\-年]\d{1,2}月?(?:[./\-]\d{1,2}日?)?)?年?`,
@@ -86,6 +85,8 @@ const DATE_FORMATS = [
   String.raw`(?:${MONTHS})[a-z]*\.?,?(?:19|20)\d{2}`,
 ];
 const DATE = new RegExp(String.raw`^(?:${DATE_FORMATS.join('|')})$`, 'iu');
+/** 引用行裡有與日期驗證相同格式的年份（西元、民國；codex 審查 3）。 */
+const HAS_DATE = new RegExp(String.raw`(?<!\d)(?:${DATE_FORMATS.join('|')})(?!\d)`, 'iu');
 
 /** 開始或結束日期的值是年份或年月格式（「100人」「3年」不算）。 */
 export function isDateValue(value: string): boolean {
@@ -93,13 +94,13 @@ export function isDateValue(value: string): boolean {
 }
 
 /**
- * 「至今」類字眼的出處：引用行要有數字年份，且字眼緊接在區間分隔符（~ - – — 至 to）後，
+ * 「至今」類字眼的出處：引用行要有年份（西元或民國，與日期驗證同格式），且字眼緊接在區間分隔符（~ - – — 至 to）後，
  * 或自己獨占一欄（Tab 分隔）／一行；「目前負責…」「I now lead…」都不算。
  */
 export function currentWordGrounded(word: string, parts: readonly string[]): boolean {
   const key = normalizeForMatch(word).toLowerCase();
   const texts = parts.map((p) => p.normalize('NFKC'));
-  if (!texts.some((t) => YEAR.test(t))) return false;
+  if (!texts.some((t) => HAS_DATE.test(normalizeForMatch(t)))) return false;
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
   const afterRange = new RegExp(String.raw`(?:[~\-–—至]|\bto)\s*${escaped}(?![A-Za-z])`, 'iu');
   return texts.some(

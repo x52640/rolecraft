@@ -105,6 +105,70 @@ export function isPersonalLabel(label: string): boolean {
   return words.some((w) => ASCII_WORDS.has(w));
 }
 
+/** 嚴格辨識時可以伴隨關鍵字出現的修飾字（「聯絡電話」「Mobile Phone」「E-mail Address」）。 */
+const CJK_FILLERS = [
+  '號碼',
+  '帳號',
+  '日期',
+  '方式',
+  '資訊',
+  '狀況',
+  '行動',
+  '住家',
+  '戶籍',
+  '現居',
+];
+const ASCII_FILLERS = new Set([
+  'number',
+  'no',
+  'id',
+  'personal',
+  'home',
+  'work',
+  'office',
+  'primary',
+  'current',
+  'mailing',
+  'full',
+  'first',
+  'last',
+  'english',
+  'chinese',
+  'info',
+  'information',
+  'details',
+  'date',
+  'of',
+  'account',
+  'url',
+]);
+const ASCII_KEYWORDS = new Set([...ASCII_WORDS, 'name', 'line']);
+const CJK_STRICT = new RegExp(`^(?:${[...CJK_KEYWORDS, ...CJK_FILLERS].join('|')})+$`, 'u');
+
+/**
+ * 嚴格的個資標籤（codex 審查 2）：整個標籤只由關鍵字與修飾字組成，且至少有一個關鍵字。
+ * 單獨一行沒有冒號時用這個判斷，「Mobile Developer」「GitHub Actions」「通訊軟體開發」不算。
+ */
+export function isStrictPersonalLabel(label: string): boolean {
+  if (!isPersonalLabel(label)) return false;
+  const parts =
+    label
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/e-mail/gu, 'email')
+      .match(/[a-z]+|[^\p{ASCII}\p{P}\s]+/gu) ?? [];
+  let keyword = false;
+  for (const part of parts) {
+    if (/^[a-z]+$/u.test(part)) {
+      if (ASCII_KEYWORDS.has(part)) keyword = true;
+      else if (!ASCII_FILLERS.has(part)) return false;
+    } else if (CJK_STRICT.test(part)) {
+      if (CJK_KEYWORDS.some((k) => part.includes(k))) keyword = true;
+    } else return false;
+  }
+  return keyword;
+}
+
 /** 這個標籤的值是姓名（抽到的值一律加入遮蔽集合）。 */
 export function isNameLabel(label: string): boolean {
   const key = compact(label);
@@ -144,6 +208,7 @@ export function personalLabelLine(line: string): LabelLine | null {
 
 /**
  * 整行只有個資標籤（「E-mail：」「LINE ID」或雙欄「姓名⇥電話」）：回傳各欄標籤，值在下一行。
+ * 會連下一行一起移除，所以用嚴格辨識（codex 審查 2）。
  */
 export function labelOnlyLine(line: string): string[] | null {
   const segments = line
@@ -157,5 +222,5 @@ export function labelOnlyLine(line: string): string[] | null {
     .filter((s) => normalizeForMatch(s) !== '');
   // 「地址：台北」這種冒號後有值的不算（交給 personalLabelLine）
   if (segments.length === 0 || segments.some((s) => /[:：]/u.test(s))) return null;
-  return segments.every(isPersonalLabel) ? segments : null;
+  return segments.every(isStrictPersonalLabel) ? segments : null;
 }

@@ -16,19 +16,21 @@ export interface MappedText {
   readonly end: readonly number[];
 }
 
+/** 字素叢集（基底字＋後面的組合記號、韓文字母序列）要一起正規化，分解式重音才會合成（codex 審查 1）。 */
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
 export function nfkcMapped(original: string): MappedText {
   let text = '';
   const start: number[] = [];
   const end: number[] = [];
-  let at = 0;
-  for (const char of original) {
-    const normalized = char.normalize('NFKC');
+  for (const { segment, index } of GRAPHEMES.segment(original)) {
+    const normalized = segment.normalize('NFKC');
+    // 叢集內所有正規化字元都對應整個原文叢集，片段邊界不會切在叢集中間
     for (let i = 0; i < normalized.length; i += 1) {
-      start.push(at);
-      end.push(at + char.length);
+      start.push(index);
+      end.push(index + segment.length);
     }
     text += normalized;
-    at += char.length;
   }
   return { text, start, end };
 }

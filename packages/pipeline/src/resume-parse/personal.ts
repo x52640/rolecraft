@@ -8,7 +8,7 @@
  */
 import type { ImportDraftField } from '@rolecraft/contracts';
 
-import { isNameLabel, labelOnlyLine, personalLabelLine } from './labels.ts';
+import { isNameLabel, isStrictPersonalLabel, labelOnlyLine, personalLabelLine } from './labels.ts';
 import { createRedactor, type Secret } from './redact.ts';
 import { headingKey, isSectionHeading, normalizeForMatch } from './text.ts';
 import type { ResumeParseInputs, SentLine } from './types.ts';
@@ -122,6 +122,11 @@ function split(inputs: ResumeParseInputs) {
       }
       if (labelLine) {
         if (labelLine.value === '') {
+          // 值在下一行、會連下一行一起移除：標籤要嚴格辨識（「Mobile Developer：」照送，codex 審查 2）
+          if (!isStrictPersonalLabel(labelLine.label)) {
+            kept.push({ pageNumber: page.pageNumber, lineIndex, original });
+            return;
+          }
           pending = [labelLine.label];
           return;
         }

@@ -101,7 +101,8 @@ npm run verify
 
 - 最後完成：首次實作（pipeline resume-parse、helper import.ai_parse／ai_status、編輯器自動整理與退路、規格）；頁首姓名去標語；main.ts 接上 AI 整理服務（協調者擴充 write_paths 後另一個 commit）；第二輪：104 改用規則（擁有者改裁定 #16）、個資遮蔽 8 項與捏造檢查 4 項修正
 - 已通過驗證：worktree `npm run verify` 綠（見完成結果「第二輪」）；第二輪新增的 15 項回歸測試換回舊實作全部失敗；全程假 provider
-- 下一步：協調者派 worker 修「codex 審查待修」各項（先重現，重現不了就記錄理由不修）；修完 codex review 修正 diff
+- codex 審查待修 3 項已修（先寫測試重現，3 項都重現；見完成結果「codex 審查項修正」）
+- 下一步：協調者對本次修正 diff 跑 codex review
 - Blocker：無
 
 ## 完成結果
@@ -128,3 +129,12 @@ npm run verify
 - verify：Vitest 3460 通過、13 略過。
 - 回歸測試：pipeline 12 項（個資 7＋捏造 4，第 4 項英文名由 helper 測試驗）＋helper 1 項＋編輯器 2 項（104 不自動呼叫、按鈕確認）；換回舊實作 15 項全部失敗。
 - 保守選擇（待裁定）：中文個資標籤限 8 字內（「負責與客戶聯絡：…」這類 8 字內內文仍會被當成個資行移除，寧可少送）；頁首英文名只認中文名後 1～3 個大寫開頭英文字（「王小明 Product Manager」也會被遮蔽，換回原文後不影響預填）；描述同一條的換行續行可接成一段，但不能只取某行的一部分。
+
+### codex 審查項修正（2026-10-12）
+
+- 3 項都先以測試重現（`resume-parse/review-fixes.test.ts`，修正前 4 個案例失敗）再修：
+  1. 個資：`text.ts` `nfkcMapped` 改以字素叢集（`Intl.Segmenter`）為單位做 NFKC，分解式重音（`Jose\u0301`）會合成後再比對；叢集內每個正規化字元都對應整個原文叢集，遮蔽範圍不會切在叢集中間，佔位字換回與原文一字不差。姓名清單與內文的組合／分解式任意搭配都遮蔽。
+  2. `labels.ts` 新增 `isStrictPersonalLabel`：整個標籤只能由關鍵字與修飾字（號碼、帳號、行動；number、id、home、address 類）組成且至少一個關鍵字。`labelOnlyLine` 與 `personal.ts`「標籤：（值在下一行）」都改用嚴格辨識，`Mobile Developer`、`GitHub Actions`、`通訊軟體開發`（含結尾冒號）與下一行照送；`Mobile Phone`、`E-mail Address`、`聯絡電話`、`LINE ID` 仍連下一行移除。
+  3. `match.ts` `currentWordGrounded` 的年份判斷改用與 `isDateValue` 同一組 `DATE_FORMATS`（`HAS_DATE`），`民國110年7月～至今` 得 `current: true`。
+- verify：Vitest 3527 通過、13 略過。
+- 殘餘（未在本次範圍）：同一行「標籤⇥值」「標籤：值」仍用寬鬆辨識（例：「GitHub Actions：CI 自動化」整行當個資移除，寧可少送、不外洩）。
