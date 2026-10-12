@@ -1,0 +1,100 @@
+---
+id: P1-T063
+phase: 1
+status: blocked
+depends_on: ["P1-T061"]
+specs: ["evidence-model.md", "bridge.md", "providers.md", "sources-and-authorization.md", "runtime-and-budget.md", "architecture.md"]
+track: helper
+primary_repo: rolecraft
+write_paths: ["docs/specs/evidence-model.md", "docs/specs/bridge.md", "packages/contracts/src/bridge/", "packages/contracts/src/entities/project-evidence.ts", "packages/contracts/src/index.ts", "packages/pipeline/src/projects/", "packages/pipeline/src/prompts/", "packages/pipeline/src/index.ts", "apps/helper/src/handlers/claims/", "apps/helper/src/handlers/analysis/", "apps/helper/src/handlers/registry.ts", "apps/helper/src/handlers/registry.test.ts", "apps/helper/src/handlers/services.ts", "apps/helper/src/handlers/contract-drift.test.ts", "apps/helper/src/main.ts", "apps/helper/src/main.test.ts", "apps/helper/src/bridge/__fixtures__/editor-requests.ts", "packages/storage/src/repositories/", "packages/storage/src/index.ts", "packages/storage/src/migrations/", "packages/storage/src/migrate.test.ts", "apps/editor/src/pages/claims/", "apps/editor/src/pages/projects/", "apps/editor/src/bridge/", "docs/adr/0006-contracts-interim-fields.md"]
+contract_change: additive
+expected_commit: "feat(P1-T063): AI 建議專案分組、使用者確認建立，重新分析自動歸入"
+---
+
+# AI 建議專案分組、使用者確認建立，重新分析自動歸入
+
+## 目標
+
+D23：目前沒有任何流程建立 ProjectEvidence。本 Task 讓 AI 依文件摘要建議怎麼分專案，使用者確認（可改名、合併、拆開）後才建立；之後重新分析產出的新事實項自動歸入其文件所屬專案。
+
+## 範圍
+
+### 包含
+
+- evidence-model.md、bridge.md 先寫規則（引用 D23），再改 contracts（只做相加）
+- 分組建議（pipeline `packages/pipeline/src/projects/`＋prompt）：
+  - 輸入只有已授權文件的全域摘要（`document_summaries`）與文件在授權資料夾內的相對名稱；不送絕對路徑、不送原文（R4）。外部內容是資料不是指令，prompt 要照既有 analysis prompt 的隔離寫法
+  - 輸出驗證：只接受已知文件 ID，每份文件至多屬一組；不合格整份不採用。不能分的文件留在「未分組」
+  - 執行走 providers 既有的訂閱檢查包裝（R5、R6），用 P1-T058 保存的選定模型；未選定或不可用回對應失敗、不呼叫模型。若同步回應可能超過橋接逾時，照 `analysis.start`／`analysis.status` 的模式做成背景工作
+  - 只由使用者按按鈕觸發，不自動執行
+- 建議要使用者確認才建立專案。使用者在確認前可以改名、取消某組、把文件移到別組。確認後：
+  - 建立 ProjectEvidence 並記住專案包含哪些文件（存法自定：可相加欄位或另建表，寫進規則）
+  - 事實項歸屬：所有來源文件都在同一專案 → 歸入；跨多個專案或沒有來源片段 → 留在未歸專案
+  - 已經歸入其他專案的事實項不搬動
+- 確認後的整理操作：改名、合併兩個專案、把事實項移到另一專案或移回未歸專案、刪除專案（事實項回到未歸專案，事實項本身不刪）。專案摘要欄位維持空字串（D23：這次不由 AI 填）
+- 重新分析自動歸入：`commitUnit` 在同一交易把新事實項依上面的歸屬規則歸入（P1-T060 的交易，不另開寫入）；既有事實項不搬動
+- 編輯器：
+  - 專案頁或事實項頁（選一個並寫進規則）放「建議專案分組」按鈕，顯示建議、可編輯、確認
+  - 事實項頁可對事實項選「移到專案…」，專案可改名、合併、刪除
+  - P1-T061 的未歸專案清單在建立或移動後同步更新
+- 測試一律用假 provider，不呼叫真實 CLI
+
+### 不包含
+
+- AI 撰寫專案摘要、目的、使用對象、成果（D23 排除）
+- 跨專案事實項的拆分
+
+## 工作區與 Context
+
+### 必讀入口
+
+- `plan.md` D23
+- P1-T022、T023、T060、T061 完成結果
+- `packages/pipeline/src/analysis/`（`summary.ts`、`runner.ts` 開頭註解）、`packages/pipeline/src/prompts/analysis-prompt.ts`
+- `apps/helper/src/handlers/analysis/`（`flow.ts`、`commit.ts`、`launch.ts`）
+- specs 欄位列的 spec
+
+### 不應載入
+
+- `Spec.md`、`docs/spec-discussions/`
+
+### 驗證命令
+
+```bash
+npm run verify
+```
+
+## 實作要求
+
+- 高風險（R1、R4、R5、R6），收官前跑對抗驗證
+- 協調者例外允許本 Task 改 contracts、分派表、`handlers/services.ts`、`main.ts`（worker 規則 10、11 對本 Task 不適用）
+- 遵守 `docs/specs/architecture.md`（單檔 300 行、相依方向）；helper 原始碼 R7 靜態掃描不放寬
+
+## 驗證
+
+### 自動驗證
+
+- 建議：假 provider 回合法分組 → 顯示建議、未建立任何專案；回不合法（未知文件 ID、同文件兩組、注入指令）→ 不採用；未選模型 → 不呼叫模型
+- 確認：建立專案、事實項依規則歸入，跨專案的留在未歸專案；改名、合併、移動、刪除後 `claims.list`／`claims.list_unassigned` 正確
+- 重新分析：新事實項自動歸入，既有手動搬過的不動；commitUnit 失敗整筆回滾、不留半套歸屬
+- 撤銷授權後的文件不出現在建議輸入
+
+### 手動驗證
+
+- 擁有者用自己的資料夾跑一次（需擁有者，併 P1-T032）
+
+## 完成定義
+
+- [ ] 「包含」各項完成
+- [ ] `npm run verify` 綠
+- [ ] 中斷／接手紀錄與完成結果已回填
+
+## 中斷／接手紀錄
+
+- 最後完成：
+- 已通過驗證：
+- 下一步：
+- Blocker：等 P1-T061（未歸專案清單）
+
+## 完成結果
+
