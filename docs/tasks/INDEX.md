@@ -72,6 +72,8 @@
 | [P1-T063](P1-T063-project-grouping.md) | AI 建議專案分組、使用者確認建立，重新分析自動歸入 | done | 1 | helper | P1-T061 |
 | [P1-T064](P1-T064-application-intro.md) | 針對職缺產生 300 字內投遞自介 | done | 1 | helper | P1-T060、P1-T062 |
 | [P1-T065](P1-T065-multipage-disorder-check.md) | 104 履歷 PDF 匯入：多頁誤判讀取順序、部首相似字 | done | 1 | resume-import | P1-T009 |
+| [P1-T066](P1-T066-resume-import-104-layout.md) | 104 履歷 PDF 版面辨識 | in_progress | 1 | resume-import | P1-T065 |
+| [P1-T067](P1-T067-import-page-layout.md) | 匯入頁版面重整 | in_progress | 1 | editor | P1-T020 |
 
 ## 依賴清單
 
@@ -99,7 +101,7 @@
 - P1-T017：P1-T015 → P1-T018
 - P1-T018：P1-T017、P1-T014 → P1-T031
 - P1-T019：P1-T016、P1-T014、P1-T041 → P1-T024
-- P1-T020：P1-T009、P1-T016、P1-T014、P1-T041 → P1-T032、P1-T043
+- P1-T020：P1-T009、P1-T016、P1-T014、P1-T041 → P1-T032、P1-T043、P1-T067
 - P1-T021：P1-T008、P1-T016、P1-T014、P1-T041 → P1-T032、P1-T043
 - P1-T022：P1-T002、P1-T003、P1-T004、P1-T005、P1-T012、P1-T008 → P1-T023、P1-T024
 - P1-T023：P1-T022、P1-T016 → P1-T025、P1-T032
@@ -144,4 +146,6 @@
 - P1-T062：P1-T058 → P1-T064
 - P1-T063：P1-T061 → —
 - P1-T064：P1-T060、P1-T062 → —
-- P1-T065：P1-T009 → —
+- P1-T065：P1-T009 → P1-T066
+- P1-T066：P1-T065 → —
+- P1-T067：P1-T020 → —

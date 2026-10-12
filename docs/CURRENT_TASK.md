@@ -5,7 +5,8 @@
 <!-- index:start -->
 ## 進行中
 
-- 無
+- P1-T066 104 履歷 PDF 版面辨識（`docs/tasks/P1-T066-resume-import-104-layout.md`）
+- P1-T067 匯入頁版面重整（`docs/tasks/P1-T067-import-page-layout.md`）
 
 ## ready
 
@@ -43,6 +44,7 @@
   9. 選取器放在 `packages/sources/src/picker/`（helper 原始碼禁子程序）；選到非 PDF 回 internal_error（P1-T043）。
   10. 否決事實項／刪素材時回傳保留的已投遞版本數需改 contracts（P1-T023、T028）；投遞狀態是否固定選項（T028）。
   11. 多份 Profile 用哪份；匯出版本未存 Profile 印出內容的結構化快照（P1-T020、T040）。
+  12. 履歷 PDF 解析用 104 專屬版面規則，不用 AI 解析（不耗額度、不送聯絡方式等個資）；其他人力銀行版面仍走通用規則（P1-T066）。求職條件、語文能力、自傳、專案成就沒有 Profile 欄位，只留在原文預覽。
 - 協調者擴充過 write_paths 的 Task：T019～T021、T023～T025、T028～T030、T040、T044、T046、T047（服務組裝、修正所需），理由記在各 commit。
 
 ## 擁有者已裁定（2026-10-11，已實作）
