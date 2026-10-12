@@ -10,6 +10,8 @@ export interface ClaimsService {
   listProjects(): Promise<ProjectEvidence[]>;
   /** 專案不存在回 null；已刪除（否決）的事實項不列出。 */
   listClaims(projectId: string): Promise<Claim[] | null>;
+  /** 未歸專案（不在任何專案 claimIds 裡）的事實項，依建立順序；已刪除的不列出（D23）。 */
+  listUnassigned(): Promise<Claim[]>;
   getClaim(claimId: string): Promise<Claim | null>;
   /**
    * 確認事實項（R1、D14）：確認時間由服務決定，記錄確認當下的文字。

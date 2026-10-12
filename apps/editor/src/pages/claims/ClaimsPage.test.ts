@@ -65,6 +65,8 @@ function fakeHelper(claims: Claim[] = [FEATURE, ROLE, REVIEW], fail = false) {
           });
         case 'claims.list':
           return Promise.resolve({ ok: true, claims });
+        case 'claims.list_unassigned':
+          return Promise.resolve({ ok: true, claims: [] });
         default:
           return Promise.resolve({ ok: true });
       }
@@ -285,6 +287,7 @@ describe('<ClaimsPage />', () => {
             projects: [{ id: 'p1', name: 'RoleCraft', summary: '', claimIds: [] }],
           });
         }
+        if (req.op === 'claims.list_unassigned') return Promise.resolve({ ok: true, claims: [] });
         lists += 1;
         return Promise.resolve({ ok: true, claims: lists === 1 ? [] : [ROLE] });
       },

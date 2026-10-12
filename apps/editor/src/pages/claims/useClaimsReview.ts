@@ -22,6 +22,9 @@ function confirmPayload(claim: Claim, choice: CompletionChoice) {
 
 const errorOf = (failure: BridgeFailure) => failure.error.message;
 
+/** 選單上「未歸專案」的值（D23）。專案 ID 不會是空字串，不會撞到。 */
+export const UNASSIGNED = '';
+
 /**
  * 事實項頁的資料與動作。每次寫入後都從 helper 重新讀取，畫面只顯示 helper 回來的狀態；
  * 確認時間由 helper 決定（R1、D14）。
@@ -35,7 +38,7 @@ export function useClaimsReview() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  // 目前選的專案：讀取回來時比對，丟掉已切走的專案的回應，避免舊清單蓋掉新清單
+  // 目前選的專案（或 UNASSIGNED）：讀取回來時比對，丟掉已切走的回應，避免舊清單蓋掉新清單
   const currentProject = useRef<string | null>(null);
   // 分析（P1-T060）在這頁開著時跑完：重新讀專案與目前專案的事實項
   const [generation, setGeneration] = useState(0);
@@ -44,15 +47,22 @@ export function useClaimsReview() {
 
   useEffect(() => {
     let live = true;
-    void bridge.send({ op: 'claims.list_projects', payload: {} }).then((res) => {
+    void Promise.all([
+      bridge.send({ op: 'claims.list_projects', payload: {} }),
+      bridge.send({ op: 'claims.list_unassigned', payload: {} }),
+    ]).then(([res, unassigned]) => {
       if (!live) return;
       setProjects(
         res.ok
           ? { state: 'ready', value: res.projects }
           : { state: 'error', message: errorOf(res) },
       );
-      const first = res.ok ? res.projects[0] : undefined;
-      if (first) setProjectId((current) => current ?? first.id);
+      if (!res.ok) return;
+      // 還沒選：有未歸專案的事實項或沒有專案時顯示未歸專案，否則第一個專案（D23）
+      const first = res.projects[0];
+      const hasUnassigned = unassigned.ok && unassigned.claims.length > 0;
+      const fallback = hasUnassigned || !first ? UNASSIGNED : first.id;
+      setProjectId((current) => current ?? fallback);
     });
     return () => {
       live = false;
@@ -61,7 +71,10 @@ export function useClaimsReview() {
 
   const reload = useCallback(
     async (id: string) => {
-      const res = await bridge.send({ op: 'claims.list', payload: { projectId: id } });
+      const res =
+        id === UNASSIGNED
+          ? await bridge.send({ op: 'claims.list_unassigned', payload: {} })
+          : await bridge.send({ op: 'claims.list', payload: { projectId: id } });
       if (currentProject.current !== id) return;
       setClaims(
         res.ok ? { state: 'ready', value: res.claims } : { state: 'error', message: errorOf(res) },

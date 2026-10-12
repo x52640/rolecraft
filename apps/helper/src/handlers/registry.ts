@@ -15,6 +15,7 @@ import { claimsConfirm } from './claims/confirm.ts';
 import { claimsGet } from './claims/get.ts';
 import { claimsListProjects } from './claims/list-projects.ts';
 import { claimsList } from './claims/list.ts';
+import { claimsListUnassigned } from './claims/list-unassigned.ts';
 import { claimsReject } from './claims/reject.ts';
 import { claimsUpdate } from './claims/update.ts';
 import { exportCreate } from './export/create.ts';
@@ -92,6 +93,7 @@ const RAW_HANDLERS: HandlerTable = {
   'claims.confirm': claimsConfirm,
   'claims.update': claimsUpdate,
   'claims.reject': claimsReject,
+  'claims.list_unassigned': claimsListUnassigned,
   'resume.generate': resumeGenerate,
   'resume.list': resumeList,
   'resume.get': resumeGet,

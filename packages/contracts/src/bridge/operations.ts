@@ -51,6 +51,7 @@ export const BridgeOperation = z.enum([
   'claims.confirm',
   'claims.update',
   'claims.reject',
+  'claims.list_unassigned', // 未歸專案的事實項（D23、P1-T061）
   // resume：逐段對照與匯出前檢查（P1-T025）
   'resume.generate',
   'resume.list',

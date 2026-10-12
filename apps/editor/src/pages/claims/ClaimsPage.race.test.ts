@@ -53,6 +53,7 @@ describe('<ClaimsPage /> 競態與失敗處理', () => {
         if (req.op === 'claims.list_projects') {
           return Promise.resolve({ ok: true, projects: PROJECTS });
         }
+        if (req.op === 'claims.list_unassigned') return Promise.resolve({ ok: true, claims: [] });
         if (req.op === 'claims.list' && req.payload.projectId === 'p1') {
           p1Calls += 1;
           // 第一次讀甲專案：先卡住，等乙專案顯示後才回來
@@ -81,6 +82,7 @@ describe('<ClaimsPage /> 競態與失敗處理', () => {
         if (req.op === 'claims.list_projects') {
           return Promise.resolve({ ok: true, projects: [PROJECTS[0]] });
         }
+        if (req.op === 'claims.list_unassigned') return Promise.resolve({ ok: true, claims: [] });
         if (req.op === 'claims.list') {
           return Promise.resolve({ ok: true, claims: [claimOf('c1', '負責後端')] });
         }
@@ -112,6 +114,7 @@ describe('<ClaimsPage /> 競態與失敗處理', () => {
         if (req.op === 'claims.list_projects') {
           return Promise.resolve({ ok: true, projects: [PROJECTS[0]] });
         }
+        if (req.op === 'claims.list_unassigned') return Promise.resolve({ ok: true, claims: [] });
         if (req.op === 'claims.list') {
           return Promise.resolve({ ok: true, claims: [claimOf('c1', '負責後端')] });
         }
@@ -136,6 +139,7 @@ describe('<ClaimsPage /> 競態與失敗處理', () => {
         if (req.op === 'claims.list_projects') {
           return Promise.resolve({ ok: true, projects: [PROJECTS[0]] });
         }
+        if (req.op === 'claims.list_unassigned') return Promise.resolve({ ok: true, claims: [] });
         if (req.op === 'claims.list') {
           return Promise.resolve({ ok: true, claims: [claimOf('c1', '負責後端')] });
         }

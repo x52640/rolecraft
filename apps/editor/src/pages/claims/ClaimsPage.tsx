@@ -1,13 +1,17 @@
 import type { Claim } from '@rolecraft/contracts';
 
 import { ClaimCard } from './ClaimCard.tsx';
-import { useClaimsReview } from './useClaimsReview.ts';
+import { UNASSIGNED, useClaimsReview } from './useClaimsReview.ts';
 import './claims.css';
 
 type Review = ReturnType<typeof useClaimsReview>;
 
 function ClaimList({ review, claims }: { review: Review; claims: readonly Claim[] }) {
-  if (claims.length === 0) return <p>這個專案還沒有事實項。</p>;
+  if (claims.length === 0) {
+    return (
+      <p>{review.projectId === UNASSIGNED ? '沒有未歸專案的事實項。' : '這個專案還沒有事實項。'}</p>
+    );
+  }
   const selectedCount = claims.filter(
     (c) => review.selected.has(c.id) && c.reviewStatus === 'normal',
   ).length;
@@ -58,9 +62,11 @@ export function ClaimsPage() {
       {projects.state === 'loading' ? <p>讀取專案中…</p> : null}
       {projects.state === 'error' ? <p role="alert">無法讀取專案：{projects.message}</p> : null}
       {projects.state === 'ready' && projects.value.length === 0 ? (
-        <p>還沒有任何專案。先到「匯入」加入專案資料夾並完成分析。</p>
+        <p>
+          還沒有任何專案。分析出的事實項會先列在「未歸專案」，一樣可以逐項確認；還沒分析的話，先到「匯入」加入專案資料夾並完成分析。
+        </p>
       ) : null}
-      {projects.state === 'ready' && projects.value.length > 0 ? (
+      {projects.state === 'ready' ? (
         <label className="claims-project">
           專案
           <select
@@ -68,6 +74,7 @@ export function ClaimsPage() {
             disabled={review.busy}
             onChange={(e) => review.setProjectId(e.target.value)}
           >
+            <option value={UNASSIGNED}>未歸專案</option>
             {projects.value.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}

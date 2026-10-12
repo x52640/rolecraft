@@ -33,6 +33,11 @@ export const CLAIMS_SCHEMAS = {
     request: bridgeOp('claims.list', z.strictObject({ projectId: OpaqueId })),
     response: withFailure(z.strictObject({ ok: z.literal(true), claims: z.array(Claim) })),
   },
+  /** 列出未歸專案的事實項（D23）：不在任何專案 claimIds 裡、未刪除；依建立順序。 */
+  'claims.list_unassigned': {
+    request: bridgeOp('claims.list_unassigned', EmptyPayload),
+    response: withFailure(z.strictObject({ ok: z.literal(true), claims: z.array(Claim) })),
+  },
   'claims.get': {
     request: bridgeOp('claims.get', ClaimRef),
     response: withFailure(z.strictObject({ ok: z.literal(true), claim: Claim })),

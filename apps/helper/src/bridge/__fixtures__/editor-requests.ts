@@ -78,6 +78,7 @@ export const editorRequests = {
   },
   'claims.update': { op: 'claims.update', payload: { claimId: ID, text: '完成登入功能' } },
   'claims.reject': { op: 'claims.reject', payload: { claimId: ID } },
+  'claims.list_unassigned': { op: 'claims.list_unassigned', payload: {} },
   'resume.generate': { op: 'resume.generate', payload: { jobSnapshotId: ID } },
   'resume.list': { op: 'resume.list', payload: { jobSnapshotId: ID } },
   'resume.get': { op: 'resume.get', payload: { resumeVersionId: ID } },

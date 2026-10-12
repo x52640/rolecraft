@@ -93,6 +93,17 @@ export function createClaimsService(options: ClaimsServiceOptions): ClaimsServic
       return Promise.resolve(found);
     },
 
+    listUnassigned() {
+      // 同一交易讀專案與事實項，避免讀到一半被歸入專案或否決而前後不一致
+      return Promise.resolve(
+        transaction(db, () => {
+          const assigned = new Set(projects.list().flatMap((p) => p.claimIds));
+          // claims.list() 依建立順序；否決（D19）會刪掉事實項列，所以已刪除的不會出現
+          return claims.list().filter((claim) => !assigned.has(claim.id));
+        }),
+      );
+    },
+
     getClaim: (claimId) => Promise.resolve(claims.get(claimId)),
 
     confirm(payload) {
