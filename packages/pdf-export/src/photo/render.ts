@@ -10,6 +10,11 @@ import { PhotoProcessError } from './errors.ts';
 export interface RenderRequest {
   /** 原始照片的 data URI（image/jpeg 或 image/png） */
   readonly dataUri: string;
+  /** 檔頭讀到的尺寸（inspectPhotoSource）：Chrome 解碼前比對，不符就拒絕（第二道防線） */
+  readonly expectedWidth: number;
+  readonly expectedHeight: number;
+  /** 像素上限：Chrome 讀到的尺寸超過就拒絕，不解碼 */
+  readonly maxPixels: number;
   readonly maxEdge: number;
   readonly quality: number;
   readonly thumbnailEdge: number;
@@ -47,9 +52,22 @@ const PAGE_HTML =
 /** 在頁面內執行的程式（字串：本套件不載入 DOM 型別）。 */
 const PAGE_SCRIPT = `async (req) => {
   const img = new Image();
-  img.src = req.dataUri;
+  try {
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = req.dataUri;
+    });
+  } catch { return { error: 'decode' }; }
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  if (!w || !h) return { error: 'decode' };
+  // 解碼前比對：Chrome 看到的尺寸必須等於檔頭檢查讀到的（允許 EXIF 方向轉 90 度），且不超過上限
+  if (w * h > req.maxPixels) return { error: 'too_large' };
+  const same = (w === req.expectedWidth && h === req.expectedHeight)
+    || (w === req.expectedHeight && h === req.expectedWidth);
+  if (!same) return { error: 'size_mismatch' };
   try { await img.decode(); } catch { return { error: 'decode' }; }
-  if (!img.naturalWidth || !img.naturalHeight) return { error: 'decode' };
   const draw = (source, sw, sh, maxEdge, quality) => {
     const scale = Math.min(1, maxEdge / Math.max(sw, sh));
     const width = Math.max(1, Math.round(sw * scale));
@@ -76,7 +94,8 @@ interface PageImage extends RenderedImage {
   readonly prefix: string;
 }
 
-type PageResult = { error: 'decode' } | { photo: PageImage; thumbnail: PageImage };
+type PageResult =
+  { error: 'decode' | 'too_large' | 'size_mismatch' } | { photo: PageImage; thumbnail: PageImage };
 
 function checked(image: PageImage): RenderedImage {
   if (image.prefix !== 'data:image/jpeg;base64') {
@@ -97,7 +116,13 @@ async function renderIn(browser: Browser, request: RenderRequest, timeoutMs: num
   const result = (await page.evaluate(
     `(${PAGE_SCRIPT})(${JSON.stringify(request)})`,
   )) as PageResult;
-  if ('error' in result) throw new PhotoProcessError('undecodable', '照片無法解讀');
+  if ('error' in result) {
+    if (result.error === 'too_large') throw new PhotoProcessError('too_large', '照片像素過多');
+    if (result.error === 'size_mismatch') {
+      throw new PhotoProcessError('undecodable', '照片實際尺寸與檔頭不符');
+    }
+    throw new PhotoProcessError('undecodable', '照片無法解讀');
+  }
   return { photo: checked(result.photo), thumbnail: checked(result.thumbnail) };
 }
 

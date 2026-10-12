@@ -89,6 +89,38 @@ export function makeJpeg(options: JpegOptions): Uint8Array {
   );
 }
 
+/**
+ * 對抗審查重現（P1-T083）：SOI 後插一個不帶長度的標記（RST0 `FFD0` 或 TEM `FF01`），
+ * 誤把它當帶長度段落的解析器會讀下一段的標記當長度往後跳；在跳到的位置（真 EOI 之後）放假的 SOF。
+ * 解碼器（libjpeg／Chrome）只把它當 2 位元組標記，看到的是真的 SOF。
+ */
+export function smuggleFakeSof(
+  real: Uint8Array,
+  fake: { width: number; height: number },
+  standalone = 0xd0,
+): Uint8Array {
+  const head = concat(Uint8Array.from([0xff, 0xd8, 0xff, standalone]), real.subarray(2));
+  const landing = 4 + (((head[4] ?? 0) << 8) | (head[5] ?? 0));
+  const { width, height } = fake;
+  const sof = segment(0xc0, [
+    8,
+    height >> 8,
+    height & 0xff,
+    width >> 8,
+    width & 0xff,
+    1,
+    1,
+    0x11,
+    0,
+  ]);
+  return concat(
+    head,
+    new Uint8Array(Math.max(0, landing - head.length)),
+    sof,
+    Uint8Array.from([0xff, 0xd9]),
+  );
+}
+
 /** 位元組裡是否出現某段文字（latin1 比對）。 */
 export function containsText(bytes: Uint8Array, text: string): boolean {
   return Buffer.from(bytes).includes(Buffer.from(text, 'utf8'));

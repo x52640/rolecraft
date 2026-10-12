@@ -204,6 +204,32 @@ describe('photo.get', () => {
     expect(thumbnail).toHaveBeenCalledTimes(1);
   });
 
+  it('重產舊照片縮圖途中 pick 換了新照片：快取不被舊照片蓋回（對抗審查）', async () => {
+    const big = { width: 4000, height: 3000 };
+    const { db, fileStore, service } = setup({}, leakyRenderer(big, 300 * 1024));
+    await service.pick?.();
+    const real = createPhotoProcessor({ renderer: leakyRenderer(big) });
+    let finish: (bytes: Uint8Array) => void = () => undefined;
+    const processor: PhotoProcessor = {
+      process: (source, options) => real.process(source, options),
+      thumbnail: () => new Promise((resolve) => (finish = resolve)),
+    };
+    const restarted = createPhotoService({
+      db,
+      fileStore,
+      processor,
+      picker: () => Promise.resolve({ bytes: SOURCE }),
+    });
+    const pending = restarted.get?.();
+    const picked = await restarted.pick?.();
+    if (picked?.status !== 'selected') throw new Error('應選定');
+    finish(new TextEncoder().encode('stale-thumbnail'));
+    await pending;
+    const view = await restarted.get?.();
+    expect(view?.photo.id).toBe(picked.view.photo.id);
+    expect(view?.thumbnail.base64).toBe(picked.view.thumbnail.base64);
+  });
+
   it('重產縮圖失敗：照實丟出（不偽造）', async () => {
     const big = { width: 4000, height: 3000 };
     const { db, fileStore, service } = setup({}, leakyRenderer(big, 300 * 1024));

@@ -82,9 +82,9 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：2026-10-12 工作者實作完成（單一 commit，未 push）
-- 已通過驗證：`npm run verify` 綠（Vitest 4050 通過、15 略過）；`RUN_CHROME=1` 真實 Chrome 重繪測試 2 案例本機通過
-- 下一步：協調者收官；高風險，收官前跑對抗驗證（E3）與 codex review；擁有者／協調者用真實選取器選一張照片（手動驗證）
+- 最後完成：2026-10-12 主體 commit 已併入 main；codex review 無發現；對抗驗證屬實 1 項＋小瑕疵 1 項已修（`fix(P1-T083)` commit）
+- 已通過驗證：`npm run verify` 綠（Vitest 4056 通過、19 略過）；`RUN_CHROME=1` 照片測試 27 案例本機通過（含真實 Chrome 夾帶假 SOF 4 案例）
+- 下一步：協調者收官；擁有者／協調者用真實選取器選一張照片（手動驗證）
 - Blocker：無
 
 ## 完成結果
@@ -97,3 +97,5 @@ npm run verify
 - 保守選擇：(1) 不只信 Chrome：重繪後自己再清除＋驗證，任何殘留就拒絕；(2) 連帶內嵌縮圖的 JFIF 與 ICC（APP2）也丟掉（色彩以 sRGB 為準）；(3) 原始照片像素上限 8,000 萬；(4) 失敗訊息是固定文字，不含路徑或內容；(5) 處理完已過期限也不寫入（客戶端可能已放棄）
 - 殘餘：(1) busy 只在照片選取器之間互斥，跟 `import.pick_pdf`、`sources.pick_folders` 的選取視窗不共用旗標（各自既有實作如此，改要動 write_paths 外）；(2) 縮圖不存資料庫（P1-T082 未存），重啟後第一次 `photo.get` 對大於 256 KiB 的照片會開一次 Chrome（20 秒上限，小於一般逾時 30 秒）；(3) `RUN_CHROME=1` 只在本機跑過一次，verify 不跑；(4) 真實選取器手動驗證待做
 - 規格落差：resume-output 說「解碼與重新編碼必須在選取器的處理餘裕內完成」，但客戶端逾時從送出算起、對話框本身最多 5 分鐘，helper 不知道送出時間；以「收到請求起算選取器逾時減 10 秒」當期限，處理上限 45 秒（< 60 秒餘裕）
+- 對抗審查修正（`fix(P1-T083)`）：(1) `source.ts` `jpegSize` 把不帶長度的標記（RST0–7、TEM）當帶長度段落往後跳，可在跳到處藏假 16×16 SOF 讓檢查通過、Chrome 實際解超過上限的巨圖。改為這些標記只前進 2 位元組，走到 SOS 為止；第二個 SOF、不認得的標記、SOS 前沒有 SOF、結構截斷一律拒絕。(2) 第二道防線：`RenderRequest` 加 `expectedWidth`／`expectedHeight`／`maxPixels`，Chrome 頁面在 `img.onload` 後、`decode()` 前比對實際尺寸（允許 EXIF 方向轉 90 度）與上限，超過回 `too_large`、不符回 `undecodable`；`thumbnail()` 用 `inspectJpeg` 讀已存照片尺寸。(3) `photo-service.ts` `thumbnailOf`：重產途中照片被更換／刪除時不寫快取（寫前比對目前照片 ID），避免舊縮圖蓋回。新測試：`photo/source.test.ts`（5）、`photo/smuggle.chrome.test.ts`（4，`RUN_CHROME=1`：用 Chrome 做 9000×9000 真 JPEG 夾帶假 SOF，兩道防線各自擋下；上限內夾帶檔處理成真實尺寸）、`photo-service.test.ts` 加 1 案例；三者都先重現失敗再修
+- 殘餘補充：`img.onload` 時 Chrome 是否已完整解碼未查證（第一道防線先擋，第二道是縱深防禦）

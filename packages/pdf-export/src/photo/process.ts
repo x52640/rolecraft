@@ -9,7 +9,7 @@ import { findChrome } from '../render/chrome.ts';
 import { PhotoProcessError } from './errors.ts';
 import { inspectJpeg, metadataProblems, stripJpegMetadata } from './jpeg.ts';
 import { createChromePhotoRenderer, type PhotoRenderer, type RenderedImage } from './render.ts';
-import { inspectPhotoSource } from './source.ts';
+import { inspectPhotoSource, PHOTO_SOURCE_MAX_PIXELS } from './source.ts';
 
 /** 存檔用 JPEG 品質。 */
 export const PHOTO_JPEG_QUALITY = 0.9;
@@ -100,11 +100,19 @@ export function createPhotoProcessor(deps: PhotoProcessorDeps = {}): PhotoProces
     return createChromePhotoRenderer(executablePath);
   }
 
-  async function render(mime: string, bytes: Uint8Array, timeoutMs: number) {
+  async function render(
+    mime: string,
+    bytes: Uint8Array,
+    expected: { width: number; height: number },
+    timeoutMs: number,
+  ) {
     return withDeadline(timeoutMs, async (signal) =>
       (await renderer())(
         {
           dataUri: dataUri(mime, bytes),
+          expectedWidth: expected.width,
+          expectedHeight: expected.height,
+          maxPixels: PHOTO_SOURCE_MAX_PIXELS,
           maxEdge: PHOTO_MAX_EDGE_PX,
           quality: PHOTO_JPEG_QUALITY,
           thumbnailEdge: PHOTO_THUMBNAIL_EDGE_PX,
@@ -118,7 +126,7 @@ export function createPhotoProcessor(deps: PhotoProcessorDeps = {}): PhotoProces
   return {
     async process(source, { timeoutMs }) {
       const info = inspectPhotoSource(source);
-      const rendered = await render(`image/${info.format}`, source, timeoutMs);
+      const rendered = await render(`image/${info.format}`, source, info, timeoutMs);
       return {
         content: finalizeJpeg(rendered.photo, PHOTO_MAX_EDGE_PX),
         width: rendered.photo.width,
@@ -127,7 +135,7 @@ export function createPhotoProcessor(deps: PhotoProcessorDeps = {}): PhotoProces
       };
     },
     async thumbnail(stored, { timeoutMs }) {
-      const rendered = await render('image/jpeg', stored, timeoutMs);
+      const rendered = await render('image/jpeg', stored, inspectJpeg(stored), timeoutMs);
       return finalizeThumbnail(rendered.thumbnail);
     },
   };

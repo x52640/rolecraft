@@ -89,7 +89,8 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       stored.content.length <= PHOTO_THUMBNAIL_MAX_BYTES
         ? stored.content
         : await processor.thumbnail(stored.content, { timeoutMs: PHOTO_THUMBNAIL_TIMEOUT_MS });
-    cached = { id: stored.photo.id, thumbnail };
+    // 重產途中照片可能已被更換或刪除：只在它仍是目前照片時寫快取，不讓舊照片蓋回
+    if (photos.get()?.photo.id === stored.photo.id) cached = { id: stored.photo.id, thumbnail };
     return thumbnail;
   }
 
