@@ -27,6 +27,18 @@ export function lastSegmentOf(value: string): string {
 }
 
 const isAbsolute = (value: string) => /^([/\\]|[A-Za-z]:)/u.test(value);
+const hasDrive = (value: string) => /^[A-Za-z]:/u.test(value);
+
+/**
+ * 授權資料夾正規化後的段落；無效（空、相對起點、`..` 超出起點）回傳 null。
+ * POSIX 根目錄 `/` 正規化後是空陣列，但是合法的資料夾（磁碟根 `C:\` 本來就有一段 `C:`）。
+ */
+function folderSegments(folderPath: string): string[] | null {
+  const folder = normalizedSegments(folderPath);
+  if (folder === null) return null;
+  if (folder.length > 0) return folder;
+  return /^[/\\]/u.test(folderPath) ? folder : null;
+}
 
 /**
  * 正規化成原樣的路徑段（不修剪、不截斷，判斷位置用）：去掉空段與 `.`，`..` 往上一段。
@@ -44,19 +56,21 @@ function normalizedSegments(value: string): string[] | null {
 }
 
 /**
- * 文件在授權資料夾內的相對路徑（以 `/` 連接）。先用正規化、未清理的完整路徑判斷是否在資料夾內
+ * 文件在授權資料夾內的相對路徑（以 `/` 連接；資料夾是根目錄 `/` 時同樣適用）。先用正規化、未清理的完整路徑判斷是否在資料夾內
  * （相對路徑視為相對於資料夾），在內才去掉資料夾前綴；不在內只給原始路徑最後一段（是 `.`／`..` 就不給），不洩漏資料夾外的目錄名。
  * 判斷完才對結果做顯示用清理；段數過多時只留最後幾段、前面以「…」表示。
  */
 export function relativeNameOf(documentPath: string, folderPath: string): string {
-  const folder = normalizedSegments(folderPath);
+  const folder = folderSegments(folderPath);
   const full = normalizedSegments(
     isAbsolute(documentPath) ? documentPath : `${folderPath}/${documentPath}`,
   );
+  // POSIX 根目錄下不收磁碟路徑（`C:\…` 不在 `/` 內）
+  const driveMismatch = folder?.length === 0 && hasDrive(documentPath);
   const inside =
     folder !== null &&
     full !== null &&
-    folder.length > 0 &&
+    !driveMismatch &&
     full.length > folder.length &&
     folder.every((part, i) => full[i] === part);
   let segments =

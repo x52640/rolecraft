@@ -100,6 +100,22 @@ describe('事實項來源名稱', () => {
     expect(relativeNameOf('a/./../b/c.md', root)).toBe('b/c.md');
   });
 
+  it('授權資料夾是根目錄時照樣給相對路徑，`..` 超出起點仍判不在內（回歸：codex 複審）', () => {
+    expect(relativeNameOf('/2023/週報.md', '/')).toBe('2023/週報.md');
+    expect(relativeNameOf('/2024/週報.md', '/')).toBe('2024/週報.md');
+    expect(relativeNameOf('2023/週報.md', '/')).toBe('2023/週報.md');
+    expect(relativeNameOf('/a/../b/c.md', '/')).toBe('b/c.md');
+    expect(relativeNameOf('/../private/report.md', '/')).toBe('report.md');
+    expect(relativeNameOf('../private/report.md', '/')).toBe('report.md');
+    expect(relativeNameOf('C:\\2023\\週報.md', 'C:\\')).toBe('2023/週報.md');
+    expect(relativeNameOf('D:\\private\\report.md', 'C:\\')).toBe('report.md');
+    // 磁碟路徑不算在 POSIX 根目錄內
+    expect(relativeNameOf('C:\\private\\report.md', '/')).toBe('report.md');
+    // 無效（空或相對起點）的資料夾不當成根目錄
+    expect(relativeNameOf('/private/report.md', '')).toBe('report.md');
+    expect(relativeNameOf('/private/report.md', '.')).toBe('report.md');
+  });
+
   it('資料夾名稱只取最後一段；控制字元換掉、空的給「（未命名）」', () => {
     expect(lastSegmentOf('/Users/me/proj/')).toBe('proj');
     expect(lastSegmentOf('C:\\work\\notes')).toBe('notes');

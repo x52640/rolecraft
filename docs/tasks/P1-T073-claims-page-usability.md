@@ -78,7 +78,8 @@ npm run verify
 
 ## 中斷／接手紀錄
 
-- 最後完成：codex 審查 1 項（source-names.ts 先用正規化、未截斷的完整路徑判斷是否在資料夾內，再清理顯示名）；先寫測試重現三種輸入皆屬實
+- 最後完成：codex 複審 1 項（授權資料夾是根目錄 `/` 時所有文件被判成資料夾外、同名檔撞名）；先寫測試重現屬實後修正
+- 先前完成：codex 審查 1 項（source-names.ts 先用正規化、未截斷的完整路徑判斷是否在資料夾內，再清理顯示名）；先寫測試重現三種輸入皆屬實
 - 已通過驗證：`npm run verify` 綠（工作者 worktree）
 - 下一步：協調者 codex review 本修正 diff
 - Blocker：無
@@ -96,3 +97,6 @@ npm run verify
 - 重現：root `/Users/me/project` 時 `/Users/me/project /private/report.md`、`/Users/me/project/../private/report.md`，以及前 100 字相同的不同目錄，舊實作都顯示 `private/report.md`（露出資料夾外目錄名）；三種皆屬實。
 - 修正：`helper/handlers/claims/source-names.ts` 新增 `normalizedSegments`（原樣分段、`..` 往上、超出起點視為無法判斷）；`relativeNameOf` 先用它比對資料夾與文件完整路徑（相對路徑視為相對於資料夾），在內才去前綴後清理顯示；不在內只給原始路徑最後一段（`.`／`..` 給「（未命名）」）。相對路徑 `../../x/y.md` 走出資料夾，改為只顯示 `y.md`（原測試預期同步修改）。
 - 測試：`source-names.test.ts`「先用完整路徑判斷在不在資料夾內：資料夾外的目錄名不出現（回歸：codex 審查）」，換回舊實作會失敗。
+- 複審重現：授權資料夾是 `/`（選取服務允許）時 `normalizedSegments('/')` 是空陣列，舊條件 `folder.length > 0` 讓所有文件都判成資料夾外，`2023/週報.md` 與 `2024/週報.md` 都顯示 `週報.md`；屬實。
+- 複審修正：新增 `folderSegments`，把合法的 POSIX 根目錄（`/`、`\`，正規化後為空陣列）與無效資料夾（空字串、相對起點、`..` 超出起點）分開；根目錄下照樣給相對路徑。磁碟根 `C:\` 正規化後有一段 `C:`，原本就正確。POSIX 根目錄下的磁碟路徑（`C:\…`）判不在內；`..` 超出起點仍判不在內，只給檔名。
+- 複審測試：`source-names.test.ts`「授權資料夾是根目錄時照樣給相對路徑，`..` 超出起點仍判不在內（回歸：codex 複審）」，換回舊實作會失敗。
